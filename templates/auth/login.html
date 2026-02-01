@@ -1,0 +1,65 @@
+{% extends 'layouts/base_auth.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Iniciar Sesión - TR4CKING{% endblock %}
+
+{% block auth_title %}Bienvenido{% endblock %}
+{% block auth_subtitle %}Ingresa tus credenciales para continuar{% endblock %}
+
+{% block auth_content %}
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="mb-4">
+        <label for="id_username" class="form-label">Usuario</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-person"></i></span>
+            <input type="text" name="username" id="id_username"
+                class="form-control {% if form.username.errors %}is-invalid{% endif %}" placeholder="Ingresa tu usuario"
+                value="{{ form.username.value|default:'' }}" autofocus required>
+        </div>
+        {% if form.username.errors %}
+        <div class="invalid-feedback d-block">{{ form.username.errors.0 }}</div>
+        {% endif %}
+    </div>
+
+    <div class="mb-4">
+        <label for="id_password" class="form-label">Contraseña</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input type="password" name="password" id="id_password"
+                class="form-control {% if form.password.errors %}is-invalid{% endif %}"
+                placeholder="Ingresa tu contraseña" required>
+        </div>
+        {% if form.password.errors %}
+        <div class="invalid-feedback d-block">{{ form.password.errors.0 }}</div>
+        {% endif %}
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-4">
+        <i class="alert-icon bi bi-exclamation-triangle-fill"></i>
+        <div class="alert-content">{{ form.non_field_errors.0 }}</div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="remember" name="remember">
+            <label class="form-check-label" for="remember">Recordarme</label>
+        </div>
+        <a href="#" class="text-primary text-decoration-none">¿Olvidaste tu contraseña?</a>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100">
+        <i class="bi bi-box-arrow-in-right me-2"></i>
+        Iniciar Sesión
+    </button>
+</form>
+{% endblock %}
+
+{% block auth_footer %}
+<div class="auth-footer">
+    ¿No tienes una cuenta? <a href="#">Contacta al administrador</a>
+</div>
+{% endblock %}

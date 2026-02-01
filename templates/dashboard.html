@@ -1,0 +1,254 @@
+{% extends 'layouts/base_tabler.html' %}
+{% block title %}Dashboard - TR4CKING{% endblock %}
+
+{% block title_content %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row row-deck row-cards mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-primary text-white avatar">
+                            <i class="bi bi-people-fill"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.personas|default:0 }} Personas
+                        </div>
+                        <div class="text-muted">
+                            <i class="bi bi-arrow-up text-green"></i> Registrados
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar">
+                            <i class="bi bi-bus-front-fill"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.buses|default:0 }} Buses
+                        </div>
+                        <div class="text-muted">
+                            <i class="bi bi-check-circle text-green"></i> Activos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-yellow text-white avatar">
+                            <i class="bi bi-building"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.empresas|default:0 }} Empresas
+                        </div>
+                        <div class="text-muted">
+                            <i class="bi bi-graph-up text-green"></i> Operando
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-red text-white avatar">
+                            <i class="bi bi-map-fill"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.itinerarios|default:0 }} Itinerarios
+                        </div>
+                        <div class="text-muted">
+                            <i class="bi bi-calendar-check text-green"></i> Activos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions & System Info -->
+<div class="row row-deck row-cards mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Acciones Rápidas</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'users:persona_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-person-plus-fill d-block p-2 fs-2"></i>
+                            Nueva Persona
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'fleet:bus_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-bus-front d-block p-2 fs-2"></i>
+                            Nuevo Bus
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'fleet:empresa_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-building-add d-block p-2 fs-2"></i>
+                            Nueva Empresa
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-map d-block p-2 fs-2"></i>
+                            Nuevo Itinerario
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'fleet:parada_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-sign-stop d-block p-2 fs-2"></i>
+                            Nueva Parada
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <a href="{% url 'users:localidad_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-geo-alt d-block p-2 fs-2"></i>
+                            Nueva Localidad
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Información del Sistema</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Versión</div>
+                        <div class="datagrid-content">1.0.0</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Django</div>
+                        <div class="datagrid-content">6.0.1</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Base de Datos</div>
+                        <div class="datagrid-content">SQLite</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Usuario Actual</div>
+                        <div class="datagrid-content">{{ user.username }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Rol</div>
+                        <div class="datagrid-content">
+                            {% if user.is_superuser %}
+                            <span class="status status-azure">Admin</span>
+                            {% else %}
+                            <span class="status status-green">Usuario</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="col-12">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Últimas Personas Registradas</h3>
+            <div class="card-actions">
+                <a href="{% url 'users:persona_list' %}" class="btn btn-sm btn-outline-primary">Ver Todas</a>
+            </div>
+        </div>
+        
+        {% if ultimas_personas %}
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                    <tr>
+                        <th class="w-1">Cédula</th>
+                        <th>Nombre Completo</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for persona in ultimas_personas %}
+                    <tr>
+                        <td><span class="text-muted">{{ persona.cedula }}</span></td>
+                        <td>
+                            <a href="#" class="text-reset" tabindex="-1">{{ persona.nombre_completo }}</a>
+                        </td>
+                        <td>
+                            {{ persona.telefono }}
+                        </td>
+                        <td>
+                            {{ persona.email|default:"-" }}
+                        </td>
+                        <td>
+                            {% if persona.es_empleado %}
+                            <span class="badge bg-blue text-blue-fg">Empleado</span>
+                            {% endif %}
+                            {% if persona.es_cliente %}
+                            <span class="badge bg-green text-green-fg">Cliente</span>
+                            {% endif %}
+                            {% if persona.es_pasajero %}
+                            <span class="badge bg-secondary text-secondary-fg">Pasajero</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">
+            <div class="empty-icon">
+                <i class="bi bi-people h1"></i>
+            </div>
+            <p class="empty-title">No hay personas registradas</p>
+            <p class="empty-subtitle text-secondary">
+                Comienza agregando la primera persona al sistema.
+            </p>
+            <div class="empty-action">
+                <a href="{% url 'users:persona_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-2"></i>
+                    Agregar Persona
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

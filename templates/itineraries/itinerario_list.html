@@ -1,0 +1,203 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}Itinerarios - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<span class="current">Itinerarios</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">Itinerarios</h1>
+        <p class="page-subtitle mb-0">Gestiona rutas y recorridos de buses</p>
+    </div>
+    <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i>
+        Nuevo Itinerario
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-lg-6">
+                <label class="form-label">Buscar</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Nombre o ruta..."
+                        value="{{ search }}">
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label">Estado</label>
+                <select name="activo" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="1" {% if activo_filter == '1' %}selected{% endif %}>Activos</option>
+                    <option value="0" {% if activo_filter == '0' %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-funnel me-2"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="card">
+    <div class="card-body p-0">
+        {% if itinerarios %}
+        <div class="table-wrapper">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Ruta</th>
+                        <th>Distancia</th>
+                        <th>Duración</th>
+                        <th>Paradas</th>
+                        <th>Días</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for itinerario in itinerarios %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}"
+                                class="text-decoration-none text-primary fw-medium">
+                                <i class="bi bi-map me-1"></i>
+                                {{ itinerario.nombre }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if itinerario.ruta %}
+                            <span class="badge badge-secondary">{{ itinerario.ruta }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if itinerario.distancia_total_km %}
+                            {{ itinerario.distancia_total_km }} km
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if itinerario.duracion_estimada_hs %}
+                            {{ itinerario.duracion_estimada_hs }} hs
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-primary">{{ itinerario.num_paradas }}</span>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ itinerario.dias_operacion_texto }}</small>
+                        </td>
+                        <td>
+                            {% if itinerario.activo %}
+                            <span class="badge badge-success">Activo</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="table-actions justify-content-end">
+                                <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm" title="Ver">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'itineraries:itinerario_delete' itinerario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-secondary">
+                Mostrando {{ page_obj.start_index }}-{{ page_obj.end_index }} de {{ page_obj.paginator.count }}
+            </span>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">{{
+                            num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-map"></i>
+            </div>
+            <h5 class="empty-state-title">No se encontraron itinerarios</h5>
+            <p class="empty-state-text">
+                {% if search or activo_filter %}
+                No hay resultados para los filtros aplicados.
+                {% else %}
+                Comienza agregando el primer itinerario al sistema.
+                {% endif %}
+            </p>
+            {% if not search and not activo_filter %}
+            <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>
+                Agregar Itinerario
+            </a>
+            {% else %}
+            <a href="{% url 'itineraries:itinerario_list' %}" class="btn btn-secondary">
+                <i class="bi bi-x-lg me-2"></i>
+                Limpiar Filtros
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

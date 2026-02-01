@@ -1,0 +1,91 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}Asientos - {{ bus.placa }} - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_list' %}">Buses</a>
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_detail' bus.pk %}">{{ bus.placa }}</a>
+<span class="separator">/</span>
+<span class="current">Asientos</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">Asientos de {{ bus.placa }}</h1>
+        <p class="page-subtitle mb-0">{{ bus.marca }} {{ bus.modelo }} - {{ bus.asientos.count }}/{{
+            bus.capacidad_asientos }} configurados</p>
+    </div>
+    <a href="{% url 'fleet:asiento_create' bus.pk %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i>
+        Nuevo Asiento
+    </a>
+</div>
+
+{% if asientos %}
+<!-- Asientos por piso -->
+{% regroup asientos by piso as pisos %}
+{% for piso in pisos %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-layers me-2"></i>
+            Piso {{ piso.grouper }}
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for asiento in piso.list %}
+            <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                <div class="card h-100 text-center" style="border: 2px solid var(--border-color);">
+                    <div class="card-body p-3">
+                        <div class="fw-bold fs-4 mb-1">{{ asiento.numero_asiento }}</div>
+                        <small class="text-muted d-block mb-2">{{ asiento.get_tipo_asiento_display }}</small>
+                        <div class="d-flex justify-content-center gap-1">
+                            <a href="{% url 'fleet:asiento_update' asiento.pk %}" class="btn btn-ghost btn-icon btn-sm"
+                                title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'fleet:asiento_delete' asiento.pk %}"
+                                class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-grid-3x3"></i>
+            </div>
+            <h5 class="empty-state-title">No hay asientos configurados</h5>
+            <p class="empty-state-text">
+                Este bus necesita {{ bus.capacidad_asientos }} asientos. Comienza a configurarlos.
+            </p>
+            <a href="{% url 'fleet:asiento_create' bus.pk %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>
+                Agregar Asiento
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{% url 'fleet:bus_detail' bus.pk %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver al Bus
+    </a>
+</div>
+{% endblock %}

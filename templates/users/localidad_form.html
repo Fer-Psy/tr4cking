@@ -1,0 +1,69 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Editar{% else %}Nueva{% endif %} Localidad - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    <a href="{% url 'users:localidad_list' %}" class="text-secondary">Configuración Geográfica</a>
+                </div>
+                <h2 class="page-title">
+                    {% if object %}Editar Localidad{% else %}Nueva Localidad{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-title">Datos Geográficos</div>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% crispy form %}
+
+                    <div class="form-footer d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if object %}Guardar{% else %}Crear{% endif %}
+                        </button>
+                        <a href="{% url 'users:localidad_list' %}" class="btn btn-secondary text-reset">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-map me-2"></i>
+                    Información
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary mb-3">
+                    Define las localidades que se usarán como puntos de origen, destino o paradas intermedias en los itinerarios.
+                </p>
+                <div class="alert alert-info">
+                    <h4 class="alert-title">Coordenadas GPS</h4>
+                    <div class="text-secondary">
+                        Las coordenadas (Latitud/Longitud) son opcionales pero recomendadas para visualizar las rutas en el mapa.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,195 @@
+/* ============================================
+   TR4CKING - CUSTOM TABLER OVERRIDES
+   "Square & High Contrast" Theme
+   ============================================ */
+
+:root {
+    /* 1. SQUARE AESTHETIC */
+    --tblr-border-radius: 0px !important;
+    --tblr-border-radius-sm: 0px !important;
+    --tblr-border-radius-lg: 0px !important;
+    --tblr-btn-border-radius: 0px !important;
+
+    /* 2. HIGH CONTRAST PALETTE */
+    /* Deep Corporate Blue */
+    --tblr-primary: #004085;
+    /* Navy Blue Base */
+    --tblr-primary-rgb: 0, 64, 133;
+
+    /* Vibrant Accents */
+    --tblr-success: #008a00;
+    /* Sharp green */
+    --tblr-danger: #d90000;
+    /* Sharp red */
+    --tblr-warning: #ffbf00;
+    /* Sharp yellow/orange */
+
+    /* Typography Overrides */
+    --tblr-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 3. SIDEBAR CUSTOMIZATION (Desktop) */
+.navbar-vertical.navbar-dark {
+    background-color: #002147 !important;
+    /* Oxford Navy Blue */
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.navbar-vertical .navbar-brand {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background-color: transparent !important;
+    /* Transparent background as requested */
+}
+
+/* Sidebar Links */
+.navbar-vertical .nav-link {
+    padding: 0.75rem 1rem;
+    color: rgba(255, 255, 255, 0.8) !important;
+    border-left: 3px solid transparent;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.navbar-vertical .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff !important;
+}
+
+.navbar-vertical .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.15);
+    /* Slightly lighter navy/transparent */
+    color: #ffffff !important;
+    border-left-color: #4dabf7;
+    /* Lighter blue accent */
+}
+
+/* Icon Spacing */
+.navbar-vertical .nav-link-icon {
+    color: rgba(255, 255, 255, 0.6);
+    margin-right: 0.75rem;
+    /* Increased spacing between icon and text */
+}
+
+.navbar-vertical .nav-link.active .nav-link-icon {
+    color: #ffffff;
+}
+
+/* Sidebar Headers */
+.nav-item.header {
+    padding: 1.5rem 1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* 4. CARD CLARITY */
+.card {
+    border: 1px solid #e2e8f0;
+    box-shadow: none !important;
+    /* Flatter look */
+    border-radius: 0 !important;
+}
+
+.card-header {
+    background-color: white;
+    /* Clean header */
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.5rem;
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* 5. NORMALIZED BUTTONS */
+.btn {
+    font-weight: 500;
+    /* Less heavy */
+    text-transform: none;
+    /* Normal case */
+    letter-spacing: normal;
+    font-size: 0.875rem;
+    /* Standard */
+    border-radius: 0 !important;
+    padding: 0.5rem 1rem;
+    /* Standard padding */
+}
+
+/* Fix for large filter/cancel buttons mentioned */
+.card-body .btn-secondary {
+    background-color: #f1f5f9;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.card-body .btn-secondary:hover {
+    background-color: #e2e8f0;
+    color: #1e293b;
+}
+
+/* 6. TABLE & DROPDOWN FIXES */
+.table thead th {
+    background: #f8fafc;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+/* 
+   RESPONSIVE TABLE STRATEGY:
+   1. On Mobile (<992px): We MUST have scroll. Dropdowns must be handled carefully (Tabler usually handles this).
+   2. On Desktop (>=992px): We allow overflow to be visible so dropdowns can pop out of the table container.
+*/
+
+.table-responsive {
+    /* Default for mobile: Enable Scroll */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 992px) {
+    .table-responsive {
+        /* Desktop: Allow dropdowns to pop out */
+        overflow: visible;
+    }
+}
+
+/* Ensure Dropdowns are always on top */
+.dropdown-menu {
+    z-index: 1050;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e2e8f0;
+    border-radius: 0;
+}
+
+
+/* 7. STAT CARDS */
+.card-sm .card-body {
+    padding: 1.5rem;
+}
+
+.avatar {
+    border-radius: 4px !important;
+    /* Slight radius for icons looks better than 0px inside cards, but user asked for square. Keeping 0px per request or maybe slight? User said square theme */
+    border-radius: 0 !important;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 991.98px) {
+    .navbar-brand {
+        padding: 0.5rem 0;
+    }
+
+    .navbar-vertical.navbar-dark {
+        background-color: #002147 !important;
+    }
+}

@@ -1,0 +1,117 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}{{ localidad.nombre }} - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Detalle de Localidad
+                </div>
+                <h2 class="page-title">
+                    {{ localidad.nombre }}
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'users:localidad_update' localidad.pk %}" class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="bi bi-pencil"></i>
+                        Editar
+                    </a>
+                    <a href="{% url 'users:localidad_update' localidad.pk %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'users:localidad_delete' localidad.pk %}" class="btn btn-danger d-none d-sm-inline-block">
+                        <i class="bi bi-trash"></i>
+                        Eliminar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">Información Geográfica</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Nombre</div>
+                        <div class="datagrid-content">{{ localidad.nombre }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Coordenadas</div>
+                        <div class="datagrid-content">
+                            {% if localidad.latitud and localidad.longitud %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <code>{{ localidad.latitud }}, {{ localidad.longitud }}</code>
+                                    <a href="https://www.google.com/maps?q={{ localidad.latitud }},{{ localidad.longitud }}" target="_blank" class="btn btn-icon btn-ghost-secondary btn-sm" title="Ver en mapa">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                </div>
+                            {% else %}
+                            <span class="text-secondary italic">No especificadas</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">
+                    Paradas Asociadas
+                </h3>
+            </div>
+            <div class="list-group list-group-flush">
+                {% if localidad.parada_set.exists %}
+                    {% for parada in localidad.parada_set.all %}
+                    <div class="list-group-item">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="avatar bg-blue-lt">
+                                    <i class="bi bi-sign-stop"></i>
+                                </span>
+                            </div>
+                            <div class="col text-truncate">
+                                <a href="{% url 'fleet:parada_detail' parada.pk %}" class="text-reset d-block">{{ parada.nombre }}</a>
+                                <div class="d-block text-secondary text-truncate mt-n1">
+                                    {{ parada.direccion }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="list-group-item">
+                    <div class="empty-state empty-state-sm">
+                        <div class="empty-state-icon">
+                            <i class="bi bi-sign-stop"></i>
+                        </div>
+                        <div class="text-secondary">No hay paradas registradas en esta localidad.</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'users:localidad_list' %}" class="btn btn-ghost-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver a la lista
+    </a>
+</div>
+{% endblock %}

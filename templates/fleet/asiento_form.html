@@ -1,0 +1,72 @@
+{% extends 'layouts/base_backoffice.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Asiento - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_list' %}">Buses</a>
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_detail' bus.pk %}">{{ bus.placa }}</a>
+<span class="separator">/</span>
+<a href="{% url 'fleet:asiento_list' bus.pk %}">Asientos</a>
+<span class="separator">/</span>
+<span class="current">{% if object %}Editar{% else %}Nuevo{% endif %}</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="page-title">{% if object %}Editar Asiento{% else %}Nuevo Asiento{% endif %}</h1>
+    <p class="page-subtitle">Bus: {{ bus.placa }} - {{ bus.marca }} {{ bus.modelo }}</p>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% crispy form %}
+
+                    <div class="divider"></div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'fleet:asiento_list' bus.pk %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if object %}Guardar{% else %}Crear{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Tipos de Asiento
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <strong>Cama:</strong> Asiento reclinable completo, máximo confort.
+                    </li>
+                    <li class="mb-2">
+                        <strong>Semi-Cama:</strong> Asiento reclinable parcial, buen confort.
+                    </li>
+                    <li>
+                        <strong>Convencional:</strong> Asiento estándar sin reclinación especial.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

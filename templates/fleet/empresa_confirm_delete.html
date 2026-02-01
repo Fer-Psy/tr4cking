@@ -1,0 +1,60 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}Eliminar Empresa - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:empresa_list' %}">Empresas</a>
+<span class="separator">/</span>
+<span class="current">Eliminar</span>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle"
+                        style="width: 80px; height: 80px;">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+
+                <h3 class="mb-3">¿Eliminar esta empresa?</h3>
+
+                <p class="text-secondary mb-4">
+                    Estás a punto de eliminar la empresa <strong>{{ object.nombre }}</strong>.
+                    Esta acción no se puede deshacer.
+                </p>
+
+                {% if object.buses.exists or object.paradas.exists %}
+                <div class="alert alert-warning text-start mb-4">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <strong>Atención:</strong> Esta empresa tiene
+                    {% if object.buses.exists %}{{ object.buses.count }} bus(es){% endif %}
+                    {% if object.buses.exists and object.paradas.exists %}y{% endif %}
+                    {% if object.paradas.exists %}{{ object.paradas.count }} parada(s){% endif %}
+                    asociado(s). Debes eliminarlos primero.
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'fleet:empresa_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-2"></i>
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger" {% if object.buses.exists or object.paradas.exists
+                            %}disabled{% endif %}>
+                            <i class="bi bi-trash me-2"></i>
+                            Sí, eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

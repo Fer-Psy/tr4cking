@@ -1,0 +1,170 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}{{ empresa.nombre }} - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:empresa_list' %}">Empresas</a>
+<span class="separator">/</span>
+<span class="current">{{ empresa.nombre }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">{{ empresa.nombre }}</h1>
+        <p class="page-subtitle mb-0">RUC: {{ empresa.ruc }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'fleet:empresa_update' empresa.pk %}" class="btn btn-secondary">
+            <i class="bi bi-pencil me-2"></i>
+            Editar
+        </a>
+        <a href="{% url 'fleet:empresa_delete' empresa.pk %}" class="btn btn-danger">
+            <i class="bi bi-trash me-2"></i>
+            Eliminar
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon primary">
+                <i class="bi bi-bus-front-fill"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Buses</div>
+                <div class="stat-card-value">{{ empresa.buses.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon success">
+                <i class="bi bi-sign-stop-fill"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Paradas</div>
+                <div class="stat-card-value">{{ empresa.paradas.count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Info -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información de Contacto
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Teléfono</label>
+                    <p class="mb-0">
+                        {% if empresa.telefono %}
+                        <i class="bi bi-telephone me-1"></i>
+                        <a href="tel:{{ empresa.telefono }}" class="text-decoration-none">{{ empresa.telefono }}</a>
+                        {% else %}
+                        <span class="text-muted">No especificado</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Email</label>
+                    <p class="mb-0">
+                        {% if empresa.email %}
+                        <i class="bi bi-envelope me-1"></i>
+                        <a href="mailto:{{ empresa.email }}" class="text-decoration-none">{{ empresa.email }}</a>
+                        {% else %}
+                        <span class="text-muted">No especificado</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <label class="form-label text-secondary small">Dirección Legal</label>
+                    <p class="mb-0">
+                        {% if empresa.direccion_legal %}
+                        <i class="bi bi-geo-alt me-1"></i>
+                        {{ empresa.direccion_legal }}
+                        {% else %}
+                        <span class="text-muted">No especificada</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buses -->
+    <div class="col-12 col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-bus-front me-2"></i>
+                    Buses de la Empresa
+                </h5>
+                <a href="{% url 'fleet:bus_create' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Nuevo Bus
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if empresa.buses.exists %}
+                <div class="table-wrapper">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Marca/Modelo</th>
+                                <th>Capacidad</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bus in empresa.buses.all %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'fleet:bus_detail' bus.pk %}"
+                                        class="text-decoration-none fw-medium">
+                                        {{ bus.placa }}
+                                    </a>
+                                </td>
+                                <td>{{ bus.marca }} {{ bus.modelo }}</td>
+                                <td>{{ bus.capacidad_asientos }} asientos</td>
+                                <td>
+                                    {% if bus.estado == 'activo' %}
+                                    <span class="badge badge-success">Activo</span>
+                                    {% elif bus.estado == 'mantenimiento' %}
+                                    <span class="badge badge-warning">Mantenimiento</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-bus-front mb-2" style="font-size: 2rem;"></i>
+                    <p class="mb-0">Esta empresa no tiene buses registrados.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'fleet:empresa_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver a la lista
+    </a>
+</div>
+{% endblock %}

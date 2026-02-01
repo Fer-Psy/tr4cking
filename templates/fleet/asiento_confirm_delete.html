@@ -1,0 +1,50 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}Eliminar Asiento - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_list' %}">Buses</a>
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_detail' object.bus.pk %}">{{ object.bus.placa }}</a>
+<span class="separator">/</span>
+<span class="current">Eliminar Asiento</span>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle"
+                        style="width: 80px; height: 80px;">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+
+                <h3 class="mb-3">¿Eliminar este asiento?</h3>
+
+                <p class="text-secondary mb-4">
+                    Estás a punto de eliminar el asiento <strong>#{{ object.numero_asiento }}</strong>
+                    (Piso {{ object.piso }}) del bus {{ object.bus.placa }}.
+                </p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'fleet:asiento_list' object.bus.pk %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-2"></i>
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-2"></i>
+                            Sí, eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

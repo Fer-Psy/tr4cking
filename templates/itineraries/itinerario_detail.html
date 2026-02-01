@@ -1,0 +1,177 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}{{ itinerario.nombre }} - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a>
+<span class="separator">/</span>
+<span class="current">{{ itinerario.nombre }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">{{ itinerario.nombre }}</h1>
+        <p class="page-subtitle mb-0">
+            {% if itinerario.ruta %}Ruta {{ itinerario.ruta }} - {% endif %}
+            {{ itinerario.dias_operacion_texto }}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'itineraries:detalle_create' itinerario.pk %}" class="btn btn-outline-primary">
+            <i class="bi bi-plus-lg me-2"></i>
+            Agregar Parada
+        </a>
+        <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}" class="btn btn-secondary">
+            <i class="bi bi-pencil me-2"></i>
+            Editar
+        </a>
+        <a href="{% url 'itineraries:itinerario_delete' itinerario.pk %}" class="btn btn-danger">
+            <i class="bi bi-trash me-2"></i>
+            Eliminar
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon primary">
+                <i class="bi bi-signpost-split"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Paradas</div>
+                <div class="stat-card-value">{{ itinerario.detalles.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon success">
+                <i class="bi bi-rulers"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Distancia</div>
+                <div class="stat-card-value">{{ itinerario.distancia_total_km|default:"--" }} km</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon warning">
+                <i class="bi bi-clock"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Duración</div>
+                <div class="stat-card-value">{{ itinerario.duracion_estimada_hs|default:"--" }} hs</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon {% if itinerario.activo %}success{% else %}danger{% endif %}">
+                <i class="bi bi-circle-fill"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Estado</div>
+                <div class="stat-card-value" style="font-size: var(--text-lg);">
+                    {% if itinerario.activo %}Activo{% else %}Inactivo{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Paradas del itinerario -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="bi bi-signpost-split me-2"></i>
+            Recorrido del Itinerario
+        </h5>
+        <a href="{% url 'itineraries:detalle_create' itinerario.pk %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-lg me-1"></i>Nueva Parada
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if itinerario.detalles.exists %}
+        <div class="table-wrapper">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Parada</th>
+                        <th>Localidad</th>
+                        <th>Hora Salida</th>
+                        <th>Min. desde Origen</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in itinerario.detalles.all %}
+                    <tr>
+                        <td>
+                            <span class="badge badge-primary">{{ detalle.orden }}</span>
+                        </td>
+                        <td>
+                            <strong>{{ detalle.parada.nombre }}</strong>
+                            {% if detalle.parada.es_sucursal %}
+                            <i class="bi bi-building text-muted ms-1" title="Sucursal"></i>
+                            {% endif %}
+                        </td>
+                        <td>{{ detalle.parada.localidad.nombre }}</td>
+                        <td>
+                            <i class="bi bi-clock me-1"></i>
+                            {{ detalle.hora_salida|time:"H:i" }}
+                        </td>
+                        <td>
+                            {% if detalle.minutos_desde_origen is not None %}
+                            {{ detalle.minutos_desde_origen }} min
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="table-actions justify-content-end">
+                                <a href="{% url 'itineraries:detalle_update' detalle.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'itineraries:detalle_delete' detalle.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-signpost-split"></i>
+            </div>
+            <h5 class="empty-state-title">Sin paradas configuradas</h5>
+            <p class="empty-state-text">
+                Este itinerario no tiene paradas definidas. Agrega las paradas del recorrido.
+            </p>
+            <a href="{% url 'itineraries:detalle_create' itinerario.pk %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>
+                Agregar Primera Parada
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'itineraries:itinerario_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver a la lista
+    </a>
+</div>
+{% endblock %}

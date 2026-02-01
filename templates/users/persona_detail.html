@@ -1,0 +1,157 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}{{ persona.nombre_completo }} - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Detalle de Persona
+                </div>
+                <h2 class="page-title">
+                    {{ persona.nombre_completo }}
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'users:persona_update' persona.pk %}" class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="bi bi-pencil"></i>
+                        Editar
+                    </a>
+                    <a href="{% url 'users:persona_update' persona.pk %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'users:persona_delete' persona.pk %}" class="btn btn-danger d-none d-sm-inline-block">
+                        <i class="bi bi-trash"></i>
+                        Eliminar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Main Info -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Información Personal</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Cédula</div>
+                        <div class="datagrid-content">{{ persona.cedula }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Nombre Completo</div>
+                        <div class="datagrid-content">{{ persona.nombre_completo }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Teléfono</div>
+                        <div class="datagrid-content">
+                            <a href="tel:{{ persona.telefono }}" class="text-reset">
+                                {{ persona.telefono }}
+                            </a>
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Email</div>
+                        <div class="datagrid-content">
+                            {% if persona.email %}
+                            <a href="mailto:{{ persona.email }}" class="text-reset">
+                                {{ persona.email }}
+                            </a>
+                            {% else %}
+                            <span class="text-secondary italic">No registrado</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Dirección</div>
+                        <div class="datagrid-content">
+                            {% if persona.direccion %}
+                                {{ persona.direccion }}
+                            {% else %}
+                                <span class="text-secondary italic">No registrada</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side Info -->
+    <div class="col-lg-4">
+        <!-- Roles -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Roles Asignados</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    {% if persona.es_empleado %}
+                    <span class="badge bg-blue text-blue-fg">
+                        Empleado
+                    </span>
+                    {% endif %}
+                    {% if persona.es_cliente %}
+                    <span class="badge bg-green text-green-fg">
+                        Cliente
+                    </span>
+                    {% endif %}
+                    {% if persona.es_pasajero %}
+                    <span class="badge bg-secondary text-secondary-fg">
+                        Pasajero
+                    </span>
+                    {% endif %}
+                    {% if not persona.es_empleado and not persona.es_cliente and not persona.es_pasajero %}
+                    <span class="text-secondary italic">Sin roles asignados</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- User Account -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Cuenta de Usuario</h3>
+            </div>
+            <div class="card-body">
+                {% if persona.user %}
+                <div class="mb-2">
+                    <div class="text-secondary small text-uppercase fw-bold">Usuario</div>
+                    <div class="font-weight-medium">{{ persona.user.username }}</div>
+                </div>
+                <div>
+                    <div class="text-secondary small text-uppercase fw-bold">Estado</div>
+                    {% if persona.user.is_active %}
+                    <span class="badge bg-green text-green-fg w-auto">Activo</span>
+                    {% else %}
+                    <span class="badge bg-red text-red-fg w-auto">Inactivo</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-secondary text-center py-3">
+                    <i class="bi bi-person-x fs-2 d-block mb-2"></i>
+                    Sin cuenta de usuario vinculada
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <a href="{% url 'users:persona_list' %}" class="btn btn-ghost-secondary w-100">
+                <i class="bi bi-arrow-left me-2"></i>
+                Volver a la lista
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

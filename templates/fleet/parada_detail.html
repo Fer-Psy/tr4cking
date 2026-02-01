@@ -1,0 +1,122 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}{{ parada.nombre }} - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:parada_list' %}">Paradas</a>
+<span class="separator">/</span>
+<span class="current">{{ parada.nombre }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">{{ parada.nombre }}</h1>
+        <p class="page-subtitle mb-0">{{ parada.localidad.nombre }} - {{ parada.empresa.nombre }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'fleet:parada_update' parada.pk %}" class="btn btn-secondary">
+            <i class="bi bi-pencil me-2"></i>
+            Editar
+        </a>
+        <a href="{% url 'fleet:parada_delete' parada.pk %}" class="btn btn-danger">
+            <i class="bi bi-trash me-2"></i>
+            Eliminar
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Empresa</label>
+                    <p class="mb-0 fw-medium">
+                        <a href="{% url 'fleet:empresa_detail' parada.empresa.pk %}" class="text-decoration-none">
+                            {{ parada.empresa.nombre }}
+                        </a>
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Localidad</label>
+                    <p class="mb-0">
+                        <a href="{% url 'users:localidad_detail' parada.localidad.pk %}" class="text-decoration-none">
+                            {{ parada.localidad.nombre }}
+                        </a>
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Tipo</label>
+                    <p class="mb-0">
+                        {% if parada.es_sucursal %}
+                        <span class="badge badge-primary py-2 px-3">
+                            <i class="bi bi-building me-1"></i> Sucursal
+                        </span>
+                        {% else %}
+                        <span class="badge badge-secondary py-2 px-3">
+                            <i class="bi bi-sign-stop me-1"></i> Parada
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <label class="form-label text-secondary small">Dirección</label>
+                    <p class="mb-0">
+                        {% if parada.direccion %}
+                        {{ parada.direccion }}
+                        {% else %}
+                        <span class="text-muted">No especificada</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-geo-alt me-2"></i>
+                    Ubicación
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if parada.latitud_gps and parada.longitud_gps %}
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Coordenadas GPS</label>
+                    <p class="mb-0">
+                        <code>{{ parada.latitud_gps }}, {{ parada.longitud_gps }}</code>
+                    </p>
+                </div>
+                <a href="https://www.google.com/maps?q={{ parada.latitud_gps }},{{ parada.longitud_gps }}"
+                    target="_blank" class="btn btn-outline-primary">
+                    <i class="bi bi-map me-2"></i>
+                    Ver en Google Maps
+                </a>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-geo-alt mb-2" style="font-size: 2rem;"></i>
+                    <p class="mb-0">No hay coordenadas GPS configuradas.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'fleet:parada_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver a la lista
+    </a>
+</div>
+{% endblock %}

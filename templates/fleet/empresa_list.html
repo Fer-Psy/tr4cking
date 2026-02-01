@@ -1,0 +1,172 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Empresas - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Flota de Transporte
+                </div>
+                <h2 class="page-title">
+                    Empresas
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'fleet:empresa_create' %}" class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="bi bi-plus-lg"></i>
+                        Nueva Empresa
+                    </a>
+                    <a href="{% url 'fleet:empresa_create' %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Nueva Empresa">
+                        <i class="bi bi-plus-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body border-bottom py-3">
+                <form method="get" class="d-flex flex-column flex-md-row gap-2 align-items-center">
+                    <div class="text-secondary">
+                        Mostrar
+                        <div class="d-inline-block mx-2">
+                            <input type="text" name="search" class="form-control form-control-sm" value="{{ search }}" size="25" placeholder="Nombre o RUC...">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-2 mt-2 mt-md-0 ms-md-auto">
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                            Buscar
+                        </button>
+                        {% if search %}
+                        <a href="{% url 'fleet:empresa_list' %}" class="btn btn-ghost-danger btn-sm" title="Limpiar">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+            
+            {% if empresas %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap datatable">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>RUC</th>
+                            <th>Flota</th>
+                            <th>Contacto</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for empresa in empresas %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'fleet:empresa_detail' empresa.pk %}" class="text-reset font-weight-medium">
+                                    {{ empresa.nombre }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="text-secondary">{{ empresa.ruc }}</span>
+                            </td>
+                            <td>
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-auto text-secondary">
+                                        {{ empresa.buses.count }} Buses
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if empresa.telefono %}
+                                <div class="text-secondary small">
+                                    <i class="bi bi-telephone me-1"></i> {{ empresa.telefono }}
+                                </div>
+                                {% endif %}
+                                {% if empresa.email %}
+                                <div class="text-secondary small">
+                                    <i class="bi bi-envelope me-1"></i> {{ empresa.email }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-list flex-nowrap justify-content-end">
+                                    <a href="{% url 'fleet:empresa_detail' empresa.pk %}" class="btn btn-icon btn-ghost-primary" title="Ver detalle" data-bs-toggle="tooltip">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'fleet:empresa_update' empresa.pk %}" class="btn btn-icon btn-ghost-primary" title="Editar" data-bs-toggle="tooltip">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'fleet:empresa_delete' empresa.pk %}" class="btn btn-icon btn-ghost-danger" title="Eliminar" data-bs-toggle="tooltip">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% if is_paginated %}
+            <div class="card-footer d-flex align-items-center">
+                <p class="m-0 text-secondary">
+                    Mostrando <span>{{ page_obj.start_index }}</span> a <span>{{ page_obj.end_index }}</span> de <span>{{ page_obj.paginator.count }}</span> entradas
+                </p>
+                <ul class="pagination m-0 ms-auto">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" tabindex="-1">
+                            <i class="bi bi-chevron-left"></i> prev
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} 
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">
+                            next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty">
+                <div class="empty-icon">
+                    <i class="bi bi-building h1"></i>
+                </div>
+                <p class="empty-title">No hay empresas</p>
+                <p class="empty-subtitle text-secondary">
+                    {% if search %}
+                    No se encontraron resultados para "{{ search }}".
+                    {% else %}
+                    No se han registrado empresas en el sistema.
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

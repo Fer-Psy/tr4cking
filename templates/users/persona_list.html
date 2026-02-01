@@ -1,0 +1,193 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Personas - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <!-- Page pre-title -->
+                <div class="page-pretitle">
+                    Gestión de Personas
+                </div>
+                <h2 class="page-title">
+                    Personas
+                </h2>
+            </div>
+            <!-- Page title actions -->
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'users:persona_create' %}" class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="bi bi-plus-lg"></i>
+                        Nueva Persona
+                    </a>
+                    <a href="{% url 'users:persona_create' %}" class="btn btn-primary d-sm-none btn-icon" aria-label="Nueva Persona">
+                        <i class="bi bi-plus-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body border-bottom py-3">
+                <form method="get" class="d-flex flex-column flex-md-row gap-2 align-items-center">
+                    <div class="text-secondary">
+                        Mostrar
+                        <div class="d-inline-block mx-2">
+                            <input type="text" name="search" class="form-control form-control-sm" value="{{ search }}" size="25" aria-label="Search inputs" placeholder="Buscar personas...">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-2 mt-2 mt-md-0 ms-md-auto">
+                        <select name="rol" class="form-select form-select-sm" style="width: auto;">
+                            <option value="">Todos los roles</option>
+                            <option value="empleado" {% if rol == 'empleado' %}selected{% endif %}>Empleados</option>
+                            <option value="cliente" {% if rol == 'cliente' %}selected{% endif %}>Clientes</option>
+                            <option value="pasajero" {% if rol == 'pasajero' %}selected{% endif %}>Pasajeros</option>
+                        </select>
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                            Filtrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            {% if personas %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap datatable">
+                    <thead>
+                        <tr>
+                            <th class="w-1">Cédula</th>
+                            <th>Nombre Completo</th>
+                            <th>Teléfono</th>
+                            <th>Email</th>
+                            <th>Roles</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for persona in personas %}
+                        <tr>
+                            <td><span class="text-secondary">{{ persona.cedula }}</span></td>
+                            <td>
+                                <a href="{% url 'users:persona_detail' persona.pk %}" class="text-reset" tabindex="-1">{{ persona.nombre_completo }}</a>
+                            </td>
+                            <td>
+                                {{ persona.telefono }}
+                            </td>
+                            <td>
+                                {{ persona.email|default:"-" }}
+                            </td>
+                            <td>
+                                {% if persona.es_empleado %}
+                                <span class="badge bg-blue text-blue-fg">Empleado</span>
+                                {% endif %}
+                                {% if persona.es_cliente %}
+                                <span class="badge bg-green text-green-fg">Cliente</span>
+                                {% endif %}
+                                {% if persona.es_pasajero %}
+                                <span class="badge bg-secondary text-secondary-fg">Pasajero</span>
+                                {% endif %}
+                                {% if not persona.es_empleado and not persona.es_cliente and not persona.es_pasajero %}
+                                <span class="badge bg-secondary text-secondary-fg">Sin rol</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-list flex-nowrap justify-content-end">
+                                    <a href="{% url 'users:persona_detail' persona.pk %}" class="btn btn-icon btn-ghost-primary" title="Ver detalle" data-bs-toggle="tooltip">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'users:persona_update' persona.pk %}" class="btn btn-icon btn-ghost-primary" title="Editar" data-bs-toggle="tooltip">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'users:persona_delete' persona.pk %}" class="btn btn-icon btn-ghost-danger" title="Eliminar" data-bs-toggle="tooltip">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% if is_paginated %}
+            <div class="card-footer d-flex align-items-center">
+                <p class="m-0 text-secondary">
+                    Mostrando <span>{{ page_obj.start_index }}</span> a <span>{{ page_obj.end_index }}</span> de <span>{{ page_obj.paginator.count }}</span> entradas
+                </p>
+                <ul class="pagination m-0 ms-auto">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if rol %}&rol={{ rol }}{% endif %}" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i> prev
+                        </a>
+                    </li>
+                    {% else %}
+                     <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i> prev
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} 
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if rol %}&rol={{ rol }}{% endif %}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if rol %}&rol={{ rol }}{% endif %}">
+                            next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty">
+                <div class="empty-icon">
+                    <i class="bi bi-people h1"></i>
+                </div>
+                <p class="empty-title">No hay resultados</p>
+                <p class="empty-subtitle text-secondary">
+                    {% if search or rol %}
+                    No se encontraron personas con los filtros seleccionados.
+                    {% else %}
+                    No se han registrado personas en el sistema.
+                    {% endif %}
+                </p>
+                {% if search or rol %}
+                <div class="empty-action">
+                    <a href="{% url 'users:persona_list' %}" class="btn btn-secondary">
+                        Limpiar Filtros
+                    </a>
+                </div>
+                {% else %}
+                <div class="empty-action">
+                    <a href="{% url 'users:persona_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-2"></i>
+                        Agregar Persona
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

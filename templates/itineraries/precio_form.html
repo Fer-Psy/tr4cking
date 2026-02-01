@@ -1,0 +1,69 @@
+{% extends 'layouts/base_backoffice.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Precio - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'itineraries:precio_list' %}">Precios</a>
+<span class="separator">/</span>
+<span class="current">{% if object %}Editar{% else %}Nuevo{% endif %}</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="page-title">{% if object %}Editar Precio{% else %}Nuevo Precio{% endif %}</h1>
+    <p class="page-subtitle">Define el precio de un tramo origen-destino</p>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% crispy form %}
+
+                    <div class="divider"></div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'itineraries:precio_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if object %}Guardar{% else %}Crear{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary small mb-3">
+                    Cada precio define el costo del pasaje entre dos paradas del itinerario.
+                </p>
+
+                <h6 class="fw-semibold mb-2">Tramos</h6>
+                <p class="text-secondary small mb-0">
+                    Debes crear un precio por cada combinación origen-destino. Por ejemplo, si tienes 3 paradas (A, B,
+                    C), necesitarás:
+                    <br>• A → B
+                    <br>• A → C
+                    <br>• B → C
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

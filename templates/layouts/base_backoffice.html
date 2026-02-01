@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block body %}
+<div class="app-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <!-- Brand -->
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+                <i class="bi bi-bus-front"></i>
+            </div>
+            <div class="sidebar-brand-text">TR<span>4</span>CKING</div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="sidebar-nav">
+            <!-- Main Section -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-section-title">Principal</div>
+            </div>
+            <a href="{% url 'dashboard' %}"
+                class="sidebar-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <!-- Users Section -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-section-title">Gestión de Personas</div>
+            </div>
+            <a href="{% url 'users:persona_list' %}"
+                class="sidebar-nav-item {% if 'persona' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-people-fill"></i>
+                <span>Personas</span>
+            </a>
+            <a href="{% url 'users:localidad_list' %}"
+                class="sidebar-nav-item {% if 'localidad' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-geo-alt-fill"></i>
+                <span>Localidades</span>
+            </a>
+
+            <!-- Fleet Section -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-section-title">Flota</div>
+            </div>
+            <a href="{% url 'fleet:empresa_list' %}"
+                class="sidebar-nav-item {% if 'empresa' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-building"></i>
+                <span>Empresas</span>
+            </a>
+            <a href="{% url 'fleet:parada_list' %}"
+                class="sidebar-nav-item {% if 'parada' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-sign-stop-fill"></i>
+                <span>Paradas</span>
+            </a>
+            <a href="{% url 'fleet:bus_list' %}"
+                class="sidebar-nav-item {% if 'bus' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-bus-front-fill"></i>
+                <span>Buses</span>
+            </a>
+
+            <!-- Itineraries Section -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-section-title">Itinerarios</div>
+            </div>
+            <a href="{% url 'itineraries:itinerario_list' %}"
+                class="sidebar-nav-item {% if 'itinerario' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-map-fill"></i>
+                <span>Itinerarios</span>
+            </a>
+            <a href="{% url 'itineraries:precio_list' %}"
+                class="sidebar-nav-item {% if 'precio' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                <i class="bi bi-cash-stack"></i>
+                <span>Precios</span>
+            </a>
+        </nav>
+
+        <!-- User Section -->
+        <div class="sidebar-user">
+            <div class="sidebar-user-avatar">
+                {% if user.first_name %}
+                {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                {% else %}
+                {{ user.username|slice:":2"|upper }}
+                {% endif %}
+            </div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">
+                    {% if user.first_name %}
+                    {{ user.first_name }} {{ user.last_name }}
+                    {% else %}
+                    {{ user.username }}
+                    {% endif %}
+                </div>
+                <div class="sidebar-user-role">
+                    {% if user.is_superuser %}Administrador{% else %}Usuario{% endif %}
+                </div>
+            </div>
+            <a href="{% url 'logout' %}" class="btn btn-ghost btn-icon btn-sm" title="Cerrar Sesión">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <!-- Mobile menu toggle -->
+                <button class="btn btn-ghost btn-icon d-lg-none" id="sidebarToggle">
+                    <i class="bi bi-list"></i>
+                </button>
+
+                <!-- Breadcrumb -->
+                <nav class="topbar-breadcrumb d-none d-md-flex">
+                    <a href="{% url 'dashboard' %}"><i class="bi bi-house-fill"></i></a>
+                    {% block breadcrumb %}{% endblock %}
+                </nav>
+            </div>
+
+            <div class="topbar-right">
+                <!-- Search button -->
+                <button class="topbar-btn" title="Buscar">
+                    <i class="bi bi-search"></i>
+                </button>
+
+                <!-- Notifications -->
+                <button class="topbar-btn" title="Notificaciones">
+                    <i class="bi bi-bell"></i>
+                    <span class="badge"></span>
+                </button>
+
+                <!-- Settings -->
+                <a href="{% url 'admin:index' %}" class="topbar-btn" title="Administración" target="_blank">
+                    <i class="bi bi-gear"></i>
+                </a>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div class="content-wrapper">
+            <!-- Messages -->
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="alert-icon bi 
+                        {% if message.tags == 'success' %}bi-check-circle-fill
+                        {% elif message.tags == 'danger' %}bi-exclamation-triangle-fill
+                        {% elif message.tags == 'warning' %}bi-exclamation-circle-fill
+                        {% else %}bi-info-circle-fill{% endif %}"></i>
+                <div class="alert-content">{{ message }}</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- Overlay for mobile sidebar -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Mobile sidebar toggle
+    document.getElementById('sidebarToggle')?.addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('show');
+        document.getElementById('sidebarOverlay').classList.toggle('show');
+    });
+
+    document.getElementById('sidebarOverlay')?.addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('show');
+        this.classList.remove('show');
+    });
+</script>
+{{ block.super }}
+{% endblock %}

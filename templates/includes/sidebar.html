@@ -1,0 +1,89 @@
+<aside class="navbar navbar-vertical navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <h1 class="navbar-brand">
+            <a href="{% url 'dashboard' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                <span class="text-white" style="font-size: 1.5rem; letter-spacing: -1px;">
+                    TR<span style="color: #4dabf7;">4</span>CKING
+                </span>
+            </a>
+        </h1>
+        
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+            <ul class="navbar-nav pt-lg-3">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-speedometer2"></i>
+                        </span>
+                        <span class="nav-link-title">Dashboard</span>
+                    </a>
+                </li>
+
+                <li class="nav-item header">Gestión de Personas</li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'persona' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'users:persona_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-people"></i>
+                        </span>
+                        <span class="nav-link-title">Personas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'localidad' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'users:localidad_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-geo-alt"></i>
+                        </span>
+                        <span class="nav-link-title">Localidades</span>
+                    </a>
+                </li>
+
+                <li class="nav-item header">Flota & Operaciones</li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'empresa' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'fleet:empresa_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-building"></i>
+                        </span>
+                        <span class="nav-link-title">Empresas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'bus' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'fleet:bus_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-bus-front"></i>
+                        </span>
+                        <span class="nav-link-title">Buses</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'parada' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'fleet:parada_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-sign-stop"></i>
+                        </span>
+                        <span class="nav-link-title">Paradas</span>
+                    </a>
+                </li>
+
+                <li class="nav-item header">Rutas & Tarifas</li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'itinerario' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'itineraries:itinerario_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-map"></i>
+                        </span>
+                        <span class="nav-link-title">Itinerarios</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'precio' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'itineraries:precio_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-currency-dollar"></i>
+                        </span>
+                        <span class="nav-link-title">Tabla de Precios</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</aside>

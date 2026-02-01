@@ -1,0 +1,176 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}{{ bus.placa }} - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<a href="{% url 'fleet:bus_list' %}">Buses</a>
+<span class="separator">/</span>
+<span class="current">{{ bus.placa }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">{{ bus.placa }}</h1>
+        <p class="page-subtitle mb-0">{{ bus.marca }} {{ bus.modelo }} - {{ bus.empresa.nombre }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'fleet:asiento_list' bus.pk %}" class="btn btn-outline-primary">
+            <i class="bi bi-grid-3x3 me-2"></i>
+            Gestionar Asientos
+        </a>
+        <a href="{% url 'fleet:bus_update' bus.pk %}" class="btn btn-secondary">
+            <i class="bi bi-pencil me-2"></i>
+            Editar
+        </a>
+        <a href="{% url 'fleet:bus_delete' bus.pk %}" class="btn btn-danger">
+            <i class="bi bi-trash me-2"></i>
+            Eliminar
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon primary">
+                <i class="bi bi-hash"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Pisos</div>
+                <div class="stat-card-value">{{ bus.capacidad_pisos }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon success">
+                <i class="bi bi-grid-3x3"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Capacidad</div>
+                <div class="stat-card-value">{{ bus.capacidad_asientos }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-card-icon warning">
+                <i class="bi bi-check2-square"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Configurados</div>
+                <div class="stat-card-value">{{ bus.asientos.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
+            <div
+                class="stat-card-icon {% if bus.estado == 'activo' %}success{% elif bus.estado == 'mantenimiento' %}warning{% else %}danger{% endif %}">
+                <i class="bi bi-circle-fill"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Estado</div>
+                <div class="stat-card-value" style="font-size: var(--text-lg);">
+                    {{ bus.get_estado_display }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Info -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información del Bus
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Empresa</label>
+                    <p class="mb-0 fw-medium">
+                        <a href="{% url 'fleet:empresa_detail' bus.empresa.pk %}" class="text-decoration-none">
+                            {{ bus.empresa.nombre }}
+                        </a>
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Placa</label>
+                    <p class="mb-0 fw-bold fs-5">{{ bus.placa }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Marca</label>
+                    <p class="mb-0">{{ bus.marca|default:"No especificada" }}</p>
+                </div>
+                <div>
+                    <label class="form-label text-secondary small">Modelo</label>
+                    <p class="mb-0">{{ bus.modelo|default:"No especificado" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asientos -->
+    <div class="col-12 col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-grid-3x3 me-2"></i>
+                    Asientos Configurados
+                </h5>
+                <a href="{% url 'fleet:asiento_create' bus.pk %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Nuevo
+                </a>
+            </div>
+            <div class="card-body">
+                {% if bus.asientos.exists %}
+                {% for piso in bus.asientos.values_list.distinct %}
+                {% endfor %}
+
+                <div class="d-flex flex-wrap gap-2">
+                    {% for asiento in bus.asientos.all %}
+                    <div class="text-center p-2 rounded-lg" style="min-width: 60px; background: var(--neutral-100);"
+                        title="{{ asiento.get_tipo_asiento_display }} - Piso {{ asiento.piso }}">
+                        <div class="fw-bold">{{ asiento.numero_asiento }}</div>
+                        <small class="text-muted">P{{ asiento.piso }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-4 pt-3 border-top">
+                    <small class="text-muted">
+                        <strong>Leyenda:</strong>
+                        {% for asiento in bus.asientos.all|slice:":3" %}
+                        <span class="badge badge-secondary me-1">{{ asiento.get_tipo_asiento_display }}</span>
+                        {% endfor %}
+                    </small>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-grid-3x3 mb-2" style="font-size: 2rem;"></i>
+                    <p class="mb-3">No hay asientos configurados para este bus.</p>
+                    <a href="{% url 'fleet:asiento_create' bus.pk %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i>
+                        Configurar Asientos
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'fleet:bus_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-2"></i>
+        Volver a la lista
+    </a>
+</div>
+{% endblock %}

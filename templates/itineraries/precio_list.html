@@ -1,0 +1,171 @@
+{% extends 'layouts/base_backoffice.html' %}
+
+{% block title %}Precios - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<span class="current">Precios</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">Matriz de Precios</h1>
+        <p class="page-subtitle mb-0">Gestiona los precios de pasajes por tramo</p>
+    </div>
+    <a href="{% url 'itineraries:precio_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i>
+        Nuevo Precio
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-8">
+                <label class="form-label">Filtrar por Itinerario</label>
+                <select name="itinerario" class="form-select">
+                    <option value="">Todos los itinerarios</option>
+                    {% for it in itinerarios %}
+                    <option value="{{ it.pk }}" {% if itinerario_filter == it.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ it.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-funnel me-2"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="card">
+    <div class="card-body p-0">
+        {% if precios %}
+        <div class="table-wrapper">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Itinerario</th>
+                        <th>Origen</th>
+                        <th></th>
+                        <th>Destino</th>
+                        <th class="text-end">Precio</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for precio in precios %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'itineraries:itinerario_detail' precio.itinerario.pk %}"
+                                class="text-decoration-none">
+                                {{ precio.itinerario.nombre }}
+                            </a>
+                        </td>
+                        <td>
+                            <i class="bi bi-geo-alt text-success me-1"></i>
+                            {{ precio.origen.nombre }}
+                        </td>
+                        <td class="text-center">
+                            <i class="bi bi-arrow-right text-muted"></i>
+                        </td>
+                        <td>
+                            <i class="bi bi-geo-alt-fill text-danger me-1"></i>
+                            {{ precio.destino.nombre }}
+                        </td>
+                        <td class="text-end">
+                            <strong class="text-success">Gs. {{ precio.precio|floatformat:0 }}</strong>
+                        </td>
+                        <td>
+                            <div class="table-actions justify-content-end">
+                                <a href="{% url 'itineraries:precio_update' precio.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'itineraries:precio_delete' precio.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-secondary">
+                Mostrando {{ page_obj.start_index }}-{{ page_obj.end_index }} de {{ page_obj.paginator.count }}
+            </span>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ page_obj.previous_page_number }}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ num }}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}">{{
+                            num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?page={{ page_obj.next_page_number }}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-cash-stack"></i>
+            </div>
+            <h5 class="empty-state-title">No se encontraron precios</h5>
+            <p class="empty-state-text">
+                {% if itinerario_filter %}
+                No hay precios para el itinerario seleccionado.
+                {% else %}
+                Comienza definiendo los precios de los tramos.
+                {% endif %}
+            </p>
+            {% if not itinerario_filter %}
+            <a href="{% url 'itineraries:precio_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>
+                Agregar Precio
+            </a>
+            {% else %}
+            <a href="{% url 'itineraries:precio_list' %}" class="btn btn-secondary">
+                <i class="bi bi-x-lg me-2"></i>
+                Limpiar Filtro
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
