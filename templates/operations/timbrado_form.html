@@ -1,0 +1,279 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Timbrado - TR4CKING{% endblock %}
+{% block title_content %}{% if object %}Editar{% else %}Nuevo{% endif %} Timbrado{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-file-earmark-code me-2"></i>
+                    {% if object %}Editar Timbrado{{ object.numero }}{% else %}Nuevo Timbrado Fiscal{% endif %}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post" id="timbrado-form">
+                    {% csrf_token %}
+
+                    <!-- Información de la Empresa -->
+                    <div class="card mb-4 border-primary">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-building me-2"></i>
+                                Datos de la Empresa
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Empresa *</label>
+                                    {{ form.empresa }}
+                                    {% if form.empresa.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.empresa.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Info de empresa (se actualiza dinámicamente) -->
+                            <div id="empresa-info" class="row mt-2" style="display: none;">
+                                <div class="col-md-6">
+                                    <div class="datagrid">
+                                        <div class="datagrid-item">
+                                            <div class="datagrid-title">RUC</div>
+                                            <div class="datagrid-content" id="empresa-ruc">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="datagrid">
+                                        <div class="datagrid-item">
+                                            <div class="datagrid-title">Razón Social</div>
+                                            <div class="datagrid-content" id="empresa-razon">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos del Timbrado -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-upc-scan me-2"></i>
+                                Datos del Timbrado
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-hash me-1"></i>
+                                        Número de Timbrado *
+                                    </label>
+                                    {{ form.numero }}
+                                    {% if form.numero.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.numero.errors.0 }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Número de timbrado asignado por la SET</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-geo-alt me-1"></i>
+                                        Punto de Expedición *
+                                    </label>
+                                    {{ form.punto_expedicion }}
+                                    {% if form.punto_expedicion.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.punto_expedicion.errors.0 }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Formato: 001-001 (establecimiento-punto)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vigencia del Timbrado -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-calendar-range me-2"></i>
+                                Vigencia del Timbrado
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-calendar-check me-1"></i>
+                                        Fecha Inicio de Vigencia *
+                                    </label>
+                                    {{ form.fecha_inicio }}
+                                    {% if form.fecha_inicio.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.fecha_inicio.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-calendar-x me-1"></i>
+                                        Fecha de Vencimiento *
+                                    </label>
+                                    {{ form.fecha_fin }}
+                                    {% if form.fecha_fin.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.fecha_fin.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rango de Numeración -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-123 me-2"></i>
+                                Rango de Numeración
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        Número de Factura Desde *
+                                    </label>
+                                    {{ form.numero_desde }}
+                                    {% if form.numero_desde.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.numero_desde.errors.0 }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Primer número de factura autorizado</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        Número de Factura Hasta *
+                                    </label>
+                                    {{ form.numero_hasta }}
+                                    {% if form.numero_hasta.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.numero_hasta.errors.0 }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Último número de factura autorizado</div>
+                                </div>
+                            </div>
+
+                            <!-- Indicador visual del rango -->
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Rango autorizado:</strong>
+                                <span id="rango-display">Seleccione los números para ver el rango</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estado -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-toggle-on me-2"></i>
+                                Estado
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch">
+                                {{ form.activo }}
+                                <label class="form-check-label" for="id_activo">
+                                    <strong>Timbrado Activo</strong>
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Desmarque esta opción si el timbrado ya no debe usarse aunque esté vigente
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <h6><i class="bi bi-exclamation-triangle me-1"></i> Error en el formulario</h6>
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                            <li><strong>{{ field }}:</strong> {{ errors.0 }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:timbrado_list' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if object %}Actualizar{% else %}Crear{% endif %} Timbrado
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const empresaSelect = document.getElementById('id_empresa');
+    const empresaInfo = document.getElementById('empresa-info');
+    const empresaRuc = document.getElementById('empresa-ruc');
+    const empresaRazon = document.getElementById('empresa-razon');
+    const numeroDesde = document.getElementById('id_numero_desde');
+    const numeroHasta = document.getElementById('id_numero_hasta');
+    const rangoDisplay = document.getElementById('rango-display');
+    
+    // Datos de empresas (se cargan del servidor)
+    const empresasData = {
+        {% for empresa in empresas %}
+        "{{ empresa.pk }}": {
+            "ruc": "{{ empresa.ruc }}",
+            "nombre": "{{ empresa.nombre }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+    
+    function actualizarEmpresaInfo() {
+        const empresaId = empresaSelect.value;
+        if (empresaId && empresasData[empresaId]) {
+            empresaRuc.textContent = empresasData[empresaId].ruc;
+            empresaRazon.textContent = empresasData[empresaId].nombre;
+            empresaInfo.style.display = 'flex';
+        } else {
+            empresaInfo.style.display = 'none';
+        }
+    }
+    
+    function actualizarRango() {
+        const desde = numeroDesde.value;
+        const hasta = numeroHasta.value;
+        if (desde && hasta) {
+            const total = parseInt(hasta) - parseInt(desde) + 1;
+            rangoDisplay.innerHTML = `<strong>${desde}</strong> al <strong>${hasta}</strong> (${total.toLocaleString('es-PY')} facturas)`;
+        } else {
+            rangoDisplay.textContent = 'Ingrese los números para ver el rango';
+        }
+    }
+    
+    if (empresaSelect) {
+        empresaSelect.addEventListener('change', actualizarEmpresaInfo);
+        // Ejecutar al cargar si hay valor
+        actualizarEmpresaInfo();
+    }
+    
+    if (numeroDesde && numeroHasta) {
+        numeroDesde.addEventListener('input', actualizarRango);
+        numeroHasta.addEventListener('input', actualizarRango);
+        actualizarRango();
+    }
+});
+</script>
+{% endblock %}

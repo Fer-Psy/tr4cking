@@ -1,0 +1,55 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Abrir Caja - TR4CKING{% endblock %}
+{% block title_content %}Apertura de Caja{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-unlock me-2"></i>
+                    Apertura de Caja
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Ingrese el monto inicial con el que abre la caja. Este monto será validado al momento del cierre.
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label class="form-label">Monto de Apertura *</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">Gs.</span>
+                            {{ form.monto_apertura }}
+                        </div>
+                        {% if form.monto_apertura.errors %}
+                        <div class="invalid-feedback d-block">{{ form.monto_apertura.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Observaciones</label>
+                        {{ form.observaciones }}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-unlock me-1"></i> Abrir Caja
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

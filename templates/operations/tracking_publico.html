@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking de Encomiendas - TR4CKING</title>
+    <meta name="description" content="Rastrea tu encomienda en tiempo real con TR4CKING">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #206bc4;
+            --success: #2fb344;
+            --warning: #f59f00;
+            --info: #4299e1;
+            --dark: #1e293b;
+        }
+
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            min-height: 100vh;
+        }
+
+        .tracking-hero {
+            background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+            padding: 3rem 0;
+            color: white;
+        }
+
+        .tracking-hero h1 {
+            font-weight: 700;
+        }
+
+        .search-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-top: -50px;
+        }
+
+        .search-input {
+            height: 60px;
+            font-size: 1.25rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(32, 107, 196, 0.2);
+        }
+
+        .btn-search {
+            height: 60px;
+            font-size: 1.25rem;
+            padding: 0 2rem;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .status-badge {
+            font-size: 1rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+        }
+
+        /* Timeline de estados */
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #e2e8f0;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 4px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            border: 3px solid white;
+        }
+
+        .timeline-item.active::before {
+            background: var(--primary);
+        }
+
+        .timeline-item.completed::before {
+            background: var(--success);
+        }
+
+        .footer {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 2rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="tracking-hero text-center">
+        <div class="container">
+            <i class="bi bi-box-seam" style="font-size: 3rem;"></i>
+            <h1 class="mt-3">Tracking de Encomiendas</h1>
+            <p class="lead mb-0">Ingresa el código de tu encomienda para rastrear su ubicación</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Search Box -->
+        <div class="search-card p-4 p-md-5 mb-4">
+            <form method="get" class="row g-3 align-items-center justify-content-center">
+                <div class="col-12 col-md-8">
+                    <input type="text" name="codigo" class="form-control search-input" placeholder="Ej: ENC-2025-0001"
+                        value="{{ request.GET.codigo|default:'' }}" required autofocus>
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button type="submit" class="btn btn-primary btn-search w-100">
+                        <i class="bi bi-search me-2"></i> Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if error %}
+        <!-- Error -->
+        <div class="result-card p-5 text-center">
+            <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+            <h3 class="mt-3">{{ error }}</h3>
+            <p class="text-muted">Verifica el código e intenta nuevamente</p>
+        </div>
+        {% endif %}
+
+        {% if encomienda %}
+        <!-- Resultado -->
+        <div class="result-card overflow-hidden">
+            <div class="row g-0">
+                <div class="col-md-7 p-4 p-md-5">
+                    <div class="d-flex justify-content-between align-items-start mb-4">
+                        <div>
+                            <h2 class="mb-1">{{ encomienda.codigo }}</h2>
+                            <span class="text-muted">{{ encomienda.get_tipo_display }}</span>
+                        </div>
+                        <span class="status-badge 
+                            {% if encomienda.estado == 'entregado' %}bg-success
+                            {% elif encomienda.estado == 'en_transito' %}bg-primary
+                            {% elif encomienda.estado == 'en_destino' %}bg-info
+                            {% else %}bg-warning{% endif %} text-white">
+                            {{ encomienda.get_estado_display }}
+                        </span>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <small class="text-muted d-block">ORIGEN</small>
+                            <strong>{{ encomienda.parada_origen.nombre }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">DESTINO</small>
+                            <strong>{{ encomienda.parada_destino.nombre }}</strong>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h5 class="mb-3"><i class="bi bi-clock-history me-2"></i>Historial de Estados</h5>
+                    <div class="timeline">
+                        <div
+                            class="timeline-item {% if encomienda.estado == 'registrado' %}active{% elif encomienda.estado != 'cancelado' %}completed{% endif %}">
+                            <strong>Registrado</strong>
+                            <p class="text-muted mb-0 small">
+                                {{ encomienda.fecha_registro|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+
+                        <div
+                            class="timeline-item {% if encomienda.estado == 'en_transito' %}active{% elif encomienda.estado in 'en_destino,entregado' %}completed{% endif %}">
+                            <strong>En Tránsito</strong>
+                            <p class="text-muted mb-0 small">
+                                {% if encomienda.viaje %}
+                                Viaje: {{ encomienda.viaje.itinerario.nombre }}
+                                {% endif %}
+                            </p>
+                        </div>
+
+                        <div
+                            class="timeline-item {% if encomienda.estado == 'en_destino' %}active{% elif encomienda.estado == 'entregado' %}completed{% endif %}">
+                            <strong>En Destino</strong>
+                            <p class="text-muted mb-0 small">
+                                {{ encomienda.parada_destino.nombre }}
+                            </p>
+                        </div>
+
+                        <div class="timeline-item {% if encomienda.estado == 'entregado' %}completed{% endif %}">
+                            <strong>Entregado</strong>
+                            {% if encomienda.fecha_entrega %}
+                            <p class="text-muted mb-0 small">
+                                {{ encomienda.fecha_entrega|date:"d/m/Y H:i" }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-5 bg-light p-4 p-md-5">
+                    <h5 class="mb-4"><i class="bi bi-info-circle me-2"></i>Detalles</h5>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">REMITENTE</small>
+                        <strong>{{ encomienda.remitente.nombre_completo }}</strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">DESTINATARIO</small>
+                        <strong>{{ encomienda.destinatario.nombre_completo }}</strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted d-block">DESCRIPCIÓN</small>
+                        <span>{{ encomienda.descripcion|default:"-" }}</span>
+                    </div>
+
+                    {% if encomienda.peso_kg %}
+                    <div class="mb-3">
+                        <small class="text-muted d-block">PESO</small>
+                        <span>{{ encomienda.peso_kg }} kg</span>
+                    </div>
+                    {% endif %}
+
+                    {% if encomienda.estado == 'entregado' and encomienda.receptor_nombre %}
+                    <div class="alert alert-success mt-4">
+                        <strong><i class="bi bi-check-circle me-2"></i>Recibido por:</strong>
+                        <br>{{ encomienda.receptor_nombre }}
+                        <br><small>CI: {{ encomienda.receptor_cedula }}</small>
+                    </div>
+                    {% endif %}
+
+                    {% if ultimo_tracking %}
+                    <div class="alert alert-info mt-4">
+                        <strong><i class="bi bi-geo-alt me-2"></i>Última ubicación:</strong>
+                        <br>{{ ultimo_tracking.parada_actual.nombre|default:"En ruta" }}
+                        <br><small>{{ ultimo_tracking.timestamp|date:"d/m/Y H:i" }}</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="footer text-center">
+        <div class="container">
+            <p class="mb-0">
+                <i class="bi bi-bus-front me-1"></i>
+                TR4CKING - Sistema de Gestión de Transporte
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

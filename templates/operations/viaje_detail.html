@@ -1,0 +1,406 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Viaje #{{ viaje.pk }} - TR4CKING{% endblock %}
+{% block title_content %}
+Viaje: {{ viaje.itinerario.nombre }}
+<span class="badge ms-2
+    {% if viaje.estado == 'programado' %}bg-azure
+    {% elif viaje.estado == 'en_curso' %}bg-green
+    {% elif viaje.estado == 'completado' %}bg-secondary
+    {% else %}bg-red{% endif %}">
+    {{ viaje.get_estado_display }}
+</span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .seat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        max-width: 300px;
+    }
+
+    .seat {
+        width: 48px;
+        height: 48px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .seat.available {
+        background: #e8f5e9;
+        border-color: #4caf50;
+        color: #2e7d32;
+    }
+
+    .seat.occupied {
+        background: #ffebee;
+        border-color: #f44336;
+        color: #c62828;
+        cursor: not-allowed;
+    }
+
+    .seat.selected {
+        background: #e3f2fd;
+        border-color: #2196f3;
+        color: #1565c0;
+    }
+
+    .seat:nth-child(2n) {
+        margin-right: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Acciones -->
+    <div class="col-12">
+        <div class="btn-group">
+            <a href="{% url 'operations:viaje_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Volver
+            </a>
+            <a href="{% url 'operations:viaje_update' viaje.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil me-1"></i> Editar
+            </a>
+            <a href="{% url 'operations:viaje_estado' viaje.pk %}" class="btn btn-outline-azure">
+                <i class="bi bi-arrow-repeat me-1"></i> Cambiar Estado
+            </a>
+            {% if viaje.estado == 'programado' %}
+            <a href="{% url 'operations:pasaje_venta' viaje.pk %}" class="btn btn-green">
+                <i class="bi bi-ticket me-1"></i> Vender Pasaje
+            </a>
+            <a href="{% url 'operations:encomienda_create' viaje.pk %}" class="btn btn-yellow">
+                <i class="bi bi-box-seam me-1"></i> Registrar Encomienda
+            </a>
+            {% endif %}
+            <a href="{% url 'operations:incidencia_viaje_create' viaje.pk %}" class="btn btn-outline-danger">
+                <i class="bi bi-exclamation-triangle me-1"></i> Reportar Incidencia
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Info Principal -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información del Viaje
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">ID Viaje</div>
+                        <div class="datagrid-content">#{{ viaje.pk }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Fecha</div>
+                        <div class="datagrid-content">{{ viaje.fecha_viaje|date:"l, d F Y" }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Itinerario</div>
+                        <div class="datagrid-content">{{ viaje.itinerario.nombre }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Bus</div>
+                        <div class="datagrid-content">
+                            <span class="badge bg-secondary-lt">{{ viaje.bus.placa }}</span>
+                            {{ viaje.bus.marca }} {{ viaje.bus.modelo }}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Chofer</div>
+                        <div class="datagrid-content">{{ viaje.chofer.nombre_completo }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Capacidad</div>
+                        <div class="datagrid-content">{{ viaje.bus.capacidad_asientos }} asientos</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Hora Salida Real</div>
+                        <div class="datagrid-content">{{ viaje.hora_salida_real|time:"H:i"|default:"-" }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Hora Llegada Real</div>
+                        <div class="datagrid-content">{{ viaje.hora_llegada_real|time:"H:i"|default:"-" }}</div>
+                    </div>
+                </div>
+
+                {% if viaje.observaciones %}
+                <div class="mt-3">
+                    <strong>Observaciones:</strong>
+                    <p class="text-muted mb-0">{{ viaje.observaciones }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-bar-chart me-2"></i>
+                    Estadísticas
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="h2 mb-0 text-primary">{{ stats.total_pasajes }}</div>
+                        <div class="text-muted small">Pasajes</div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="h2 mb-0 text-yellow">{{ stats.total_encomiendas }}</div>
+                        <div class="text-muted small">Encomiendas</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="h5 mb-0 text-green">Gs. {{ stats.ingresos_pasajes|floatformat:0 }}</div>
+                        <div class="text-muted small">Ing. Pasajes</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="h5 mb-0 text-green">Gs. {{ stats.ingresos_encomiendas|floatformat:0 }}</div>
+                        <div class="text-muted small">Ing. Encomiendas</div>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <div class="h3 mb-0 text-green">Gs. {{ stats.total_ingresos|floatformat:0 }}</div>
+                    <div class="text-muted">Total Ingresos</div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label">Ocupación: {{ viaje.porcentaje_ocupacion }}%</label>
+                    <div class="progress">
+                        <div class="progress-bar 
+                            {% if viaje.porcentaje_ocupacion >= 80 %}bg-green
+                            {% elif viaje.porcentaje_ocupacion >= 50 %}bg-yellow
+                            {% else %}bg-red{% endif %}" style="width: {{ viaje.porcentaje_ocupacion }}%">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted mt-1">
+                        <span>{{ stats.total_pasajes }} vendidos</span>
+                        <span>{{ viaje.asientos_disponibles }} disponibles</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pasajes y Encomiendas -->
+    <div class="col-lg-8">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#pasajes">
+                    <i class="bi bi-ticket me-1"></i>
+                    Pasajes <span class="badge bg-primary ms-1">{{ pasajes|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#encomiendas">
+                    <i class="bi bi-box-seam me-1"></i>
+                    Encomiendas <span class="badge bg-yellow ms-1">{{ encomiendas|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#asientos">
+                    <i class="bi bi-grid-3x3-gap me-1"></i>
+                    Mapa de Asientos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#incidencias">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Incidencias <span class="badge bg-danger ms-1">{{ incidencias|length }}</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Tab Pasajes -->
+            <div class="tab-pane active" id="pasajes">
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                                <tr>
+                                    <th>Asiento</th>
+                                    <th>Código</th>
+                                    <th>Pasajero</th>
+                                    <th>Tramo</th>
+                                    <th>Precio</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pasaje in pasajes %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ pasaje.asiento.numero_asiento }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'operations:pasaje_detail' pasaje.pk %}">
+                                            {{ pasaje.codigo }}
+                                        </a>
+                                    </td>
+                                    <td>{{ pasaje.pasajero.nombre_completo }}</td>
+                                    <td>
+                                        <small>{{ pasaje.parada_origen.nombre }} → {{ pasaje.parada_destino.nombre
+                                            }}</small>
+                                    </td>
+                                    <td>Gs. {{ pasaje.precio|floatformat:0 }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if pasaje.estado == 'vendido' %}bg-green
+                                            {% elif pasaje.estado == 'reservado' %}bg-azure
+                                            {% elif pasaje.estado == 'abordado' %}bg-purple
+                                            {% else %}bg-red{% endif %}">
+                                            {{ pasaje.get_estado_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        No hay pasajes vendidos aún
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Encomiendas -->
+            <div class="tab-pane" id="encomiendas">
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Tipo</th>
+                                    <th>Remitente</th>
+                                    <th>Destinatario</th>
+                                    <th>Destino</th>
+                                    <th>Precio</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for enc in encomiendas %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'operations:encomienda_detail' enc.pk %}">
+                                            {{ enc.codigo }}
+                                        </a>
+                                    </td>
+                                    <td>{{ enc.get_tipo_display }}</td>
+                                    <td>{{ enc.remitente.nombre_completo }}</td>
+                                    <td>{{ enc.destinatario.nombre_completo }}</td>
+                                    <td>{{ enc.parada_destino.nombre }}</td>
+                                    <td>Gs. {{ enc.precio|floatformat:0 }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if enc.estado == 'entregado' %}bg-green
+                                            {% elif enc.estado == 'en_transito' %}bg-azure
+                                            {% elif enc.estado == 'en_destino' %}bg-purple
+                                            {% else %}bg-yellow{% endif %}">
+                                            {{ enc.get_estado_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        No hay encomiendas registradas
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Mapa de Asientos -->
+            <div class="tab-pane" id="asientos">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-center gap-4 mb-4">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="seat available" style="width: 24px; height: 24px; font-size: 0.625rem;">
+                                </div>
+                                <small>Disponible</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="seat occupied" style="width: 24px; height: 24px; font-size: 0.625rem;">
+                                </div>
+                                <small>Ocupado</small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-center">
+                            <div class="seat-grid">
+                                {% for asiento in asientos_bus %}
+                                <div
+                                    class="seat {% if asiento.pk in asientos_ocupados %}occupied{% else %}available{% endif %}">
+                                    {{ asiento.numero_asiento }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Incidencias -->
+            <div class="tab-pane" id="incidencias">
+                <div class="card">
+                    <div class="list-group list-group-flush">
+                        {% for inc in incidencias %}
+                        <a href="{% url 'operations:incidencia_detail' inc.pk %}"
+                            class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge 
+                                        {% if inc.prioridad == 'critica' %}bg-red
+                                        {% elif inc.prioridad == 'alta' %}bg-orange
+                                        {% elif inc.prioridad == 'media' %}bg-yellow
+                                        {% else %}bg-secondary{% endif %} me-2">
+                                        {{ inc.get_prioridad_display }}
+                                    </span>
+                                    <strong>{{ inc.get_tipo_display }}</strong>
+                                    <p class="mb-0 text-muted small mt-1">{{ inc.descripcion|truncatechars:100 }}</p>
+                                </div>
+                                <span
+                                    class="badge {% if inc.estado == 'resuelta' %}bg-green{% else %}bg-azure{% endif %}">
+                                    {{ inc.get_estado_display }}
+                                </span>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="list-group-item text-center py-4 text-muted">
+                            No hay incidencias reportadas
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

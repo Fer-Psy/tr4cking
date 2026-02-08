@@ -1,0 +1,184 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Factura {{ factura.numero_completo }} - TR4CKING{% endblock %}
+{% block title_content %}Factura: {{ factura.numero_completo }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-receipt me-2"></i>
+                    Detalle de Factura
+                </h3>
+                <span class="badge {% if factura.estado == 'emitida' %}bg-green{% else %}bg-red{% endif %} fs-6">
+                    {{ factura.get_estado_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5>Datos de Facturación</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <th>Número:</th>
+                                <td>{{ factura.numero_completo }}</td>
+                            </tr>
+                            <tr>
+                                <th>Timbrado:</th>
+                                <td>{{ factura.timbrado.numero }}</td>
+                            </tr>
+                            <tr>
+                                <th>Fecha Emisión:</th>
+                                <td>{{ factura.fecha_emision|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Condición:</th>
+                                <td>{{ factura.get_condicion_display }}</td>
+                            </tr>
+                            <tr>
+                                <th>Cajero:</th>
+                                <td>{{ factura.cajero.get_full_name|default:factura.cajero.username }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Cliente</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <th>Cédula/RUC:</th>
+                                <td>{{ factura.cliente.cedula }}</td>
+                            </tr>
+                            <tr>
+                                <th>Nombre:</th>
+                                <td>{{ factura.cliente.nombre_completo }}</td>
+                            </tr>
+                            {% if factura.cliente.direccion %}
+                            <tr>
+                                <th>Dirección:</th>
+                                <td>{{ factura.cliente.direccion }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+
+                <h5>Detalle de Ítems</h5>
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cant.</th>
+                            <th>Descripción</th>
+                            <th class="text-center">IVA</th>
+                            <th class="text-end">P. Unit.</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in detalles %}
+                        <tr>
+                            <td>{{ d.cantidad|floatformat:0 }}</td>
+                            <td>{{ d.descripcion }}</td>
+                            <td class="text-center">{{ d.tasa_iva }}%</td>
+                            <td class="text-end">Gs. {{ d.precio_unitario|floatformat:0 }}</td>
+                            <td class="text-end">Gs. {{ d.subtotal|floatformat:0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% if factura.estado == 'anulada' %}
+                <div class="alert alert-danger mt-4">
+                    <h5><i class="bi bi-x-circle me-2"></i>Factura Anulada</h5>
+                    <p class="mb-0">
+                        <strong>Fecha:</strong> {{ factura.fecha_anulacion|date:"d/m/Y H:i" }}<br>
+                        <strong>Motivo:</strong> {{ factura.motivo_anulacion }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+                    <div class="btn-group">
+                        <a href="{% url 'operations:factura_ticket' factura.pk %}?print=1" class="btn btn-success"
+                            target="_blank" title="Imprimir directamente">
+                            <i class="bi bi-printer me-1"></i> Imprimir
+                        </a>
+                        <a href="{% url 'operations:factura_ticket' factura.pk %}" class="btn btn-primary"
+                            target="_blank" title="Ver ticket">
+                            <i class="bi bi-eye me-1"></i> Ver Ticket
+                        </a>
+                        <a href="{% url 'operations:factura_pdf' factura.pk %}" class="btn btn-outline-primary"
+                            title="Descargar PDF">
+                            <i class="bi bi-file-pdf me-1"></i> PDF
+                        </a>
+                        {% if factura.estado == 'emitida' %}
+                        <a href="{% url 'operations:factura_anular' factura.pk %}" class="btn btn-danger">
+                            <i class="bi bi-x-circle me-1"></i> Anular
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Totales -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Totales</h4>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>Subtotal Exenta:</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_exenta|floatformat:0 }}</td>
+                    </tr>
+                    <tr>
+                        <td>Gravada 5%:</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_iva5|floatformat:0 }}</td>
+                    </tr>
+                    <tr>
+                        <td>Gravada 10%:</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_iva10|floatformat:0 }}</td>
+                    </tr>
+                </table>
+                <hr>
+                <div class="d-flex justify-content-between h3 mb-0">
+                    <span>TOTAL:</span>
+                    <span class="text-green">Gs. {{ factura.total|floatformat:0 }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liquidación IVA -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Liquidación IVA</h4>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>IVA 5%:</td>
+                        <td class="text-end">Gs. {{ factura.iva_5|floatformat:0 }}</td>
+                    </tr>
+                    <tr>
+                        <td>IVA 10%:</td>
+                        <td class="text-end">Gs. {{ factura.iva_10|floatformat:0 }}</td>
+                    </tr>
+                </table>
+                <hr>
+                <div class="d-flex justify-content-between h5 mb-0">
+                    <span>Total IVA:</span>
+                    <span>Gs. {{ factura.total_iva|floatformat:0 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

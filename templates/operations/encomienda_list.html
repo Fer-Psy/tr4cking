@@ -1,0 +1,131 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Encomiendas - TR4CKING{% endblock %}
+{% block title_content %}Gestión de Encomiendas{% endblock %}
+
+{% block content %}
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in estados %}
+                    <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label">Buscar</label>
+                <input type="text" name="search" class="form-control" placeholder="Código, cédula, nombre..."
+                    value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Tipo</th>
+                    <th>Remitente</th>
+                    <th>Destinatario</th>
+                    <th>Destino</th>
+                    <th>Precio</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for enc in encomiendas %}
+                <tr>
+                    <td>
+                        <a href="{% url 'operations:encomienda_detail' enc.pk %}">
+                            <strong>{{ enc.codigo }}</strong>
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt">{{ enc.get_tipo_display }}</span>
+                    </td>
+                    <td>
+                        <div>{{ enc.remitente.nombre_completo }}</div>
+                        <small class="text-muted">{{ enc.remitente.cedula }}</small>
+                    </td>
+                    <td>
+                        <div>{{ enc.destinatario.nombre_completo }}</div>
+                        <small class="text-muted">{{ enc.destinatario.cedula }}</small>
+                    </td>
+                    <td>{{ enc.parada_destino.nombre }}</td>
+                    <td>Gs. {{ enc.precio|floatformat:0 }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if enc.estado == 'entregado' %}bg-green
+                            {% elif enc.estado == 'en_transito' %}bg-azure
+                            {% elif enc.estado == 'en_destino' %}bg-purple
+                            {% elif enc.estado == 'registrado' %}bg-yellow
+                            {% else %}bg-red{% endif %}">
+                            {{ enc.get_estado_display }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <a href="{% url 'operations:encomienda_detail' enc.pk %}"
+                                class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if enc.estado == 'en_destino' %}
+                            <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-green">
+                                <i class="bi bi-check-lg"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <i class="bi bi-box-seam h1"></i>
+                        <p class="mb-0">No se encontraron encomiendas</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer d-flex justify-content-center">
+        <ul class="pagination mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

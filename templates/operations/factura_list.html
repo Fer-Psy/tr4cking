@@ -1,0 +1,146 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Facturas - TR4CKING{% endblock %}
+{% block title_content %}Gestión de Facturas{% endblock %}
+
+{% block content %}
+<!-- Header con botón -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-title mb-1">Facturas</h1>
+        <p class="page-subtitle mb-0">Gestión de facturas emitidas</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'operations:clientes_pendientes_factura' %}" class="btn btn-outline-success">
+            <i class="bi bi-person-lines-fill me-1"></i> Ver Pendientes
+        </a>
+        <a href="{% url 'operations:factura_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nueva Factura
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Fecha</label>
+                <input type="date" name="fecha" class="form-control" value="{{ fecha_filter }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in estados %}
+                    <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Buscar</label>
+                <input type="text" name="search" class="form-control" placeholder="Número, cédula, nombre..."
+                    value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Condición</th>
+                    <th class="text-end">Total</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>
+                        <a href="{% url 'operations:factura_detail' factura.pk %}">
+                            <strong>{{ factura.numero_completo }}</strong>
+                        </a>
+                    </td>
+                    <td>{{ factura.fecha_emision|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div>{{ factura.cliente.nombre_completo }}</div>
+                        <small class="text-muted">{{ factura.cliente.cedula }}</small>
+                    </td>
+                    <td>{{ factura.get_condicion_display }}</td>
+                    <td class="text-end">
+                        <strong>Gs. {{ factura.total|floatformat:0 }}</strong>
+                    </td>
+                    <td>
+                        <span class="badge {% if factura.estado == 'emitida' %}bg-green{% else %}bg-red{% endif %}">
+                            {{ factura.get_estado_display }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <a href="{% url 'operations:factura_detail' factura.pk %}"
+                                class="btn btn-sm btn-outline-primary" title="Ver">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{% url 'operations:factura_ticket' factura.pk %}"
+                                class="btn btn-sm btn-outline-secondary" title="Ticket" target="_blank">
+                                <i class="bi bi-printer"></i>
+                            </a>
+                            {% if factura.estado == 'emitida' %}
+                            <a href="{% url 'operations:factura_anular' factura.pk %}"
+                                class="btn btn-sm btn-outline-danger" title="Anular">
+                                <i class="bi bi-x-circle"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-receipt h1"></i>
+                        <p class="mb-0">No se encontraron facturas</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer d-flex justify-content-center">
+        <ul class="pagination mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

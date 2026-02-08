@@ -1,0 +1,67 @@
+<!-- Partial: Mapa de asientos -->
+<div class="seat-map">
+    <div class="d-flex justify-content-center gap-4 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 24px; height: 24px; background: #e8f5e9; border: 2px solid #4caf50; border-radius: 4px;">
+            </div>
+            <small>Disponible</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 24px; height: 24px; background: #ffebee; border: 2px solid #f44336; border-radius: 4px;">
+            </div>
+            <small>Ocupado</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 24px; height: 24px; background: #e3f2fd; border: 2px solid #2196f3; border-radius: 4px;">
+            </div>
+            <small>Seleccionado</small>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 280px;">
+            {% for asiento in asientos %}
+            <button type="button"
+                class="seat-btn {% if asiento.pk in asientos_ocupados %}occupied{% else %}available{% endif %}" {% if
+                asiento.pk in asientos_ocupados %}disabled{% endif %} data-asiento-id="{{ asiento.pk }}"
+                data-asiento-numero="{{ asiento.numero_asiento }}"
+                style="width: 50px; height: 50px; border: 2px solid #dee2e6; border-radius: 8px; 
+                           {% if asiento.pk in asientos_ocupados %}background: #ffebee; border-color: #f44336; color: #c62828;{% else %}background: #e8f5e9; border-color: #4caf50; color: #2e7d32;{% endif %}
+                           font-weight: bold; cursor: {% if asiento.pk in asientos_ocupados %}not-allowed{% else %}pointer{% endif %};">
+                {{ asiento.numero_asiento }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="text-center mt-3 text-muted">
+        <small>
+            <i class="bi bi-info-circle me-1"></i>
+            {{ viaje.asientos_disponibles }} asientos disponibles de {{ viaje.bus.capacidad_asientos }}
+        </small>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.seat-btn.available').forEach(btn => {
+        btn.addEventListener('click', function () {
+            // Deseleccionar otros
+            document.querySelectorAll('.seat-btn.selected').forEach(b => {
+                b.classList.remove('selected');
+                b.style.background = '#e8f5e9';
+                b.style.borderColor = '#4caf50';
+                b.style.color = '#2e7d32';
+            });
+
+            // Seleccionar este
+            this.classList.add('selected');
+            this.style.background = '#e3f2fd';
+            this.style.borderColor = '#2196f3';
+            this.style.color = '#1565c0';
+
+            // Actualizar input oculto
+            const asientoId = this.dataset.asientoId;
+            document.querySelector('select[name="asiento"]').value = asientoId;
+        });
+    });
+</script>

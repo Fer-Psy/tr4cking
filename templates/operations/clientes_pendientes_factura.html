@@ -1,0 +1,212 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Clientes Pendientes de Facturar - TR4CKING{% endblock %}
+{% block title_content %}Clientes Pendientes de Facturar{% endblock %}
+
+{% block content %}
+<!-- Header con estadísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="h1 text-primary mb-2">{{ total_clientes }}</div>
+                <div class="text-muted">Clientes Pendientes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="h1 text-success mb-2">{{ total_pasajes }}</div>
+                <div class="text-muted">Pasajes sin Facturar</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="h1 text-info mb-2">{{ total_encomiendas }}</div>
+                <div class="text-muted">Encomiendas sin Facturar</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                {% if timbrado_vigente %}
+                <div class="h4 text-warning mb-2">{{ proximo_numero }}</div>
+                <div class="text-muted">Próximo Número</div>
+                {% else %}
+                <div class="h5 text-danger mb-2">Sin Timbrado</div>
+                <div class="text-muted">Configure un timbrado</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info de Timbrado -->
+{% if timbrado_vigente %}
+<div class="alert alert-info d-flex align-items-center mb-4">
+    <i class="bi bi-info-circle me-2"></i>
+    <div>
+        <strong>Timbrado activo:</strong> {{ timbrado_vigente.numero }} 
+        ({{ timbrado_vigente.punto_expedicion }}) - 
+        Vigente hasta {{ timbrado_vigente.fecha_fin|date:"d/m/Y" }}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <strong>¡Atención!</strong> No hay timbrado vigente configurado. Configure uno antes de facturar.
+    </div>
+    <a href="{% url 'operations:timbrado_create' %}" class="btn btn-warning">
+        <i class="bi bi-plus me-1"></i> Crear Timbrado
+    </a>
+</div>
+{% endif %}
+
+<!-- Lista de clientes -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="card-title mb-0">
+            <i class="bi bi-people me-2"></i>
+            Clientes con Items Pendientes
+        </h4>
+        <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-primary">
+            <i class="bi bi-receipt me-1"></i> Ver Facturas Emitidas
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Cédula/RUC</th>
+                    <th class="text-center">Pasajes</th>
+                    <th class="text-center">Encomiendas</th>
+                    <th class="text-end">Total Pasajes</th>
+                    <th class="text-end">Total Encomiendas</th>
+                    <th class="text-end">Total General</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in clientes %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="avatar avatar-sm bg-primary-lt me-2">
+                                {{ item.cliente.nombre|slice:":1"|upper }}
+                            </div>
+                            <div>
+                                <strong>{{ item.cliente.nombre_completo }}</strong>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <code>{{ item.cliente.cedula }}</code>
+                    </td>
+                    <td class="text-center">
+                        {% if item.pasajes %}
+                        <span class="badge bg-success">{{ item.pasajes|length }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if item.encomiendas %}
+                        <span class="badge bg-info">{{ item.encomiendas|length }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if item.total_pasajes %}
+                        Gs. {{ item.total_pasajes|floatformat:0 }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if item.total_encomiendas %}
+                        Gs. {{ item.total_encomiendas|floatformat:0 }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <strong class="text-success">Gs. {{ item.total|floatformat:0 }}</strong>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'operations:factura_create' %}?cliente={{ item.cliente.cedula }}" 
+                           class="btn btn-primary btn-sm"
+                           {% if not timbrado_vigente %}disabled title="Configure un timbrado primero"{% endif %}>
+                            <i class="bi bi-receipt me-1"></i> Facturar
+                        </a>
+                    </td>
+                </tr>
+                <!-- Detalle colapsable de items -->
+                <tr class="bg-light">
+                    <td colspan="8" class="p-0">
+                        <div class="collapse" id="detalle-{{ item.cliente.pk }}">
+                            <div class="p-3">
+                                <div class="row">
+                                    {% if item.pasajes %}
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted"><i class="bi bi-ticket me-1"></i> Pasajes</h6>
+                                        <ul class="list-unstyled mb-0">
+                                            {% for p in item.pasajes %}
+                                            <li class="d-flex justify-content-between py-1">
+                                                <span>
+                                                    {{ p.viaje.itinerario.nombre }} - 
+                                                    {{ p.viaje.fecha_viaje|date:"d/m" }} 
+                                                    (Asiento {{ p.asiento.numero_asiento }})
+                                                </span>
+                                                <strong>Gs. {{ p.precio|floatformat:0 }}</strong>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    {% if item.encomiendas %}
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted"><i class="bi bi-box me-1"></i> Encomiendas</h6>
+                                        <ul class="list-unstyled mb-0">
+                                            {% for e in item.encomiendas %}
+                                            <li class="d-flex justify-content-between py-1">
+                                                <span>
+                                                    {{ e.codigo }} - {{ e.parada_destino.nombre }}
+                                                </span>
+                                                <strong>Gs. {{ e.precio|floatformat:0 }}</strong>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-link w-100 text-muted" 
+                                type="button" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#detalle-{{ item.cliente.pk }}">
+                            <i class="bi bi-chevron-down"></i> Ver detalle
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <i class="bi bi-check-circle h1 text-success"></i>
+                        <p class="mb-0 mt-2">¡Todos los items están facturados!</p>
+                        <p class="text-muted">No hay pasajes ni encomiendas pendientes de facturar.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

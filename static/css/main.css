@@ -1201,23 +1201,58 @@ h6 {
 
 @media (max-width: 991.98px) {
 
-    /* Hide sidebar by default on mobile */
+    /* Sidebar siempre visible - versión colapsada en mobile */
     .sidebar {
-        transform: translateX(-100%);
-        box-shadow: var(--shadow-xl);
-    }
-
-    /* Show sidebar when toggled */
-    .sidebar.show {
+        width: var(--sidebar-collapsed-width);
         transform: translateX(0);
     }
 
-    /* Adjust main content - remove left margin */
-    .main-content {
-        margin-left: 0;
+    /* Ocultar texto en sidebar colapsado */
+    .sidebar-brand-text,
+    .sidebar-nav-item span,
+    .sidebar-nav-section-title,
+    .sidebar-user-info {
+        display: none;
     }
 
-    /* Adjust topbar */
+    /* Centrar elementos en sidebar colapsado */
+    .sidebar-brand {
+        justify-content: center;
+        padding: var(--space-4);
+    }
+
+    .sidebar-nav-item {
+        justify-content: center;
+        padding: var(--space-3);
+        border-left: none;
+    }
+
+    .sidebar-nav-item:hover,
+    .sidebar-nav-item.active {
+        border-left: none;
+        border-bottom: 2px solid var(--primary-500);
+    }
+
+    .sidebar-user {
+        justify-content: center;
+        padding: var(--space-3);
+    }
+
+    .sidebar-user form {
+        display: none;
+    }
+
+    /* Ajustar contenido principal */
+    .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+
+    /* Ocultar botón toggle ya que sidebar siempre está visible */
+    #sidebarToggle {
+        display: none;
+    }
+
+    /* Ajustar topbar */
     .topbar {
         padding: var(--space-3) var(--space-4);
     }

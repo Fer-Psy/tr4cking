@@ -1,0 +1,265 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Crear Factura - TR4CKING{% endblock %}
+{% block title_content %}Nueva Factura{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post" id="factura-form">
+            {% csrf_token %}
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-receipt me-2"></i>
+                        Datos de Facturación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Timbrado *</label>
+                            {{ form.timbrado }}
+                            {% if form.timbrado.errors %}
+                            <div class="invalid-feedback d-block">{{ form.timbrado.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Condición de Venta *</label>
+                            {{ form.condicion }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Cédula/RUC del Cliente *</label>
+                            {{ form.cedula_cliente }}
+                            <div id="info-cliente-factura" class="mt-2"></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Próximo Número</label>
+                            <input type="text" class="form-control" id="proximo-numero" readonly 
+                                   placeholder="Se calculará automáticamente">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selección de Pasajes -->
+            {% if form.pasajes.field.queryset.count > 0 %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-ticket-perforated me-2"></i>
+                        Pasajes Disponibles
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th width="40"></th>
+                                    <th>Código</th>
+                                    <th>Viaje</th>
+                                    <th>Pasajero</th>
+                                    <th>Asiento</th>
+                                    <th class="text-end">Precio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pasaje in form.pasajes.field.queryset %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" name="pasajes" value="{{ pasaje.pk }}" 
+                                               class="form-check-input item-check"
+                                               data-precio="{{ pasaje.precio }}"
+                                               {% if pasaje in form.pasajes.initial %}checked{% endif %}>
+                                    </td>
+                                    <td>{{ pasaje.codigo }}</td>
+                                    <td>{{ pasaje.viaje.itinerario.nombre }} - {{ pasaje.viaje.fecha_viaje|date:"d/m" }}</td>
+                                    <td>{{ pasaje.pasajero.nombre_completo }}</td>
+                                    <td>{{ pasaje.asiento.numero_asiento }}</td>
+                                    <td class="text-end">Gs. {{ pasaje.precio|floatformat:0 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Selección de Encomiendas -->
+            {% if form.encomiendas.field.queryset.count > 0 %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-box-seam me-2"></i>
+                        Encomiendas Disponibles
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th width="40"></th>
+                                    <th>Código</th>
+                                    <th>Tipo</th>
+                                    <th>Descripción</th>
+                                    <th>Destino</th>
+                                    <th class="text-end">Precio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for enc in form.encomiendas.field.queryset %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" name="encomiendas" value="{{ enc.pk }}" 
+                                               class="form-check-input item-check"
+                                               data-precio="{{ enc.precio }}"
+                                               {% if enc in form.encomiendas.initial %}checked{% endif %}>
+                                    </td>
+                                    <td>{{ enc.codigo }}</td>
+                                    <td>{{ enc.get_tipo_display }}</td>
+                                    <td>{{ enc.descripcion|truncatechars:30 }}</td>
+                                    <td>{{ enc.parada_destino.nombre }}</td>
+                                    <td class="text-end">Gs. {{ enc.precio|floatformat:0 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-receipt me-2"></i> Generar Factura
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Resumen -->
+        <div class="card sticky-top" style="top: 1rem;">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-calculator me-2"></i>
+                    Resumen
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Items seleccionados:</span>
+                    <span id="items-count" class="badge bg-primary">0</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal Exenta:</span>
+                    <span id="subtotal-exenta">Gs. 0</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Gravada 10%:</span>
+                    <span id="subtotal-iva10">Gs. 0</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between h4 mb-0">
+                    <span>TOTAL:</span>
+                    <span id="total" class="text-success">Gs. 0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info del Cliente -->
+        <div class="card mt-4" id="cliente-card" style="display: none;">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Cliente</h4>
+            </div>
+            <div class="card-body" id="cliente-info">
+                <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.item-check');
+    const itemsCount = document.getElementById('items-count');
+    const subtotalExenta = document.getElementById('subtotal-exenta');
+    const subtotalIva10 = document.getElementById('subtotal-iva10');
+    const totalEl = document.getElementById('total');
+    
+    function calcularTotales() {
+        let count = 0;
+        let exenta = 0;
+        let iva10 = 0;
+        
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                count++;
+                // Por defecto, pasajes de transporte son exentos en Paraguay
+                exenta += parseFloat(cb.dataset.precio) || 0;
+            }
+        });
+        
+        const total = exenta + iva10;
+        
+        itemsCount.textContent = count;
+        subtotalExenta.textContent = 'Gs. ' + exenta.toLocaleString('es-PY');
+        subtotalIva10.textContent = 'Gs. ' + iva10.toLocaleString('es-PY');
+        totalEl.textContent = 'Gs. ' + total.toLocaleString('es-PY');
+    }
+    
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', calcularTotales);
+    });
+    
+    // Calcular al cargar
+    calcularTotales();
+    
+    // Actualizar próximo número cuando cambia el timbrado
+    const timbradoSelect = document.getElementById('id_timbrado');
+    const proximoNumero = document.getElementById('proximo-numero');
+    
+    if (timbradoSelect) {
+        timbradoSelect.addEventListener('change', function() {
+            if (this.value) {
+                fetch(`/operations/timbrados/${this.value}/siguiente-numero/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.numero) {
+                            proximoNumero.value = data.numero;
+                        } else if (data.error) {
+                            proximoNumero.value = data.error;
+                        }
+                    })
+                    .catch(() => {
+                        proximoNumero.value = 'Error al obtener';
+                    });
+            }
+        });
+        // Trigger al cargar si hay valor
+        if (timbradoSelect.value) {
+            timbradoSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
+{% endblock %}

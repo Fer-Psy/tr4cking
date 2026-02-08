@@ -1,0 +1,413 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load static %}
+
+{% block title %}Centro de Operaciones - TR4CKING{% endblock %}
+{% block title_content %}Centro de Operaciones{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.5rem;
+    }
+    .quick-action-btn {
+        padding: 1rem;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .quick-action-btn:hover {
+        transform: scale(1.05);
+    }
+    .quick-action-btn i {
+        font-size: 2rem;
+    }
+    .viaje-card {
+        border-left: 4px solid;
+    }
+    .viaje-card.programado { border-left-color: #206bc4; }
+    .viaje-card.en_curso { border-left-color: #2fb344; }
+    .viaje-card.completado { border-left-color: #626976; }
+    .viaje-card.cancelado { border-left-color: #d63939; }
+    
+    .alert-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+    .alert-item.warning { background: rgba(247, 186, 30, 0.1); }
+    .alert-item.danger { background: rgba(214, 57, 57, 0.1); }
+    .alert-item.info { background: rgba(32, 107, 196, 0.1); }
+    
+    .kpi-ring {
+        width: 80px;
+        height: 80px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header con estado de caja -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1 class="h2 mb-1">Centro de Operaciones</h1>
+                <p class="text-muted mb-0">
+                    <i class="bi bi-calendar3 me-1"></i>
+                    {{ "now"|date:"l, d F Y" }}
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                {% if caja_abierta %}
+                <span class="badge bg-green-lt fs-6 py-2 px-3">
+                    <i class="bi bi-cash-stack me-1"></i>
+                    Caja Abierta: Gs. {{ total_caja|floatformat:0|default:0 }}
+                </span>
+                <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-box-arrow-right me-1"></i> Cerrar Caja
+                </a>
+                {% else %}
+                <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary">
+                    <i class="bi bi-unlock me-1"></i> Abrir Caja
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPIs principales -->
+<div class="row row-deck row-cards mb-4">
+    <!-- Viajes Hoy -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-primary-lt text-primary me-3">
+                        <i class="bi bi-bus-front-fill"></i>
+                    </div>
+                    <div>
+                        <div class="h1 mb-0">{{ viajes_hoy }}</div>
+                        <div class="text-muted">Viajes Hoy</div>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex gap-3 small">
+                    <span class="text-green"><i class="bi bi-play-circle"></i> {{ viajes_en_curso }} en curso</span>
+                    <span class="text-azure"><i class="bi bi-clock"></i> {{ viajes_programados }} prog.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pasajes Vendidos -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-green-lt text-green me-3">
+                        <i class="bi bi-ticket-perforated-fill"></i>
+                    </div>
+                    <div>
+                        <div class="h1 mb-0">{{ pasajes_vendidos_hoy }}</div>
+                        <div class="text-muted">Pasajes Vendidos</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="h4 text-green">Gs. {{ ingresos_pasajes_hoy|floatformat:0 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Encomiendas -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-yellow-lt text-yellow me-3">
+                        <i class="bi bi-box-seam-fill"></i>
+                    </div>
+                    <div>
+                        <div class="h1 mb-0">{{ encomiendas_hoy }}</div>
+                        <div class="text-muted">Encomiendas Hoy</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="text-yellow"><i class="bi bi-hourglass-split"></i> {{ encomiendas_pendientes }} pendientes</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ocupación Promedio -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-purple-lt text-purple me-3">
+                        <i class="bi bi-graph-up-arrow"></i>
+                    </div>
+                    <div>
+                        <div class="h1 mb-0">{{ ocupacion_promedio }}%</div>
+                        <div class="text-muted">Ocupación Semanal</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-purple" style="width: {{ ocupacion_promedio }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alertas + Acciones Rápidas -->
+<div class="row mb-4">
+    <!-- Alertas -->
+    <div class="col-lg-4 mb-4 mb-lg-0">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-bell-fill text-warning me-2"></i>
+                    Alertas
+                    {% if incidencias_abiertas > 0 %}
+                    <span class="badge bg-red ms-2">{{ incidencias_abiertas }}</span>
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if alertas %}
+                    {% for alerta in alertas %}
+                    <div class="alert-item {{ alerta.tipo }}">
+                        <i class="bi {{ alerta.icono }}" style="font-size: 1.25rem;"></i>
+                        <span>{{ alerta.mensaje }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle h1 text-green"></i>
+                        <p class="mb-0">Sin alertas activas</p>
+                    </div>
+                {% endif %}
+                
+                {% if incidencias_abiertas > 0 %}
+                <div class="mt-3">
+                    <a href="{% url 'operations:incidencia_list' %}" class="btn btn-outline-warning w-100">
+                        Ver Incidencias
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Acciones Rápidas -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-lightning-fill text-primary me-2"></i>
+                    Acciones Rápidas
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:viaje_create' %}" class="quick-action-btn btn btn-outline-primary w-100 h-100">
+                            <i class="bi bi-plus-circle"></i>
+                            <span>Nuevo Viaje</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:viaje_list' %}" class="quick-action-btn btn btn-outline-green w-100 h-100">
+                            <i class="bi bi-ticket"></i>
+                            <span>Vender Pasaje</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:encomienda_list' %}" class="quick-action-btn btn btn-outline-yellow w-100 h-100">
+                            <i class="bi bi-box-seam"></i>
+                            <span>Encomiendas</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:incidencia_create' %}" class="quick-action-btn btn btn-outline-danger w-100 h-100">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <span>Reportar</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:caja_dashboard' %}" class="quick-action-btn btn btn-outline-azure w-100 h-100">
+                            <i class="bi bi-cash-stack"></i>
+                            <span>Caja</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:factura_list' %}" class="quick-action-btn btn btn-outline-purple w-100 h-100">
+                            <i class="bi bi-receipt"></i>
+                            <span>Facturas</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:reporte_diario' %}" class="quick-action-btn btn btn-outline-cyan w-100 h-100">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Reporte Día</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <a href="{% url 'operations:tracking_publico' %}" class="quick-action-btn btn btn-outline-secondary w-100 h-100" target="_blank">
+                            <i class="bi bi-geo-alt"></i>
+                            <span>Tracking</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Viajes en curso y próximos -->
+<div class="row">
+    <!-- Viajes en Curso -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-play-circle-fill text-green me-2"></i>
+                    Viajes en Curso
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:viaje_list' %}?estado=en_curso" class="btn btn-sm btn-outline-primary">
+                        Ver todos
+                    </a>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for viaje in viajes_activos %}
+                <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="list-group-item list-group-item-action viaje-card en_curso">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ viaje.itinerario.nombre }}</h6>
+                            <small class="text-muted">
+                                <i class="bi bi-bus-front me-1"></i>{{ viaje.bus.placa }}
+                                <i class="bi bi-person ms-2 me-1"></i>{{ viaje.chofer.nombre_completo }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-green">En Curso</span>
+                            <div class="small text-muted mt-1">
+                                {{ viaje.porcentaje_ocupacion }}% ocupado
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="list-group-item text-center text-muted py-4">
+                    <i class="bi bi-bus-front h2"></i>
+                    <p class="mb-0">No hay viajes en curso</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Próximos Viajes -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-clock-fill text-azure me-2"></i>
+                    Próximos Viajes
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:viaje_list' %}" class="btn btn-sm btn-outline-primary">
+                        Ver todos
+                    </a>
+                </div>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for viaje in proximos_viajes %}
+                <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="list-group-item list-group-item-action viaje-card programado">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ viaje.itinerario.nombre }}</h6>
+                            <small class="text-muted">
+                                <i class="bi bi-bus-front me-1"></i>{{ viaje.bus.placa }}
+                                <i class="bi bi-person ms-2 me-1"></i>{{ viaje.chofer.nombre_completo }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-azure">Programado</span>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-people me-1"></i>{{ viaje.asientos_disponibles }} asientos
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="list-group-item text-center text-muted py-4">
+                    <i class="bi bi-calendar-x h2"></i>
+                    <p class="mb-0">No hay viajes programados para hoy</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen Semanal -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Resumen Semanal
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:reporte_ventas' %}" class="btn btn-sm btn-outline-primary">
+                        Ver Reportes
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="h1 mb-1 text-primary">{{ pasajes_semana }}</div>
+                        <div class="text-muted">Pasajes Vendidos</div>
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="h1 mb-1 text-green">Gs. {{ ingresos_semana|floatformat:0 }}</div>
+                        <div class="text-muted">Ingresos Totales</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="h1 mb-1 text-purple">{{ ocupacion_promedio }}%</div>
+                        <div class="text-muted">Ocupación Promedio</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

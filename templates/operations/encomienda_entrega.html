@@ -1,0 +1,51 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Entregar Encomienda - TR4CKING{% endblock %}
+{% block title_content %}Entregar Encomienda{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-green-lt">
+                <h3 class="card-title">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Confirmar Entrega
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <strong>Encomienda:</strong> {{ encomienda.codigo }}<br>
+                    <strong>Descripción:</strong> {{ encomienda.descripcion }}<br>
+                    <strong>Destinatario:</strong> {{ encomienda.destinatario.nombre_completo }}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre de quien recibe *</label>
+                        {{ form.receptor_nombre }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cédula de quien recibe *</label>
+                        {{ form.receptor_cedula }}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:encomienda_detail' encomienda.pk %}"
+                            class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-green">
+                            <i class="bi bi-check-lg me-1"></i> Confirmar Entrega
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

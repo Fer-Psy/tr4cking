@@ -1,0 +1,139 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Cerrar Caja - TR4CKING{% endblock %}
+{% block title_content %}Cierre de Caja{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-5 mb-4">
+        <!-- Resumen -->
+        <div class="card">
+            <div class="card-header bg-azure-lt">
+                <h3 class="card-title">
+                    <i class="bi bi-calculator me-2"></i>
+                    Resumen de Sesión
+                </h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>Apertura:</td>
+                        <td class="text-end">{{ sesion.fecha_apertura|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <td>Duración:</td>
+                        <td class="text-end">{{ sesion.duracion_sesion }}</td>
+                    </tr>
+                </table>
+                <hr>
+                <table class="table">
+                    <tr>
+                        <td>Monto Apertura:</td>
+                        <td class="text-end h5">Gs. {{ sesion.monto_apertura|floatformat:0 }}</td>
+                    </tr>
+                    <tr class="text-green">
+                        <td><i class="bi bi-plus-circle me-1"></i> Total Ingresos:</td>
+                        <td class="text-end h5">Gs. {{ sesion.total_ingresos|floatformat:0 }}</td>
+                    </tr>
+                    <tr class="text-red">
+                        <td><i class="bi bi-dash-circle me-1"></i> Total Egresos:</td>
+                        <td class="text-end h5">Gs. {{ sesion.total_egresos|floatformat:0 }}</td>
+                    </tr>
+                </table>
+                <hr>
+                <div class="bg-primary-lt p-3 rounded text-center">
+                    <span class="text-muted">Monto Esperado en Caja</span>
+                    <div class="h2 mb-0 text-primary">Gs. {{ monto_esperado|floatformat:0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-lock me-2"></i>
+                    Cierre de Caja
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="alert alert-warning mb-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Cuente el dinero en caja e ingrese el monto real. El sistema calculará la diferencia
+                        automáticamente.
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label h5">Monto Real en Caja *</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">Gs.</span>
+                            {{ form.monto_real }}
+                        </div>
+                        {% if form.monto_real.errors %}
+                        <div class="invalid-feedback d-block">{{ form.monto_real.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Observaciones</label>
+                        {{ form.observaciones }}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="bi bi-lock me-1"></i> Cerrar Caja
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Lista de movimientos -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Movimientos de la Sesión</h3>
+            </div>
+            <div class="table-responsive" style="max-height: 300px;">
+                <table class="table table-vcenter card-table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Hora</th>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimientos %}
+                        <tr>
+                            <td>{{ mov.fecha|time:"H:i" }}</td>
+                            <td>
+                                {% if mov.tipo == 'ingreso' %}
+                                <span class="badge bg-green-lt text-green">+</span>
+                                {% else %}
+                                <span class="badge bg-red-lt text-red">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.get_concepto_display }}</td>
+                            <td class="text-end">Gs. {{ mov.monto|floatformat:0 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Sin movimientos</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

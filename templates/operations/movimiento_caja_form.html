@@ -1,0 +1,70 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Registrar Movimiento - TR4CKING{% endblock %}
+{% block title_content %}Registrar Movimiento de Caja{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-cash me-2"></i>
+                    Nuevo Movimiento
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if sesion %}
+                <div class="alert alert-info mb-4">
+                    <strong>Sesión de Caja:</strong> {{ sesion.fecha_apertura|date:"d/m/Y H:i" }}<br>
+                    <strong>Saldo Actual:</strong> Gs. {{ sesion.calcular_cierre|floatformat:0 }}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Movimiento *</label>
+                        {{ form.tipo }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Concepto *</label>
+                        {{ form.concepto }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Monto *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Gs.</span>
+                            {{ form.monto }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        {{ form.descripcion }}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Registrar
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    No tiene una sesión de caja abierta.
+                </div>
+                <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary">Abrir Caja</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

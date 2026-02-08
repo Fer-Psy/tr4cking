@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
+from django.db.models import Q
 
 from .models import Persona, Localidad
 from .forms import PersonaForm, LocalidadForm
@@ -29,10 +30,10 @@ class PersonaListView(LoginRequiredMixin, ListView):
         search = self.request.GET.get('search', '')
         if search:
             queryset = queryset.filter(
-                models.Q(cedula__icontains=search) |
-                models.Q(nombre__icontains=search) |
-                models.Q(apellido__icontains=search) |
-                models.Q(telefono__icontains=search)
+                Q(cedula__icontains=search) |
+                Q(nombre__icontains=search) |
+                Q(apellido__icontains=search) |
+                Q(telefono__icontains=search)
             )
         
         # Role filter

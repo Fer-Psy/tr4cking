@@ -1,0 +1,87 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Viaje - TR4CKING{% endblock %}
+{% block title_content %}{% if form.instance.pk %}Editar Viaje{% else %}Programar Nuevo Viaje{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-bus-front me-2"></i>
+                    {% if form.instance.pk %}
+                    Editar Viaje #{{ form.instance.pk }}
+                    {% else %}
+                    Programar Nuevo Viaje
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Itinerario</label>
+                            {{ form.itinerario }}
+                            {% if form.itinerario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.itinerario.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Bus</label>
+                            {{ form.bus }}
+                            {% if form.bus.errors %}
+                            <div class="invalid-feedback d-block">{{ form.bus.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Chofer</label>
+                            {{ form.chofer }}
+                            {% if form.chofer.errors %}
+                            <div class="invalid-feedback d-block">{{ form.chofer.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fecha del Viaje</label>
+                            {{ form.fecha_viaje }}
+                            {% if form.fecha_viaje.errors %}
+                            <div class="invalid-feedback d-block">{{ form.fecha_viaje.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Observaciones</label>
+                            {{ form.observaciones }}
+                            {% if form.observaciones.errors %}
+                            <div class="invalid-feedback d-block">{{ form.observaciones.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:viaje_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if form.instance.pk %}Guardar Cambios{% else %}Programar Viaje{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

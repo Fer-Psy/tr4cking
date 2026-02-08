@@ -55,7 +55,10 @@
                             </div>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            <a href="{% url 'logout' %}" class="dropdown-item">Cerrar Sesión</a>
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                            </form>
                         </div>
                     </div>
                 </div>

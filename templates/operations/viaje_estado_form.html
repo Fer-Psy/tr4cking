@@ -1,0 +1,52 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Cambiar Estado de Viaje - TR4CKING{% endblock %}
+{% block title_content %}Cambiar Estado del Viaje{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Cambiar Estado
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <strong>Viaje:</strong> {{ object.itinerario.nombre }}<br>
+                    <strong>Fecha:</strong> {{ object.fecha_viaje|date:"d/m/Y" }}<br>
+                    <strong>Estado Actual:</strong>
+                    <span class="badge 
+                        {% if object.estado == 'programado' %}bg-azure
+                        {% elif object.estado == 'en_curso' %}bg-green
+                        {% elif object.estado == 'completado' %}bg-secondary
+                        {% else %}bg-red{% endif %}">
+                        {{ object.get_estado_display }}
+                    </span>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label class="form-label">Nuevo Estado</label>
+                        {{ form.estado }}
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'operations:viaje_detail' object.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Cambiar Estado
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

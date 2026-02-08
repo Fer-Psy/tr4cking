@@ -1,0 +1,12 @@
+<!-- Partial: Persona encontrada -->
+<div class="alert alert-success py-2">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <strong><i class="bi bi-check-circle me-1"></i> Persona encontrada</strong>
+            <br>
+            <span>{{ persona.nombre_completo }}</span>
+            <span class="text-muted ms-2">{{ persona.telefono|default:"" }}</span>
+        </div>
+        <span class="badge bg-success">{{ persona.cedula }}</span>
+    </div>
+</div>

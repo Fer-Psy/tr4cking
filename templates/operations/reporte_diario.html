@@ -1,0 +1,216 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Reporte Diario - TR4CKING{% endblock %}
+{% block title_content %}Reporte Diario de Operaciones{% endblock %}
+
+{% block content %}
+<!-- Selector de fecha -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Fecha del Reporte</label>
+                <input type="date" name="fecha" class="form-control" value="{{ fecha|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search me-1"></i> Ver Reporte
+                </button>
+            </div>
+            <div class="col-md-auto">
+                <a href="?fecha={{ fecha|date:'Y-m-d' }}" class="btn btn-outline-secondary"
+                    onclick="window.print(); return false;">
+                    <i class="bi bi-printer me-1"></i> Imprimir
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h3>
+            <i class="bi bi-calendar3 me-2"></i>
+            {{ fecha|date:"l, d F Y" }}
+        </h3>
+    </div>
+</div>
+
+<!-- Resumen del día -->
+<div class="row row-deck row-cards mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Viajes</div>
+                </div>
+                <div class="h1 mb-0">{{ total_viajes }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Pasajes Vendidos</div>
+                </div>
+                <div class="h1 mb-0">{{ total_pasajes }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Encomiendas</div>
+                </div>
+                <div class="h1 mb-0">{{ total_encomiendas }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card bg-green-lt">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Ingresos Totales</div>
+                </div>
+                <div class="h1 mb-0 text-green">Gs. {{ total_ingresos|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detalle de ingresos -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ingresos por Pasajes</h3>
+            </div>
+            <div class="card-body">
+                <div class="h2 text-green mb-0">Gs. {{ ingresos_pasajes|floatformat:0 }}</div>
+                <p class="text-muted mb-0">{{ total_pasajes }} pasajes vendidos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ingresos por Encomiendas</h3>
+            </div>
+            <div class="card-body">
+                <div class="h2 text-green mb-0">Gs. {{ ingresos_encomiendas|floatformat:0 }}</div>
+                <p class="text-muted mb-0">{{ total_encomiendas }} encomiendas</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Viajes del día -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="bi bi-bus-front me-2"></i>
+            Viajes del Día
+        </h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Itinerario</th>
+                    <th>Bus</th>
+                    <th>Chofer</th>
+                    <th class="text-center">Pasajes</th>
+                    <th class="text-center">Ocupación</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for viaje in viajes %}
+                <tr>
+                    <td>#{{ viaje.pk }}</td>
+                    <td>{{ viaje.itinerario.nombre }}</td>
+                    <td>{{ viaje.bus.placa }}</td>
+                    <td>{{ viaje.chofer.nombre_completo }}</td>
+                    <td class="text-center">{{ viaje.pasajes.count }}</td>
+                    <td class="text-center">
+                        <div class="progress" style="width: 80px; height: 6px;">
+                            <div class="progress-bar" style="width: {{ viaje.porcentaje_ocupacion }}%"></div>
+                        </div>
+                        <small>{{ viaje.porcentaje_ocupacion }}%</small>
+                    </td>
+                    <td>
+                        <span class="badge 
+                            {% if viaje.estado == 'completado' %}bg-success
+                            {% elif viaje.estado == 'en_curso' %}bg-primary
+                            {% elif viaje.estado == 'programado' %}bg-info
+                            {% else %}bg-danger{% endif %}">
+                            {{ viaje.get_estado_display }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        No hubo viajes este día
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Sesiones de caja -->
+{% if sesiones_caja %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="bi bi-cash-stack me-2"></i>
+            Sesiones de Caja
+        </h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>Cajero</th>
+                    <th>Apertura</th>
+                    <th>Cierre</th>
+                    <th class="text-end">M. Apertura</th>
+                    <th class="text-end">Ingresos</th>
+                    <th class="text-end">Egresos</th>
+                    <th class="text-end">M. Cierre</th>
+                    <th class="text-center">Diferencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ses in sesiones_caja %}
+                <tr>
+                    <td>{{ ses.cajero.get_full_name|default:ses.cajero.username }}</td>
+                    <td>{{ ses.fecha_apertura|time:"H:i" }}</td>
+                    <td>{{ ses.fecha_cierre|time:"H:i"|default:"-" }}</td>
+                    <td class="text-end">Gs. {{ ses.monto_apertura|floatformat:0 }}</td>
+                    <td class="text-end text-green">Gs. {{ ses.total_ingresos|floatformat:0 }}</td>
+                    <td class="text-end text-red">Gs. {{ ses.total_egresos|floatformat:0 }}</td>
+                    <td class="text-end">Gs. {{ ses.monto_cierre_real|floatformat:0|default:"-" }}</td>
+                    <td class="text-center">
+                        {% if ses.estado == 'cerrada' %}
+                        <span
+                            class="badge {% if ses.diferencia == 0 %}bg-success{% elif ses.diferencia > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+                            Gs. {{ ses.diferencia|floatformat:0 }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-info">Abierta</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

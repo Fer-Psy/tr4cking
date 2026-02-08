@@ -1,0 +1,54 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Resolver Incidencia - TR4CKING{% endblock %}
+{% block title_content %}Resolver Incidencia{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-success-lt">
+                <h3 class="card-title">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Resolver Incidencia #{{ incidencia.pk }}
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <strong>Tipo:</strong> {{ incidencia.get_tipo_display }}<br>
+                    <strong>Prioridad:</strong> {{ incidencia.get_prioridad_display }}<br>
+                    {% if incidencia.viaje %}
+                    <strong>Viaje:</strong> {{ incidencia.viaje.itinerario.nombre }}
+                    {% endif %}
+                </div>
+
+                <h5>Descripción del problema</h5>
+                <div class="bg-light p-3 rounded mb-4">
+                    {{ incidencia.descripcion }}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label h5">Resolución *</label>
+                        {{ form.resolucion }}
+                        <small class="text-muted">Describa las acciones tomadas para resolver la incidencia</small>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'operations:incidencia_detail' incidencia.pk %}"
+                            class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i> Marcar como Resuelta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

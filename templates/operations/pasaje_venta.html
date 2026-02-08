@@ -1,0 +1,246 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Vender Pasaje - TR4CKING{% endblock %}
+{% block title_content %}Venta de Pasaje{% endblock %}
+
+{% block extra_css %}
+<style>
+    .seat-selector {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        max-width: 280px;
+    }
+
+    .seat-btn {
+        width: 50px;
+        height: 50px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        background: #e8f5e9;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+
+    .seat-btn:hover:not(:disabled) {
+        transform: scale(1.1);
+        border-color: #206bc4;
+    }
+
+    .seat-btn.selected {
+        background: #206bc4;
+        color: white;
+        border-color: #206bc4;
+    }
+
+    .seat-btn:disabled {
+        background: #ffebee;
+        border-color: #f44336;
+        color: #c62828;
+        cursor: not-allowed;
+    }
+
+    .seat-btn:nth-child(2n) {
+        margin-right: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-ticket me-2"></i>
+                    Venta de Pasaje - {{ viaje.itinerario.nombre }}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post" id="venta-form">
+                    {% csrf_token %}
+                    {{ form.viaje }}
+
+                    <!-- Datos del Pasajero -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-person me-2"></i>
+                                Datos del Pasajero
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cédula del Pasajero *</label>
+                                    {{ form.cedula_pasajero }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nombre</label>
+                                    {{ form.nombre_pasajero }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Apellido</label>
+                                    {{ form.apellido_pasajero }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Teléfono</label>
+                                    {{ form.telefono_pasajero }}
+                                </div>
+                            </div>
+                            <div id="datos-pasajero"></div>
+                        </div>
+                    </div>
+
+                    <!-- Selección de Tramo -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-signpost me-2"></i>
+                                Tramo del Viaje
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Origen *</label>
+                                    {{ form.parada_origen }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Destino *</label>
+                                    {{ form.parada_destino }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Selección de Asiento -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-grid-3x3-gap me-2"></i>
+                                Selección de Asiento
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Asiento *</label>
+                                    {{ form.asiento }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Precio</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Gs.</span>
+                                        {{ form.precio }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                            <li>{{ field }}: {{ errors.0 }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-green btn-lg">
+                            <i class="bi bi-check-lg me-1"></i> Confirmar Venta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info del Viaje -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Información del Viaje</h4>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Itinerario</div>
+                        <div class="datagrid-content">{{ viaje.itinerario.nombre }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Fecha</div>
+                        <div class="datagrid-content">{{ viaje.fecha_viaje|date:"d/m/Y" }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Bus</div>
+                        <div class="datagrid-content">{{ viaje.bus.placa }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Asientos Disponibles</div>
+                        <div class="datagrid-content">
+                            <span class="badge bg-green fs-5">{{ viaje.asientos_disponibles }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paradaOrigen = document.getElementById('id_parada_origen');
+    const paradaDestino = document.getElementById('id_parada_destino');
+    const precioInput = document.getElementById('id_precio');
+    const viajeInput = document.getElementById('id_viaje');
+    
+    function actualizarPrecio() {
+        const origenId = paradaOrigen.value;
+        const destinoId = paradaDestino.value;
+        const viajeId = viajeInput.value;
+        
+        if (origenId && destinoId && viajeId && origenId !== destinoId) {
+            fetch(`{% url 'operations:obtener_precio' %}?viaje=${viajeId}&origen=${origenId}&destino=${destinoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.precio && data.precio > 0) {
+                        precioInput.value = data.precio;
+                        precioInput.classList.remove('is-invalid');
+                        precioInput.classList.add('is-valid');
+                    } else {
+                        precioInput.value = '';
+                        precioInput.placeholder = 'Precio no configurado - Ingrese manualmente';
+                        precioInput.classList.remove('is-valid');
+                        precioInput.classList.add('is-invalid');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al obtener precio:', error);
+                    precioInput.value = '';
+                    precioInput.placeholder = 'Error - Ingrese manualmente';
+                });
+        } else {
+            precioInput.value = '';
+            precioInput.classList.remove('is-valid', 'is-invalid');
+        }
+    }
+    
+    // Escuchar cambios en las paradas
+    if (paradaOrigen && paradaDestino) {
+        paradaOrigen.addEventListener('change', actualizarPrecio);
+        paradaDestino.addEventListener('change', actualizarPrecio);
+    }
+});
+</script>
+{% endblock %}

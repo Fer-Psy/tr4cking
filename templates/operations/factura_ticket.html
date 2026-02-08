@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=80mm">
+    <title>Factura {{ factura.numero_completo }}</title>
+    <style>
+        /* =================================================================
+           ESTILOS PARA IMPRESORA TÉRMICA 80mm
+           Replicando formato físico de factura paraguaya
+           ================================================================= */
+
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
+            font-size: 11px;
+            line-height: 1.3;
+            width: 80mm;
+            padding: 2mm;
+            background: #fff;
+            color: #000;
+        }
+
+        .ticket {
+            width: 100%;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .uppercase {
+            text-transform: uppercase;
+        }
+
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+        }
+
+        .divider-solid {
+            border-top: 1px solid #000;
+            margin: 4px 0;
+        }
+
+        .divider-double {
+            border-top: 2px solid #000;
+            margin: 4px 0;
+        }
+
+        /* ============================================================
+           CABECERA - DATOS DE LA EMPRESA
+           ============================================================ */
+        .header {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .empresa-tipo {
+            font-size: 9px;
+            font-style: italic;
+        }
+
+        .empresa-nombre {
+            font-size: 18px;
+            font-weight: bold;
+            font-style: italic;
+            margin: 3px 0;
+        }
+
+        .empresa-actividad {
+            font-size: 9px;
+            line-height: 1.2;
+        }
+
+        .empresa-ruc {
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 3px;
+        }
+
+        /* ============================================================
+           DATOS FISCALES
+           ============================================================ */
+        .fiscal-section {
+            margin: 6px 0;
+            padding: 4px;
+            border: 1px solid #000;
+        }
+
+        .factura-tipo {
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 3px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .info-label {
+            color: #333;
+        }
+
+        .info-value {
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .numero-factura {
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            margin: 4px 0;
+        }
+
+        /* ============================================================
+           DATOS DEL VIAJE
+           ============================================================ */
+        .viaje-section {
+            margin: 6px 0;
+            font-size: 11px;
+        }
+
+        .viaje-codigo {
+            font-weight: bold;
+        }
+
+        .viaje-ruta {
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        /* ============================================================
+           DATOS DEL CLIENTE / PASAJERO
+           ============================================================ */
+        .cliente-section {
+            margin: 6px 0;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .cliente-titulo {
+            font-weight: bold;
+        }
+
+        /* ============================================================
+           DETALLE DE ITEMS
+           ============================================================ */
+        .detalle-header {
+            display: grid;
+            grid-template-columns: 25px 1fr 30px 50px;
+            font-size: 9px;
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            padding: 3px 0;
+            margin-top: 6px;
+        }
+
+        .detalle-item {
+            font-size: 10px;
+            padding: 3px 0;
+            line-height: 1.3;
+        }
+
+        .detalle-descripcion {
+            margin-left: 25px;
+            word-wrap: break-word;
+        }
+
+        .detalle-valores {
+            display: grid;
+            grid-template-columns: 25px 1fr 30px 50px;
+            font-size: 10px;
+        }
+
+        /* ============================================================
+           TOTALES
+           ============================================================ */
+        .subtotal-row {
+            text-align: right;
+            font-size: 11px;
+            padding: 3px 0;
+        }
+
+        .total-principal {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px 0;
+            margin: 4px 0;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+        }
+
+        /* ============================================================
+           LIQUIDACIÓN IVA
+           ============================================================ */
+        .iva-section {
+            margin: 6px 0;
+            font-size: 10px;
+            padding: 4px;
+            border: 1px dashed #000;
+        }
+
+        .iva-title {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 3px;
+        }
+
+        .iva-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .total-letras {
+            font-size: 10px;
+            text-align: center;
+            margin: 4px 0;
+        }
+
+        /* ============================================================
+           INFORMACIÓN ADICIONAL
+           ============================================================ */
+        .info-adicional {
+            font-size: 10px;
+            margin: 6px 0;
+            padding: 4px;
+            border: 1px solid #000;
+        }
+
+        .info-adicional-row {
+            display: flex;
+            justify-content: space-between;
+            line-height: 1.4;
+        }
+
+        /* ============================================================
+           CÓDIGO QR
+           ============================================================ */
+        .qr-section {
+            text-align: center;
+            margin: 8px 0;
+        }
+
+        .qr-code {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .qr-placeholder {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+        }
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        .footer {
+            text-align: center;
+            font-size: 9px;
+            margin-top: 8px;
+            padding-top: 4px;
+            border-top: 1px dashed #000;
+        }
+
+        .anulada-stamp {
+            font-size: 16px;
+            font-weight: bold;
+            color: red;
+            text-align: center;
+            margin: 8px 0;
+            padding: 6px;
+            border: 2px solid red;
+        }
+
+        /* ============================================================
+           ESTILOS PARA PANTALLA (preview)
+           ============================================================ */
+        @media screen {
+            body {
+                max-width: 80mm;
+                margin: 20px auto;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+                padding: 4mm;
+                background: #fff;
+            }
+
+            .no-print {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                z-index: 1000;
+            }
+
+            .no-print button,
+            .no-print a {
+                padding: 10px 16px;
+                font-size: 13px;
+                cursor: pointer;
+                border: none;
+                border-radius: 6px;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-family: sans-serif;
+            }
+
+            .btn-print {
+                background: #206bc4;
+                color: white;
+            }
+
+            .btn-pdf {
+                background: #d63939;
+                color: white;
+            }
+
+            .btn-back {
+                background: #626976;
+                color: white;
+            }
+
+            .btn-print:hover,
+            .btn-pdf:hover,
+            .btn-back:hover {
+                opacity: 0.9;
+            }
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                margin: 0;
+                padding: 1mm;
+                width: 80mm;
+            }
+
+            .anulada-stamp {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Botones de acción (solo pantalla) -->
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">
+            🖨️ Imprimir
+        </button>
+        <a href="{% url 'operations:factura_pdf' factura.pk %}" class="btn-pdf" target="_blank">
+            📄 Descargar PDF
+        </a>
+        <button class="btn-back" onclick="history.back()">
+            ← Volver
+        </button>
+    </div>
+
+    <div class="ticket">
+        <!-- ============================================================
+             CABECERA - DATOS DE LA EMPRESA
+             ============================================================ -->
+        <div class="header">
+            <div class="empresa-tipo">EMPRESA</div>
+            <div class="empresa-nombre">{{ empresa.nombre }}</div>
+            <div class="empresa-actividad">
+                TRANSPORTE URBANO Y SUBURBANO DE<br>
+                PASAJEROS POR VIA TERRESTRE
+            </div>
+            {% if empresa.direccion_legal %}
+            <div class="empresa-actividad">{{ empresa.direccion_legal }}</div>
+            {% endif %}
+            <div class="empresa-ruc">RUC: {{ empresa.ruc }}</div>
+        </div>
+
+        <div class="divider-double"></div>
+
+        <!-- ============================================================
+             DATOS FISCALES
+             ============================================================ -->
+        <div class="fiscal-section">
+            <div class="factura-tipo">FACTURA ELECTRÓNICA</div>
+            
+            <div class="info-row">
+                <span class="info-label">TIMBRADO:</span>
+                <span class="info-value">{{ factura.timbrado.numero }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">CONDICIÓN:</span>
+                <span class="info-value">{{ factura.get_condicion_display|upper }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">VIGENCIA:</span>
+                <span class="info-value">{{ factura.timbrado.fecha_fin|date:"d/m/Y" }}</span>
+            </div>
+            
+            <div class="divider-solid"></div>
+            
+            <div class="numero-factura">
+                NÚMERO: {{ factura.numero_completo }}
+            </div>
+        </div>
+
+        <!-- ============================================================
+             INFORMACIÓN DEL VIAJE (si aplica)
+             ============================================================ -->
+        {% with primer_pasaje=primer_detalle_pasaje %}
+        {% if primer_pasaje %}
+        <div class="viaje-section">
+            <div class="info-row">
+                <span class="info-label">COCHE:</span>
+                <span class="viaje-codigo">{{ primer_pasaje.viaje.bus.placa }}</span>
+            </div>
+            <div class="viaje-ruta">
+                {{ primer_pasaje.parada_origen.nombre|upper }} - {{ primer_pasaje.parada_destino.nombre|upper }}
+                {{ primer_pasaje.viaje.fecha_viaje|date:"d/m/Y" }}
+            </div>
+            {% if primer_pasaje.viaje.itinerario.hora_salida %}
+            <div style="font-size: 11px;">{{ primer_pasaje.viaje.itinerario.hora_salida|time:"H:i" }}</div>
+            {% endif %}
+        </div>
+        <div class="divider"></div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- ============================================================
+             DATOS DEL CLIENTE
+             ============================================================ -->
+        <div class="cliente-section">
+            <div class="cliente-titulo">CLIENTE: C.I. {{ factura.cliente.cedula }}</div>
+            <div class="uppercase">{{ factura.cliente.nombre_completo }}</div>
+        </div>
+
+        <!-- Pasajero si es diferente al cliente -->
+        {% if primer_detalle_pasaje and primer_detalle_pasaje.pasajero != factura.cliente %}
+        <div class="cliente-section">
+            <div class="cliente-titulo">PASAJERO: C.I. {{ primer_detalle_pasaje.pasajero.cedula }}</div>
+            <div class="uppercase">{{ primer_detalle_pasaje.pasajero.nombre_completo }}</div>
+        </div>
+        {% endif %}
+
+        <div class="divider-solid"></div>
+
+        <!-- ============================================================
+             DETALLE DE ITEMS
+             ============================================================ -->
+        <div class="detalle-header">
+            <span>Cant</span>
+            <span>Detalle</span>
+            <span>IVA%</span>
+            <span class="right">Imp. Gs</span>
+        </div>
+
+        {% for detalle in detalles %}
+        <div class="detalle-item">
+            <div class="detalle-valores">
+                <span>{{ detalle.cantidad|floatformat:0 }}</span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="detalle-descripcion">
+                {{ detalle.descripcion|upper }}
+            </div>
+            <div class="detalle-valores" style="margin-top: 2px;">
+                <span></span>
+                <span></span>
+                <span>{{ detalle.tasa_iva }}</span>
+                <span class="right">{{ detalle.subtotal|floatformat:0 }}</span>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- ============================================================
+             TOTALES
+             ============================================================ -->
+        <div class="subtotal-row">
+            {{ factura.total|floatformat:0 }}
+        </div>
+
+        <div class="total-principal">
+            *** TOTAL Gs. *** &nbsp;&nbsp;&nbsp; {{ factura.total|floatformat:0 }}
+        </div>
+
+        <!-- ============================================================
+             LIQUIDACIÓN DE IVA
+             ============================================================ -->
+        <div class="iva-section">
+            <div class="iva-title">*** Liquidación del IVA ***</div>
+            <div class="iva-row">
+                <span>Total Exenta</span>
+                <span>{{ factura.subtotal_exenta|floatformat:0 }}</span>
+            </div>
+            <div class="iva-row">
+                <span>Total I.V.A 5%</span>
+                <span>{{ factura.iva_5|floatformat:0 }}</span>
+            </div>
+            <div class="iva-row">
+                <span>Total I.V.A 10%</span>
+                <span>{{ factura.iva_10|floatformat:0 }}</span>
+            </div>
+            <div class="iva-row bold">
+                <span>TOTAL I.V.A</span>
+                <span>{{ factura.total_iva|floatformat:0 }}</span>
+            </div>
+        </div>
+
+        <div class="total-letras">
+            Son Gs.: {{ total_letras }}
+        </div>
+
+        <div class="divider-solid"></div>
+
+        <!-- ============================================================
+             INFORMACIÓN ADICIONAL - ASIENTO Y AGENTE
+             ============================================================ -->
+        <div class="info-adicional">
+            {% if primer_detalle_pasaje %}
+            <div class="info-adicional-row">
+                <span class="bold">ASIENTO Nº:</span>
+                <span class="bold">{{ primer_detalle_pasaje.asiento.numero_asiento }}</span>
+            </div>
+            {% endif %}
+            <div class="info-adicional-row">
+                <span>AGENTE:</span>
+                <span>{{ factura.cajero.get_full_name|default:factura.cajero.username|upper }}</span>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Fecha y hora de emisión -->
+        <div class="center" style="font-size: 10px; margin: 4px 0;">
+            FECHA HORA VENTA: {{ factura.fecha_emision|date:"d/m/y" }} {{ factura.fecha_emision|time:"H:i" }}
+        </div>
+
+        <!-- ============================================================
+             CÓDIGO QR
+             ============================================================ -->
+        <div class="qr-section">
+            {% if qr_image %}
+            <img src="data:image/png;base64,{{ qr_image }}" alt="QR Code" class="qr-code">
+            {% else %}
+            <div class="qr-placeholder">
+                [QR CODE]<br>
+                {{ factura.numero_completo }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ============================================================
+             MARCA DE ANULACIÓN (si aplica)
+             ============================================================ -->
+        {% if factura.estado == 'anulada' %}
+        <div class="anulada-stamp">
+            *** FACTURA ANULADA ***<br>
+            <span style="font-size: 10px;">{{ factura.fecha_anulacion|date:"d/m/Y H:i" }}</span>
+        </div>
+        {% endif %}
+
+        <!-- ============================================================
+             FOOTER
+             ============================================================ -->
+        <div class="footer">
+            <div>Original: Cliente</div>
+            <div style="margin-top: 4px; font-weight: bold;">¡GRACIAS POR SU PREFERENCIA!</div>
+            <div style="margin-top: 4px;">
+                TR4CKING - Sistema de Gestión de Transporte
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-imprimir si viene con parámetro ?print=1
+        if (window.location.search.includes('print=1')) {
+            window.onload = function () {
+                window.print();
+            };
+        }
+    </script>
+</body>
+
+</html>

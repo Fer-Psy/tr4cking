@@ -1,0 +1,178 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Caja - TR4CKING{% endblock %}
+{% block title_content %}Gestión de Caja{% endblock %}
+
+{% block content %}
+{% if sesion_abierta %}
+<!-- Caja Abierta -->
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <!-- Estado de Caja -->
+        <div class="card bg-green-lt">
+            <div class="card-body text-center">
+                <div class="mb-2">
+                    <i class="bi bi-unlock-fill h1 text-green"></i>
+                </div>
+                <h2 class="text-green mb-1">CAJA ABIERTA</h2>
+                <p class="text-muted mb-0">Desde {{ sesion.fecha_apertura|date:"H:i" }}</p>
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Resumen de Caja</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>Monto Apertura:</td>
+                        <td class="text-end">Gs. {{ sesion.monto_apertura|floatformat:0 }}</td>
+                    </tr>
+                    <tr class="text-green">
+                        <td><i class="bi bi-arrow-down-circle me-1"></i> Ingresos:</td>
+                        <td class="text-end">Gs. {{ sesion.total_ingresos|floatformat:0 }}</td>
+                    </tr>
+                    <tr class="text-red">
+                        <td><i class="bi bi-arrow-up-circle me-1"></i> Egresos:</td>
+                        <td class="text-end">Gs. {{ sesion.total_egresos|floatformat:0 }}</td>
+                    </tr>
+                </table>
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="h4 mb-0">Total Actual:</span>
+                    <span class="h3 text-green mb-0">Gs. {{ total_actual|floatformat:0 }}</span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-lock me-1"></i> Cerrar Caja
+                </a>
+            </div>
+        </div>
+
+        <!-- Registrar Movimiento -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Registrar Movimiento</h3>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'operations:movimiento_caja_create' %}" class="btn btn-primary w-100">
+                    <i class="bi bi-plus-lg me-1"></i> Nuevo Movimiento
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <!-- Últimos Movimientos -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Últimos Movimientos
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                        <tr>
+                            <th>Hora</th>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
+                            <th>Descripción</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimientos %}
+                        <tr>
+                            <td>{{ mov.fecha|time:"H:i" }}</td>
+                            <td>
+                                {% if mov.tipo == 'ingreso' %}
+                                <span class="badge bg-green"><i class="bi bi-arrow-down"></i> Ingreso</span>
+                                {% else %}
+                                <span class="badge bg-red"><i class="bi bi-arrow-up"></i> Egreso</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.get_concepto_display }}</td>
+                            <td>{{ mov.descripcion|truncatechars:30 }}</td>
+                            <td class="text-end {% if mov.tipo == 'ingreso' %}text-green{% else %}text-red{% endif %}">
+                                {% if mov.tipo == 'egreso' %}-{% endif %}Gs. {{ mov.monto|floatformat:0 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                No hay movimientos registrados
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Caja Cerrada -->
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-lock-fill h1 text-secondary" style="font-size: 4rem;"></i>
+                </div>
+                <h2 class="mb-3">Caja Cerrada</h2>
+                <p class="text-muted mb-4">
+                    No tiene una sesión de caja abierta. Abra una nueva sesión para registrar movimientos.
+                </p>
+                <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-unlock me-2"></i> Abrir Caja
+                </a>
+            </div>
+        </div>
+
+        {% if sesiones_recientes %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3 class="card-title">Últimas Sesiones</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for ses in sesiones_recientes %}
+                <a href="{% url 'operations:sesion_caja_detail' ses.pk %}"
+                    class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ ses.fecha_apertura|date:"d/m/Y" }}</strong>
+                            <br>
+                            <small class="text-muted">{{ ses.fecha_apertura|time:"H:i" }} - {{
+                                ses.fecha_cierre|time:"H:i"|default:"En curso" }}</small>
+                        </div>
+                        <div class="text-end">
+                            {% if ses.estado == 'cerrada' %}
+                            <span
+                                class="badge {% if ses.diferencia == 0 %}bg-green{% elif ses.diferencia > 0 %}bg-yellow{% else %}bg-red{% endif %}">
+                                {% if ses.diferencia == 0 %}✓ Sin diferencia
+                                {% elif ses.diferencia > 0 %}+Gs. {{ ses.diferencia|floatformat:0 }}
+                                {% else %}-Gs. {{ ses.diferencia|floatformat:0|slice:"1:" }}
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-azure">Abierta</span>
+                            {% endif %}
+                            <br>
+                            <small>Gs. {{ ses.monto_cierre_real|floatformat:0|default:"-" }}</small>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

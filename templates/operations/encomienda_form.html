@@ -1,0 +1,137 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Registrar Encomienda - TR4CKING{% endblock %}
+{% block title_content %}Registrar Nueva Encomienda{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-box-seam me-2"></i>
+                    Nueva Encomienda
+                    {% if viaje %}
+                    - {{ viaje.itinerario.nombre }}
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.viaje }}
+
+                    <div class="row">
+                        <!-- Remitente -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h4 class="card-title mb-0">
+                                        <i class="bi bi-person me-2"></i>
+                                        Remitente
+                                    </h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Cédula *</label>
+                                        {{ form.cedula_remitente }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Destinatario -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h4 class="card-title mb-0">
+                                        <i class="bi bi-person-check me-2"></i>
+                                        Destinatario
+                                    </h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Cédula *</label>
+                                        {{ form.cedula_destinatario }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detalles de la encomienda -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-box me-2"></i>
+                                Detalles de la Encomienda
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Tipo *</label>
+                                    {{ form.tipo }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Parada Origen *</label>
+                                    {{ form.parada_origen }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Parada Destino *</label>
+                                    {{ form.parada_destino }}
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Descripción *</label>
+                                    {{ form.descripcion }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Peso (kg)</label>
+                                    {{ form.peso_kg }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Dimensiones</label>
+                                    {{ form.dimensiones }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Precio *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Gs.</span>
+                                        {{ form.precio }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                            <li>{{ field }}: {{ errors.0 }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between">
+                        {% if viaje %}
+                        <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        {% else %}
+                        <a href="{% url 'operations:encomienda_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-yellow btn-lg">
+                            <i class="bi bi-check-lg me-1"></i> Registrar Encomienda
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

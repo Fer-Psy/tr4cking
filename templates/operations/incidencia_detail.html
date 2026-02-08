@@ -1,0 +1,181 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Incidencia #{{ incidencia.pk }} - TR4CKING{% endblock %}
+{% block title_content %}Detalle de Incidencia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Incidencia #{{ incidencia.pk }}
+                </h3>
+                <div>
+                    <span class="badge 
+                        {% if incidencia.prioridad == 'critica' %}bg-danger
+                        {% elif incidencia.prioridad == 'alta' %}bg-orange
+                        {% elif incidencia.prioridad == 'media' %}bg-yellow
+                        {% else %}bg-secondary{% endif %} me-2">
+                        {{ incidencia.get_prioridad_display }}
+                    </span>
+                    <span class="badge 
+                        {% if incidencia.estado == 'resuelta' %}bg-success
+                        {% elif incidencia.estado == 'en_proceso' %}bg-info
+                        {% elif incidencia.estado == 'cerrada' %}bg-secondary
+                        {% else %}bg-warning{% endif %}">
+                        {{ incidencia.get_estado_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th>Tipo:</th>
+                                <td>{{ incidencia.get_tipo_display }}</td>
+                            </tr>
+                            <tr>
+                                <th>Reportado por:</th>
+                                <td>{{ incidencia.reportador.get_full_name|default:incidencia.reportador.username }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Fecha Reporte:</th>
+                                <td>{{ incidencia.fecha_reporte|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        {% if incidencia.viaje %}
+                        <table class="table table-sm">
+                            <tr>
+                                <th>Viaje:</th>
+                                <td>
+                                    <a href="{% url 'operations:viaje_detail' incidencia.viaje.pk %}">
+                                        {{ incidencia.viaje.itinerario.nombre }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Fecha Viaje:</th>
+                                <td>{{ incidencia.viaje.fecha_viaje|date:"d/m/Y" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Bus:</th>
+                                <td>{{ incidencia.viaje.bus.placa }}</td>
+                            </tr>
+                        </table>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <h5>Descripción</h5>
+                <div class="bg-light p-3 rounded mb-4">
+                    {{ incidencia.descripcion|linebreaks }}
+                </div>
+
+                {% if incidencia.estado == 'resuelta' %}
+                <hr>
+                <h5><i class="bi bi-check-circle text-success me-2"></i>Resolución</h5>
+                <div class="alert alert-success">
+                    <p class="mb-0">{{ incidencia.resolucion|linebreaks }}</p>
+                    <hr>
+                    <small>
+                        <strong>Fecha resolución:</strong> {{ incidencia.fecha_resolucion|date:"d/m/Y H:i" }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'operations:incidencia_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+
+                    {% if incidencia.estado in 'abierta,en_proceso' %}
+                    <div class="btn-group">
+                        {% if incidencia.estado == 'abierta' %}
+                        <form method="post" action="" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="estado" value="en_proceso">
+                        </form>
+                        {% endif %}
+                        <a href="{% url 'operations:incidencia_resolver' incidencia.pk %}" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i> Resolver
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Timeline -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Historial</h4>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item completed">
+                        <strong>Reportada</strong>
+                        <p class="text-muted small mb-0">{{ incidencia.fecha_reporte|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    {% if incidencia.estado in 'en_proceso,resuelta,cerrada' %}
+                    <div class="timeline-item completed">
+                        <strong>En Proceso</strong>
+                    </div>
+                    {% endif %}
+                    {% if incidencia.estado in 'resuelta,cerrada' %}
+                    <div class="timeline-item completed">
+                        <strong>Resuelta</strong>
+                        <p class="text-muted small mb-0">{{ incidencia.fecha_resolucion|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 25px;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 5px;
+        bottom: 5px;
+        width: 2px;
+        background: #e2e8f0;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 1rem;
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -22px;
+        top: 3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #e2e8f0;
+    }
+
+    .timeline-item.completed::before {
+        background: #2fb344;
+    }
+</style>
+{% endblock %}
