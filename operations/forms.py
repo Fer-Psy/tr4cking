@@ -195,27 +195,75 @@ class PasajeCancelacionForm(forms.Form):
 class EncomiendaForm(forms.ModelForm):
     """Formulario para registrar encomiendas."""
     
+    # Campo oculto para remitente seleccionado desde el modal
+    remitente_id = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={'id': 'id_remitente_id'})
+    )
+    
     cedula_remitente = forms.IntegerField(
         label="Cédula del Remitente",
+        required=False,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'hx-get': '/operations/buscar-persona/',
-            'hx-trigger': 'blur',
-            'hx-target': '#info-remitente',
-            'hx-swap': 'innerHTML',
-            'hx-vals': 'js:{cedula: this.value}'
+            'placeholder': 'Ingrese cédula o busque en el listado',
+            'readonly': 'readonly'
         })
     )
     
+    # Campos del destinatario (para crear nuevo si no existe)
     cedula_destinatario = forms.IntegerField(
         label="Cédula del Destinatario",
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'hx-get': '/operations/buscar-persona/',
-            'hx-trigger': 'blur',
-            'hx-target': '#info-destinatario',
-            'hx-swap': 'innerHTML',
-            'hx-vals': 'js:{cedula: this.value}'
+            'placeholder': 'Número de cédula'
+        })
+    )
+    
+    nombre_destinatario = forms.CharField(
+        label="Nombre del Destinatario",
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nombre'
+        })
+    )
+    
+    apellido_destinatario = forms.CharField(
+        label="Apellido del Destinatario",
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Apellido'
+        })
+    )
+    
+    telefono_destinatario = forms.CharField(
+        label="Teléfono del Destinatario",
+        max_length=30,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Número de teléfono'
+        })
+    )
+    
+    direccion_destinatario = forms.CharField(
+        label="Dirección del Destinatario",
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Dirección de entrega'
+        })
+    )
+    
+    dimensiones = forms.CharField(
+        label="Dimensiones (opcional)",
+        required=False,
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: 30x20x15 cm'
         })
     )
 
@@ -228,14 +276,17 @@ class EncomiendaForm(forms.ModelForm):
         widgets = {
             'descripcion': forms.Textarea(attrs={
                 'class': 'form-control',
-                'rows': 3
+                'rows': 3,
+                'placeholder': 'Describa el contenido de la encomienda'
             }),
             'peso_kg': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'step': '0.01'
+                'step': '0.01',
+                'placeholder': 'Peso en kg'
             }),
             'precio': forms.NumberInput(attrs={
-                'class': 'form-control'
+                'class': 'form-control',
+                'placeholder': 'Precio en Gs.'
             }),
         }
 
@@ -243,6 +294,7 @@ class EncomiendaForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         if viaje:
+            # Si viene de un viaje específico, ocultarlo
             self.fields['viaje'].initial = viaje
             self.fields['viaje'].widget = forms.HiddenInput()
             
@@ -251,6 +303,38 @@ class EncomiendaForm(forms.ModelForm):
             paradas_queryset = Parada.objects.filter(id__in=list(paradas_ids)).order_by('nombre')
             self.fields['parada_origen'].queryset = paradas_queryset
             self.fields['parada_destino'].queryset = paradas_queryset
+        else:
+            # Si es creación directa, mostrar selector de viajes con info del bus
+            from django.utils import timezone
+            hoy = timezone.now().date()
+            
+            # Mostrar solo viajes programados o en curso de hoy en adelante
+            viajes_disponibles = Viaje.objects.filter(
+                fecha_viaje__gte=hoy,
+                estado__in=['programado', 'en_curso']
+            ).select_related(
+                'itinerario', 'bus'
+            ).prefetch_related(
+                'itinerario__detalles'
+            ).order_by('fecha_viaje', 'itinerario__nombre')
+            
+            self.fields['viaje'].queryset = viajes_disponibles
+            
+            def get_viaje_label(obj):
+                # Obtener hora de salida del primer detalle del itinerario
+                primer_detalle = obj.itinerario.detalles.order_by('orden').first()
+                hora_str = primer_detalle.hora_salida.strftime('%H:%M') if primer_detalle and primer_detalle.hora_salida else 'Sin hora'
+                return (
+                    f"{obj.fecha_viaje.strftime('%d/%m/%Y')} - {obj.itinerario.nombre} - "
+                    f"Bus: {obj.bus.placa} ({hora_str})"
+                )
+            
+            self.fields['viaje'].label_from_instance = get_viaje_label
+            self.fields['viaje'].widget.attrs.update({
+                'class': 'form-select',
+                'id': 'id_viaje'
+            })
+            self.fields['viaje'].empty_label = "-- Seleccione un viaje --"
         
         for field_name, field in self.fields.items():
             if 'class' not in field.widget.attrs:
@@ -382,14 +466,22 @@ class FacturaForm(forms.ModelForm):
             fecha_fin__gte=hoy
         )
         
+        # Convertir cliente a int si viene como string
+        cliente_cedula = None
+        if cliente:
+            try:
+                cliente_cedula = int(cliente) if isinstance(cliente, str) else cliente
+            except (ValueError, TypeError):
+                cliente_cedula = None
+        
         # Pre-seleccionar pasaje o encomienda si viene de una venta
         if pasaje:
             self.fields['pasajes'].queryset = Pasaje.objects.filter(pk=pasaje.pk)
             self.fields['pasajes'].initial = [pasaje]
-        elif cliente:
+        elif cliente_cedula:
             # Pasajes del cliente sin facturar
             self.fields['pasajes'].queryset = Pasaje.objects.filter(
-                pasajero__cedula=cliente,
+                pasajero__cedula=cliente_cedula,
                 estado='vendido'
             ).exclude(
                 detalles_factura__factura__estado='emitida'
@@ -398,10 +490,10 @@ class FacturaForm(forms.ModelForm):
         if encomienda:
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(pk=encomienda.pk)
             self.fields['encomiendas'].initial = [encomienda]
-        elif cliente:
+        elif cliente_cedula:
             # Encomiendas del cliente sin facturar
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(
-                remitente__cedula=cliente,
+                remitente__cedula=cliente_cedula,
                 estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'

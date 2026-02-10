@@ -34,8 +34,21 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Cédula/RUC del Cliente *</label>
-                            {{ form.cedula_cliente }}
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="cedula-busqueda" 
+                                       placeholder="Ingrese cédula o RUC para buscar"
+                                       autocomplete="off">
+                                <button type="button" class="btn btn-primary" id="btn-buscar-cliente">
+                                    <i class="bi bi-search me-1"></i> Buscar
+                                </button>
+                            </div>
+                            <input type="hidden" name="cedula_cliente" id="cedula-cliente-hidden">
                             <div id="info-cliente-factura" class="mt-2"></div>
+                            
+                            <!-- Dropdown de resultados de búsqueda -->
+                            <div id="resultados-busqueda" class="list-group position-absolute w-100 shadow-lg" 
+                                 style="z-index: 1050; max-height: 300px; overflow-y: auto; display: none;">
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Próximo Número</label>
@@ -46,9 +59,8 @@
                 </div>
             </div>
 
-            <!-- Selección de Pasajes -->
-            {% if form.pasajes.field.queryset.count > 0 %}
-            <div class="card mb-4">
+            <!-- Selección de Pasajes (carga dinámica) -->
+            <div class="card mb-4" id="card-pasajes" style="display: none;">
                 <div class="card-header">
                     <h4 class="card-title mb-0">
                         <i class="bi bi-ticket-perforated me-2"></i>
@@ -68,32 +80,19 @@
                                     <th class="text-end">Precio</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for pasaje in form.pasajes.field.queryset %}
-                                <tr>
-                                    <td>
-                                        <input type="checkbox" name="pasajes" value="{{ pasaje.pk }}" 
-                                               class="form-check-input item-check"
-                                               data-precio="{{ pasaje.precio }}"
-                                               {% if pasaje in form.pasajes.initial %}checked{% endif %}>
-                                    </td>
-                                    <td>{{ pasaje.codigo }}</td>
-                                    <td>{{ pasaje.viaje.itinerario.nombre }} - {{ pasaje.viaje.fecha_viaje|date:"d/m" }}</td>
-                                    <td>{{ pasaje.pasajero.nombre_completo }}</td>
-                                    <td>{{ pasaje.asiento.numero_asiento }}</td>
-                                    <td class="text-end">Gs. {{ pasaje.precio|floatformat:0 }}</td>
-                                </tr>
-                                {% endfor %}
+                            <tbody id="tbody-pasajes">
+                                <!-- Se llena dinámicamente -->
                             </tbody>
                         </table>
                     </div>
+                    <div id="no-pasajes" class="text-muted text-center py-3" style="display: none;">
+                        <i class="bi bi-info-circle me-1"></i> No hay pasajes pendientes de facturar
+                    </div>
                 </div>
             </div>
-            {% endif %}
 
-            <!-- Selección de Encomiendas -->
-            {% if form.encomiendas.field.queryset.count > 0 %}
-            <div class="card mb-4">
+            <!-- Selección de Encomiendas (carga dinámica) -->
+            <div class="card mb-4" id="card-encomiendas" style="display: none;">
                 <div class="card-header">
                     <h4 class="card-title mb-0">
                         <i class="bi bi-box-seam me-2"></i>
@@ -113,28 +112,24 @@
                                     <th class="text-end">Precio</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for enc in form.encomiendas.field.queryset %}
-                                <tr>
-                                    <td>
-                                        <input type="checkbox" name="encomiendas" value="{{ enc.pk }}" 
-                                               class="form-check-input item-check"
-                                               data-precio="{{ enc.precio }}"
-                                               {% if enc in form.encomiendas.initial %}checked{% endif %}>
-                                    </td>
-                                    <td>{{ enc.codigo }}</td>
-                                    <td>{{ enc.get_tipo_display }}</td>
-                                    <td>{{ enc.descripcion|truncatechars:30 }}</td>
-                                    <td>{{ enc.parada_destino.nombre }}</td>
-                                    <td class="text-end">Gs. {{ enc.precio|floatformat:0 }}</td>
-                                </tr>
-                                {% endfor %}
+                            <tbody id="tbody-encomiendas">
+                                <!-- Se llena dinámicamente -->
                             </tbody>
                         </table>
                     </div>
+                    <div id="no-encomiendas" class="text-muted text-center py-3" style="display: none;">
+                        <i class="bi bi-info-circle me-1"></i> No hay encomiendas pendientes de facturar
+                    </div>
                 </div>
             </div>
-            {% endif %}
+
+            <!-- Mensaje cuando no hay cliente seleccionado -->
+            <div class="card mb-4" id="card-seleccionar-cliente">
+                <div class="card-body text-center text-muted py-5">
+                    <i class="bi bi-person-search display-4 mb-3 d-block"></i>
+                    <p class="mb-0">Busque y seleccione un cliente para ver sus pasajes y encomiendas pendientes de facturar.</p>
+                </div>
+            </div>
 
             {% if form.non_field_errors %}
             <div class="alert alert-danger">
@@ -146,7 +141,7 @@
                 <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Cancelar
                 </a>
-                <button type="submit" class="btn btn-primary btn-lg">
+                <button type="submit" class="btn btn-primary btn-lg" id="btn-generar" disabled>
                     <i class="bi bi-receipt me-2"></i> Generar Factura
                 </button>
             </div>
@@ -169,11 +164,11 @@
                 </div>
                 <hr>
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Subtotal Exenta:</span>
+                    <span>Subtotal Gravado:</span>
                     <span id="subtotal-exenta">Gs. 0</span>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Gravada 10%:</span>
+                    <span>IVA 10% (incluido):</span>
                     <span id="subtotal-iva10">Gs. 0</span>
                 </div>
                 <hr>
@@ -195,46 +190,357 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de búsqueda de clientes -->
+<div class="modal fade" id="modalBuscarCliente" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-people me-2"></i>
+                    Seleccionar Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control form-control-lg" id="modal-busqueda-input"
+                           placeholder="Buscar por cédula, RUC o nombre...">
+                </div>
+                <div id="modal-resultados">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-search display-6 mb-2 d-block"></i>
+                        <p>Ingrese al menos 2 caracteres para buscar</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const checkboxes = document.querySelectorAll('.item-check');
+    const cedulaBusqueda = document.getElementById('cedula-busqueda');
+    const cedulaHidden = document.getElementById('cedula-cliente-hidden');
+    const btnBuscar = document.getElementById('btn-buscar-cliente');
+    const resultadosBusqueda = document.getElementById('resultados-busqueda');
+    const cardPasajes = document.getElementById('card-pasajes');
+    const cardEncomiendas = document.getElementById('card-encomiendas');
+    const cardSeleccionarCliente = document.getElementById('card-seleccionar-cliente');
+    const tbodyPasajes = document.getElementById('tbody-pasajes');
+    const tbodyEncomiendas = document.getElementById('tbody-encomiendas');
+    const noPasajes = document.getElementById('no-pasajes');
+    const noEncomiendas = document.getElementById('no-encomiendas');
+    const clienteCard = document.getElementById('cliente-card');
+    const clienteInfo = document.getElementById('cliente-info');
+    const btnGenerar = document.getElementById('btn-generar');
     const itemsCount = document.getElementById('items-count');
     const subtotalExenta = document.getElementById('subtotal-exenta');
     const subtotalIva10 = document.getElementById('subtotal-iva10');
     const totalEl = document.getElementById('total');
     
+    let debounceTimer;
+    
+    // ===== BÚSQUEDA DE CLIENTES =====
+    function buscarClientes(query) {
+        if (query.length < 2) {
+            resultadosBusqueda.style.display = 'none';
+            return;
+        }
+        
+        fetch(`/operations/api/buscar-clientes/?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.clientes && data.clientes.length > 0) {
+                    let html = '';
+                    data.clientes.forEach(cliente => {
+                        html += `
+                            <a href="#" class="list-group-item list-group-item-action cliente-option"
+                               data-cedula="${cliente.cedula}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${cliente.nombre}</strong>
+                                        <small class="text-muted d-block">
+                                            Cédula: ${cliente.cedula}
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-primary">${cliente.total_pendientes} pendiente(s)</span>
+                                        <small class="text-muted d-block">
+                                            ${cliente.pasajes_pendientes} pasaje(s) | ${cliente.encomiendas_pendientes} enc.
+                                        </small>
+                                    </div>
+                                </div>
+                            </a>
+                        `;
+                    });
+                    resultadosBusqueda.innerHTML = html;
+                    resultadosBusqueda.style.display = 'block';
+                    
+                    // Agregar eventos a las opciones
+                    document.querySelectorAll('.cliente-option').forEach(el => {
+                        el.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            seleccionarCliente(this.dataset.cedula);
+                        });
+                    });
+                } else {
+                    resultadosBusqueda.innerHTML = `
+                        <div class="list-group-item text-muted text-center">
+                            <i class="bi bi-info-circle me-1"></i>
+                            No se encontraron clientes con items pendientes
+                        </div>
+                    `;
+                    resultadosBusqueda.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                console.error('Error buscando clientes:', err);
+            });
+    }
+    
+    // Evento de búsqueda con debounce
+    cedulaBusqueda.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            buscarClientes(this.value);
+        }, 300);
+    });
+    
+    // Botón buscar abre el modal
+    btnBuscar.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('modalBuscarCliente'));
+        modal.show();
+        document.getElementById('modal-busqueda-input').value = cedulaBusqueda.value;
+        document.getElementById('modal-busqueda-input').focus();
+    });
+    
+    // Búsqueda en modal
+    const modalBusquedaInput = document.getElementById('modal-busqueda-input');
+    const modalResultados = document.getElementById('modal-resultados');
+    
+    modalBusquedaInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const query = this.value.trim();
+            if (query.length < 2) {
+                modalResultados.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-search display-6 mb-2 d-block"></i>
+                        <p>Ingrese al menos 2 caracteres para buscar</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            modalResultados.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Buscando clientes...</p>
+                </div>
+            `;
+            
+            fetch(`/operations/api/buscar-clientes/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.clientes && data.clientes.length > 0) {
+                        let html = '<div class="list-group">';
+                        data.clientes.forEach(cliente => {
+                            html += `
+                                <a href="#" class="list-group-item list-group-item-action modal-cliente-option"
+                                   data-cedula="${cliente.cedula}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">${cliente.nombre}</h6>
+                                            <small class="text-muted">
+                                                Cédula: ${cliente.cedula}
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-primary fs-6">${cliente.total_pendientes}</span>
+                                            <small class="text-muted d-block">items pendientes</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            `;
+                        });
+                        html += '</div>';
+                        modalResultados.innerHTML = html;
+                        
+                        // Agregar eventos a las opciones del modal
+                        document.querySelectorAll('.modal-cliente-option').forEach(el => {
+                            el.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                seleccionarCliente(this.dataset.cedula);
+                                bootstrap.Modal.getInstance(document.getElementById('modalBuscarCliente')).hide();
+                            });
+                        });
+                    } else {
+                        modalResultados.innerHTML = `
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-person-x display-6 mb-2 d-block"></i>
+                                <p>No se encontraron clientes con items pendientes de facturar</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(err => {
+                    modalResultados.innerHTML = `
+                        <div class="alert alert-danger">Error al buscar clientes</div>
+                    `;
+                });
+        }, 300);
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!resultadosBusqueda.contains(e.target) && e.target !== cedulaBusqueda) {
+            resultadosBusqueda.style.display = 'none';
+        }
+    });
+    
+    // ===== SELECCIONAR CLIENTE Y CARGAR ITEMS =====
+    function seleccionarCliente(cedula) {
+        resultadosBusqueda.style.display = 'none';
+        cedulaBusqueda.value = cedula;
+        cedulaHidden.value = cedula;
+        
+        // Mostrar loader
+        cardSeleccionarCliente.innerHTML = `
+            <div class="card-body text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Cargando items del cliente...</p>
+            </div>
+        `;
+        
+        fetch(`/operations/api/items-pendientes/?cedula=${encodeURIComponent(cedula)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    cardSeleccionarCliente.innerHTML = `
+                        <div class="card-body text-center text-danger py-5">
+                            <i class="bi bi-exclamation-triangle display-4 mb-3 d-block"></i>
+                            <p>${data.error}</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Ocultar mensaje de seleccionar cliente
+                cardSeleccionarCliente.style.display = 'none';
+                
+                // Mostrar info del cliente
+                clienteCard.style.display = 'block';
+                clienteInfo.innerHTML = `
+                    <p class="mb-1"><strong>${data.cliente.nombre}</strong></p>
+                    <p class="mb-0 text-muted">Cédula: ${data.cliente.cedula}</p>
+                `;
+                
+                // Cargar pasajes
+                if (data.pasajes && data.pasajes.length > 0) {
+                    cardPasajes.style.display = 'block';
+                    noPasajes.style.display = 'none';
+                    let pasajesHtml = '';
+                    data.pasajes.forEach(p => {
+                        pasajesHtml += `
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="pasajes" value="${p.pk}" 
+                                           class="form-check-input item-check"
+                                           data-precio="${p.precio}" checked>
+                                </td>
+                                <td>${p.codigo}</td>
+                                <td>${p.viaje}</td>
+                                <td>${p.pasajero}</td>
+                                <td>${p.asiento}</td>
+                                <td class="text-end">Gs. ${p.precio.toLocaleString('es-PY')}</td>
+                            </tr>
+                        `;
+                    });
+                    tbodyPasajes.innerHTML = pasajesHtml;
+                } else {
+                    cardPasajes.style.display = 'block';
+                    tbodyPasajes.innerHTML = '';
+                    noPasajes.style.display = 'block';
+                }
+                
+                // Cargar encomiendas
+                if (data.encomiendas && data.encomiendas.length > 0) {
+                    cardEncomiendas.style.display = 'block';
+                    noEncomiendas.style.display = 'none';
+                    let encomiendasHtml = '';
+                    data.encomiendas.forEach(e => {
+                        encomiendasHtml += `
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="encomiendas" value="${e.pk}" 
+                                           class="form-check-input item-check"
+                                           data-precio="${e.precio}" checked>
+                                </td>
+                                <td>${e.codigo}</td>
+                                <td>${e.tipo}</td>
+                                <td>${e.descripcion}</td>
+                                <td>${e.destino}</td>
+                                <td class="text-end">Gs. ${e.precio.toLocaleString('es-PY')}</td>
+                            </tr>
+                        `;
+                    });
+                    tbodyEncomiendas.innerHTML = encomiendasHtml;
+                } else {
+                    cardEncomiendas.style.display = 'block';
+                    tbodyEncomiendas.innerHTML = '';
+                    noEncomiendas.style.display = 'block';
+                }
+                
+                // Agregar eventos a los checkboxes
+                document.querySelectorAll('.item-check').forEach(cb => {
+                    cb.addEventListener('change', calcularTotales);
+                });
+                
+                // Calcular totales iniciales
+                calcularTotales();
+            })
+            .catch(err => {
+                console.error('Error cargando items:', err);
+                cardSeleccionarCliente.innerHTML = `
+                    <div class="card-body text-center text-danger py-5">
+                        <i class="bi bi-exclamation-triangle display-4 mb-3 d-block"></i>
+                        <p>Error al cargar los datos del cliente</p>
+                    </div>
+                `;
+            });
+    }
+    
+    // ===== CALCULAR TOTALES =====
     function calcularTotales() {
+        const checkboxes = document.querySelectorAll('.item-check');
         let count = 0;
-        let exenta = 0;
-        let iva10 = 0;
+        let total = 0;
         
         checkboxes.forEach(cb => {
             if (cb.checked) {
                 count++;
-                // Por defecto, pasajes de transporte son exentos en Paraguay
-                exenta += parseFloat(cb.dataset.precio) || 0;
+                total += parseFloat(cb.dataset.precio) || 0;
             }
         });
         
-        const total = exenta + iva10;
+        // IVA 10% incluido: total / 11
+        const iva10 = Math.round(total / 11);
+        // Gravada (base imponible): total - iva
+        const gravada = total - iva10;
         
         itemsCount.textContent = count;
-        subtotalExenta.textContent = 'Gs. ' + exenta.toLocaleString('es-PY');
+        subtotalExenta.textContent = 'Gs. ' + gravada.toLocaleString('es-PY');
         subtotalIva10.textContent = 'Gs. ' + iva10.toLocaleString('es-PY');
         totalEl.textContent = 'Gs. ' + total.toLocaleString('es-PY');
+        
+        // Habilitar/deshabilitar botón de generar
+        btnGenerar.disabled = count === 0;
     }
     
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', calcularTotales);
-    });
-    
-    // Calcular al cargar
-    calcularTotales();
-    
-    // Actualizar próximo número cuando cambia el timbrado
+    // ===== TIMBRADO - SIGUIENTE NÚMERO =====
     const timbradoSelect = document.getElementById('id_timbrado');
     const proximoNumero = document.getElementById('proximo-numero');
     
@@ -260,6 +566,11 @@ document.addEventListener('DOMContentLoaded', function() {
             timbradoSelect.dispatchEvent(new Event('change'));
         }
     }
+    
+    // ===== SI VIENE CON CLIENTE PRESELECCIONADO =====
+    {% if cliente_cedula %}
+    seleccionarCliente('{{ cliente_cedula }}');
+    {% endif %}
 });
 </script>
 {% endblock %}

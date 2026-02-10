@@ -388,21 +388,8 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
         
         pasaje.save()
         
-        # Registrar movimiento de caja si hay sesión abierta
-        try:
-            sesion_caja = SesionCaja.objects.get(
-                cajero=self.request.user,
-                estado='abierta'
-            )
-            MovimientoCaja.objects.create(
-                sesion=sesion_caja,
-                tipo='ingreso',
-                concepto='venta_pasaje',
-                monto=pasaje.precio,
-                descripcion=f"Venta pasaje {pasaje.codigo}"
-            )
-        except SesionCaja.DoesNotExist:
-            messages.warning(self.request, "No hay caja abierta. El movimiento no fue registrado.")
+        # NOTA: El ingreso en caja se registra al momento de generar la factura,
+        # no al vender el pasaje
         
         messages.success(self.request, f"Pasaje {pasaje.codigo} vendido exitosamente.")
         return redirect('operations:pasaje_detail', pk=pasaje.pk)
@@ -529,45 +516,73 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         encomienda = form.save(commit=False)
         
-        # Obtener remitente
+        # Obtener remitente por ID (desde el campo oculto del modal)
+        remitente_id = form.cleaned_data.get('remitente_id')
         cedula_remitente = form.cleaned_data.get('cedula_remitente')
-        try:
-            remitente = Persona.objects.get(cedula=cedula_remitente)
-        except Persona.DoesNotExist:
-            messages.error(self.request, f"No se encontró persona con cédula {cedula_remitente}")
+        
+        if remitente_id:
+            try:
+                remitente = Persona.objects.get(cedula=remitente_id)
+            except Persona.DoesNotExist:
+                messages.error(self.request, f"No se encontró persona con cédula {remitente_id}")
+                return self.form_invalid(form)
+        elif cedula_remitente:
+            try:
+                remitente = Persona.objects.get(cedula=cedula_remitente)
+            except Persona.DoesNotExist:
+                messages.error(self.request, f"No se encontró persona con cédula {cedula_remitente}")
+                return self.form_invalid(form)
+        else:
+            messages.error(self.request, "Debe seleccionar un remitente")
             return self.form_invalid(form)
         
-        # Obtener destinatario
+        # Obtener o crear destinatario
         cedula_destinatario = form.cleaned_data.get('cedula_destinatario')
+        nombre_destinatario = form.cleaned_data.get('nombre_destinatario')
+        apellido_destinatario = form.cleaned_data.get('apellido_destinatario')
+        telefono_destinatario = form.cleaned_data.get('telefono_destinatario')
+        direccion_destinatario = form.cleaned_data.get('direccion_destinatario', '')
+        
         try:
             destinatario = Persona.objects.get(cedula=cedula_destinatario)
+            # Actualizar datos si se proporcionaron nuevos
+            actualizado = False
+            if nombre_destinatario and destinatario.nombre != nombre_destinatario:
+                destinatario.nombre = nombre_destinatario
+                actualizado = True
+            if apellido_destinatario and destinatario.apellido != apellido_destinatario:
+                destinatario.apellido = apellido_destinatario
+                actualizado = True
+            if telefono_destinatario and destinatario.telefono != telefono_destinatario:
+                destinatario.telefono = telefono_destinatario
+                actualizado = True
+            if direccion_destinatario and destinatario.direccion != direccion_destinatario:
+                destinatario.direccion = direccion_destinatario
+                actualizado = True
+            if actualizado:
+                destinatario.save()
         except Persona.DoesNotExist:
-            messages.error(self.request, f"No se encontró persona con cédula {cedula_destinatario}")
-            return self.form_invalid(form)
+            # Crear nuevo destinatario
+            destinatario = Persona.objects.create(
+                cedula=cedula_destinatario,
+                nombre=nombre_destinatario,
+                apellido=apellido_destinatario,
+                telefono=telefono_destinatario,
+                direccion=direccion_destinatario,
+                es_cliente=True
+            )
         
         encomienda.remitente = remitente
         encomienda.destinatario = destinatario
         encomienda.registrador = self.request.user
         encomienda.save()
         
-        # Registrar ingreso en caja
-        try:
-            sesion_caja = SesionCaja.objects.get(
-                cajero=self.request.user,
-                estado='abierta'
-            )
-            MovimientoCaja.objects.create(
-                sesion=sesion_caja,
-                tipo='ingreso',
-                concepto='venta_encomienda',
-                monto=encomienda.precio,
-                descripcion=f"Encomienda {encomienda.codigo}"
-            )
-        except SesionCaja.DoesNotExist:
-            messages.warning(self.request, "No hay caja abierta. El movimiento no fue registrado.")
+        # NOTA: El ingreso en caja se registra al momento de generar la factura,
+        # no al crear la encomienda
         
         messages.success(self.request, f"Encomienda {encomienda.codigo} registrada exitosamente.")
-        return redirect('operations:encomienda_detail', pk=encomienda.pk)
+        # Redirigir al ticket con auto-print para imprimir inmediatamente
+        return redirect(f"{reverse('operations:encomienda_ticket', kwargs={'pk': encomienda.pk})}?print=1")
 
 
 class EncomiendaEntregarView(LoginRequiredMixin, View):
@@ -614,6 +629,23 @@ class EncomiendaCambiarEstadoView(LoginRequiredMixin, View):
             messages.success(request, f"Estado actualizado a '{encomienda.get_estado_display()}'")
         
         return redirect('operations:encomienda_detail', pk=pk)
+
+
+class EncomiendaTicketView(LoginRequiredMixin, DetailView):
+    """Vista de encomienda en formato ticket térmico con QR."""
+    model = Encomienda
+    template_name = 'operations/encomienda_ticket.html'
+    context_object_name = 'encomienda'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Usar el servicio de ticket para preparar el contexto
+        from .services import EncomiendaTicketService
+        ticket_context = EncomiendaTicketService.preparar_contexto_ticket(self.object)
+        context.update(ticket_context)
+        
+        return context
 
 
 # =============================================================================
@@ -1042,7 +1074,11 @@ class FacturaCreateView(LoginRequiredMixin, View):
         from .forms import FacturaForm
         from .services import FacturacionService
         
-        form = FacturaForm(request.POST)
+        # Obtener la cédula del cliente del POST para construir el formulario correctamente
+        cedula_cliente = request.POST.get('cedula_cliente', '').strip()
+        
+        # Construir el formulario con el cliente para que los querysets sean válidos
+        form = FacturaForm(request.POST, cliente=cedula_cliente)
         
         if form.is_valid():
             try:
@@ -1085,6 +1121,8 @@ class FacturaCreateView(LoginRequiredMixin, View):
                 messages.error(request, "Cliente no encontrado con esa cédula.")
         
         return render(request, 'operations/factura_form.html', {'form': form})
+
+
 
 
 class FacturaAnularView(LoginRequiredMixin, View):
@@ -1402,3 +1440,167 @@ class ObtenerPrecioView(LoginRequiredMixin, View):
                 return JsonResponse({'precio': 0, 'error': 'No encontrado'})
         
         return JsonResponse({'precio': 0})
+
+
+class BuscarClientesFacturaView(LoginRequiredMixin, View):
+    """API para buscar clientes con items pendientes de facturar."""
+    
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        
+        if len(query) < 2:
+            return JsonResponse({'clientes': []})
+        
+        # Buscar clientes que tengan pasajes o encomiendas pendientes de facturar
+        # Primero buscar personas que coincidan con la búsqueda
+        personas = Persona.objects.filter(
+            Q(cedula__icontains=query) |
+            Q(nombre__icontains=query) |
+            Q(apellido__icontains=query)
+        )[:20]
+        
+        clientes = []
+        for persona in personas:
+            # Verificar si tiene pasajes pendientes
+            pasajes_pendientes = Pasaje.objects.filter(
+                pasajero=persona,
+                estado='vendido'
+            ).exclude(
+                detalles_factura__factura__estado='emitida'
+            ).count()
+            
+            # Verificar si tiene encomiendas pendientes
+            encomiendas_pendientes = Encomienda.objects.filter(
+                remitente=persona,
+                estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
+            ).exclude(
+                detalles_factura__factura__estado='emitida'
+            ).count()
+            
+            total_pendientes = pasajes_pendientes + encomiendas_pendientes
+            
+            if total_pendientes > 0:
+                clientes.append({
+                    'cedula': str(persona.cedula),
+                    'nombre': persona.nombre_completo,
+                    'pasajes_pendientes': pasajes_pendientes,
+                    'encomiendas_pendientes': encomiendas_pendientes,
+                    'total_pendientes': total_pendientes
+                })
+        
+        return JsonResponse({'clientes': clientes})
+
+
+class BuscarClientesRegistradosView(LoginRequiredMixin, View):
+    """API para buscar clientes registrados (para el modal de remitente)."""
+    
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        
+        if len(query) < 2:
+            return JsonResponse({'clientes': []})
+        
+        # Buscar personas que coincidan con la búsqueda
+        personas = Persona.objects.filter(
+            Q(cedula__icontains=query) |
+            Q(nombre__icontains=query) |
+            Q(apellido__icontains=query)
+        ).order_by('apellido', 'nombre')[:30]
+        
+        clientes = []
+        for persona in personas:
+            clientes.append({
+                'cedula': str(persona.cedula),
+                'nombre': persona.nombre_completo,
+                'telefono': persona.telefono or '-',
+                'direccion': persona.direccion or '-'
+            })
+        
+        return JsonResponse({'clientes': clientes})
+
+class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
+    """API para obtener pasajes y encomiendas pendientes de un cliente."""
+    
+    def get(self, request):
+        cedula = request.GET.get('cedula', '').strip()
+        
+        if not cedula:
+            return JsonResponse({'error': 'Cédula requerida'}, status=400)
+        
+        try:
+            persona = Persona.objects.get(cedula=cedula)
+        except Persona.DoesNotExist:
+            return JsonResponse({'error': 'Cliente no encontrado'}, status=404)
+        
+        # Obtener pasajes pendientes
+        pasajes = Pasaje.objects.filter(
+            pasajero=persona,
+            estado='vendido'
+        ).exclude(
+            detalles_factura__factura__estado='emitida'
+        ).select_related('viaje__itinerario', 'asiento')
+        
+        pasajes_data = []
+        for p in pasajes:
+            pasajes_data.append({
+                'pk': p.pk,
+                'codigo': p.codigo,
+                'viaje': f"{p.viaje.itinerario.nombre} - {p.viaje.fecha_viaje.strftime('%d/%m')}",
+                'pasajero': p.pasajero.nombre_completo,
+                'asiento': p.asiento.numero_asiento if p.asiento else '-',
+                'precio': float(p.precio)
+            })
+        
+        # Obtener encomiendas pendientes
+        encomiendas = Encomienda.objects.filter(
+            remitente=persona,
+            estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
+        ).exclude(
+            detalles_factura__factura__estado='emitida'
+        ).select_related('parada_destino')
+        
+        encomiendas_data = []
+        for e in encomiendas:
+            encomiendas_data.append({
+                'pk': e.pk,
+                'codigo': e.codigo,
+                'tipo': e.get_tipo_display(),
+                'descripcion': e.descripcion[:30] if e.descripcion else '-',
+                'destino': e.parada_destino.nombre if e.parada_destino else '-',
+                'precio': float(e.precio)
+            })
+        
+        return JsonResponse({
+            'cliente': {
+                'cedula': str(persona.cedula),
+                'nombre': persona.nombre_completo
+            },
+            'pasajes': pasajes_data,
+            'encomiendas': encomiendas_data
+        })
+
+
+class ViajeParadasView(LoginRequiredMixin, View):
+    """API para obtener las paradas de un viaje específico."""
+    
+    def get(self, request, viaje_pk):
+        viaje = get_object_or_404(Viaje, pk=viaje_pk)
+        
+        # Obtener paradas del itinerario
+        paradas_ids = viaje.itinerario.detalles.values_list('parada_id', flat=True)
+        paradas = Parada.objects.filter(id__in=list(paradas_ids)).order_by('nombre')
+        
+        paradas_data = [
+            {'id': p.id, 'nombre': p.nombre}
+            for p in paradas
+        ]
+        
+        return JsonResponse({
+            'viaje': {
+                'id': viaje.pk,
+                'nombre': viaje.itinerario.nombre,
+                'fecha': viaje.fecha_viaje.strftime('%d/%m/%Y'),
+                'bus': viaje.bus.placa
+            },
+            'paradas': paradas_data
+        })

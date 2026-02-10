@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-10">
+    <div class="col-lg-11">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
@@ -18,24 +18,60 @@
                 </h3>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="encomienda-form">
                     {% csrf_token %}
+                    
+                    {% if not viaje %}
+                    <!-- Selector de Viaje/Bus -->
+                    <div class="card mb-4 border-primary">
+                        <div class="card-header bg-primary-lt">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-bus-front me-2"></i>
+                                Seleccionar Viaje / Bus
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-12">
+                                    <label class="form-label">Viaje Disponible *</label>
+                                    {{ form.viaje }}
+                                    <small class="text-muted">
+                                        Seleccione el viaje en el que se enviará la encomienda
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
                     {{ form.viaje }}
+                    {% endif %}
 
                     <div class="row">
                         <!-- Remitente -->
                         <div class="col-md-6">
                             <div class="card mb-4">
-                                <div class="card-header">
+                                <div class="card-header bg-azure-lt">
                                     <h4 class="card-title mb-0">
                                         <i class="bi bi-person me-2"></i>
-                                        Remitente
+                                        Remitente (Quien envía)
                                     </h4>
                                 </div>
                                 <div class="card-body">
+                                    {{ form.remitente_id }}
                                     <div class="mb-3">
-                                        <label class="form-label">Cédula *</label>
-                                        {{ form.cedula_remitente }}
+                                        <label class="form-label">Buscar Cliente Remitente *</label>
+                                        <div class="input-group">
+                                            {{ form.cedula_remitente }}
+                                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalBuscarRemitente">
+                                                <i class="bi bi-search me-1"></i> Buscar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="info-remitente" class="alert alert-light p-2 mb-0" style="min-height: 60px;">
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Haga clic en "Buscar" para seleccionar un cliente registrado
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -44,17 +80,65 @@
                         <!-- Destinatario -->
                         <div class="col-md-6">
                             <div class="card mb-4">
-                                <div class="card-header">
+                                <div class="card-header bg-purple-lt">
                                     <h4 class="card-title mb-0">
                                         <i class="bi bi-person-check me-2"></i>
-                                        Destinatario
+                                        Destinatario (Quien recibe)
                                     </h4>
                                 </div>
                                 <div class="card-body">
-                                    <div class="mb-3">
-                                        <label class="form-label">Cédula *</label>
-                                        {{ form.cedula_destinatario }}
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Cédula del Destinatario *</label>
+                                            {{ form.cedula_destinatario }}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Teléfono *</label>
+                                            {{ form.telefono_destinatario }}
+                                        </div>
                                     </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Nombre *</label>
+                                            {{ form.nombre_destinatario }}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Apellido *</label>
+                                            {{ form.apellido_destinatario }}
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Dirección de Entrega</label>
+                                        {{ form.direccion_destinatario }}
+                                    </div>
+                                    <div class="alert alert-info p-2 mb-0">
+                                        <small>
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Complete los datos del destinatario. Si ya existe, se actualizarán; si no, se creará un nuevo registro.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Origen y Destino -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-green-lt">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-geo-alt me-2"></i>
+                                Origen y Destino
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Origen *</label>
+                                    {{ form.parada_origen }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Destino *</label>
+                                    {{ form.parada_destino }}
                                 </div>
                             </div>
                         </div>
@@ -62,7 +146,7 @@
 
                     <!-- Detalles de la encomienda -->
                     <div class="card mb-4">
-                        <div class="card-header">
+                        <div class="card-header bg-yellow-lt">
                             <h4 class="card-title mb-0">
                                 <i class="bi bi-box me-2"></i>
                                 Detalles de la Encomienda
@@ -71,20 +155,8 @@
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Tipo *</label>
+                                    <label class="form-label">Tipo de Encomienda *</label>
                                     {{ form.tipo }}
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Parada Origen *</label>
-                                    {{ form.parada_origen }}
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Parada Destino *</label>
-                                    {{ form.parada_destino }}
-                                </div>
-                                <div class="col-12 mb-3">
-                                    <label class="form-label">Descripción *</label>
-                                    {{ form.descripcion }}
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">Peso (kg)</label>
@@ -94,11 +166,35 @@
                                     <label class="form-label">Dimensiones</label>
                                     {{ form.dimensiones }}
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Precio *</label>
-                                    <div class="input-group">
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Descripción del Contenido *</label>
+                                    {{ form.descripcion }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Precio -->
+                    <div class="card mb-4 border-success">
+                        <div class="card-header bg-success-lt">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-currency-dollar me-2"></i>
+                                Costo del Servicio
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <label class="form-label">Precio del Envío *</label>
+                                    <div class="input-group input-group-lg">
                                         <span class="input-group-text">Gs.</span>
                                         {{ form.precio }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-info mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        El precio es establecido por el operador según el tipo y peso de la encomienda.
                                     </div>
                                 </div>
                             </div>
@@ -107,9 +203,10 @@
 
                     {% if form.errors %}
                     <div class="alert alert-danger">
+                        <h5><i class="bi bi-exclamation-triangle me-2"></i>Errores en el formulario</h5>
                         <ul class="mb-0">
                             {% for field, errors in form.errors.items %}
-                            <li>{{ field }}: {{ errors.0 }}</li>
+                            <li><strong>{{ field }}:</strong> {{ errors.0 }}</li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -125,8 +222,8 @@
                             <i class="bi bi-x-lg me-1"></i> Cancelar
                         </a>
                         {% endif %}
-                        <button type="submit" class="btn btn-yellow btn-lg">
-                            <i class="bi bi-check-lg me-1"></i> Registrar Encomienda
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-lg me-2"></i> Registrar Encomienda
                         </button>
                     </div>
                 </form>
@@ -134,4 +231,238 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Búsqueda de Remitente -->
+<div class="modal modal-lg fade" id="modalBuscarRemitente" tabindex="-1" aria-labelledby="modalBuscarRemitenteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-azure-lt">
+                <h5 class="modal-title" id="modalBuscarRemitenteLabel">
+                    <i class="bi bi-search me-2"></i>
+                    Buscar Cliente Remitente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Campo de búsqueda -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="buscarRemitenteInput" class="form-control" 
+                               placeholder="Buscar por cédula, nombre o apellido..." autofocus>
+                    </div>
+                    <small class="text-muted">Ingrese al menos 2 caracteres para buscar</small>
+                </div>
+                
+                <!-- Tabla de resultados -->
+                <div id="resultadosRemitente" class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-vcenter" id="tablaRemitentes">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>Cédula</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaRemitentes">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    <i class="bi bi-search me-2"></i>
+                                    Ingrese un término de búsqueda
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const viajeSelect = document.getElementById('id_viaje');
+    const paradaOrigen = document.getElementById('id_parada_origen');
+    const paradaDestino = document.getElementById('id_parada_destino');
+    
+    // Actualizar paradas cuando cambia el viaje
+    if (viajeSelect) {
+        viajeSelect.addEventListener('change', function() {
+            const viajeId = this.value;
+            if (viajeId) {
+                fetch(`/operations/viajes/${viajeId}/paradas/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        updateParadaOptions(paradaOrigen, data.paradas);
+                        updateParadaOptions(paradaDestino, data.paradas);
+                    })
+                    .catch(error => console.log('Error cargando paradas:', error));
+            }
+        });
+    }
+    
+    function updateParadaOptions(select, paradas) {
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">---------</option>';
+        paradas.forEach(parada => {
+            const option = document.createElement('option');
+            option.value = parada.id;
+            option.textContent = parada.nombre;
+            select.appendChild(option);
+        });
+        if (currentValue) {
+            select.value = currentValue;
+        }
+    }
+    
+    // ========================================================
+    // BÚSQUEDA DE REMITENTE
+    // ========================================================
+    const buscarInput = document.getElementById('buscarRemitenteInput');
+    const listaRemitentes = document.getElementById('listaRemitentes');
+    const cedulaRemitenteInput = document.getElementById('id_cedula_remitente');
+    const remitenteIdInput = document.getElementById('id_remitente_id');
+    const infoRemitente = document.getElementById('info-remitente');
+    let searchTimeout;
+    
+    if (buscarInput) {
+        buscarInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                listaRemitentes.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            <i class="bi bi-search me-2"></i>
+                            Ingrese al menos 2 caracteres para buscar
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            listaRemitentes.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Buscando...</span>
+                        </div>
+                        <span class="ms-2">Buscando clientes...</span>
+                    </td>
+                </tr>
+            `;
+            
+            searchTimeout = setTimeout(() => {
+                fetch(`/operations/api/buscar-clientes-registrados/?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.clientes && data.clientes.length > 0) {
+                            listaRemitentes.innerHTML = data.clientes.map(cliente => `
+                                <tr>
+                                    <td><strong>${cliente.cedula}</strong></td>
+                                    <td>${cliente.nombre}</td>
+                                    <td>${cliente.telefono}</td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-primary btn-seleccionar-remitente"
+                                                data-cedula="${cliente.cedula}"
+                                                data-nombre="${cliente.nombre}"
+                                                data-telefono="${cliente.telefono}"
+                                                data-direccion="${cliente.direccion}">
+                                            <i class="bi bi-check-lg me-1"></i> Seleccionar
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('');
+                            
+                            // Agregar evento click a los botones
+                            document.querySelectorAll('.btn-seleccionar-remitente').forEach(btn => {
+                                btn.addEventListener('click', function() {
+                                    seleccionarRemitente(
+                                        this.dataset.cedula,
+                                        this.dataset.nombre,
+                                        this.dataset.telefono,
+                                        this.dataset.direccion
+                                    );
+                                });
+                            });
+                        } else {
+                            listaRemitentes.innerHTML = `
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        <i class="bi bi-exclamation-circle me-2"></i>
+                                        No se encontraron clientes con ese criterio
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error en búsqueda:', error);
+                        listaRemitentes.innerHTML = `
+                            <tr>
+                                <td colspan="4" class="text-center text-danger py-4">
+                                    <i class="bi bi-x-circle me-2"></i>
+                                    Error al buscar clientes
+                                </td>
+                            </tr>
+                        `;
+                    });
+            }, 300);
+        });
+    }
+    
+    function seleccionarRemitente(cedula, nombre, telefono, direccion) {
+        // Llenar campos ocultos y visibles
+        if (remitenteIdInput) remitenteIdInput.value = cedula;
+        if (cedulaRemitenteInput) cedulaRemitenteInput.value = cedula;
+        
+        // Mostrar info del remitente seleccionado
+        if (infoRemitente) {
+            infoRemitente.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="avatar avatar-sm bg-azure-lt me-2">
+                        <i class="bi bi-person"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold">${nombre}</div>
+                        <div class="text-muted small">
+                            <i class="bi bi-card-text me-1"></i> CI: ${cedula}
+                            <span class="mx-2">|</span>
+                            <i class="bi bi-telephone me-1"></i> ${telefono}
+                        </div>
+                    </div>
+                </div>
+            `;
+            infoRemitente.classList.remove('alert-light');
+            infoRemitente.classList.add('alert-success');
+        }
+        
+        // Cerrar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalBuscarRemitente'));
+        if (modal) modal.hide();
+        
+        // Limpiar búsqueda
+        if (buscarInput) buscarInput.value = '';
+        listaRemitentes.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted py-4">
+                    <i class="bi bi-search me-2"></i>
+                    Ingrese un término de búsqueda
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Limpiar búsqueda al abrir el modal
+    document.getElementById('modalBuscarRemitente')?.addEventListener('shown.bs.modal', function() {
+        buscarInput?.focus();
+    });
+});
+</script>
 {% endblock %}

@@ -38,6 +38,8 @@ urlpatterns = [
     path('encomiendas/<int:pk>/', views.EncomiendaDetailView.as_view(), name='encomienda_detail'),
     path('encomiendas/<int:pk>/entregar/', views.EncomiendaEntregarView.as_view(), name='encomienda_entregar'),
     path('encomiendas/<int:pk>/estado/', views.EncomiendaCambiarEstadoView.as_view(), name='encomienda_estado'),
+    path('encomiendas/<int:pk>/ticket/', views.EncomiendaTicketView.as_view(), name='encomienda_ticket'),
+    path('encomiendas/nueva/', views.EncomiendaCreateView.as_view(), name='encomienda_create_direct'),
     
     # Registro de encomiendas (desde un viaje)
     path('viajes/<int:viaje_pk>/encomienda/', views.EncomiendaCreateView.as_view(), name='encomienda_create'),
@@ -93,4 +95,13 @@ urlpatterns = [
     path('buscar-persona/', views.BuscarPersonaView.as_view(), name='buscar_persona'),
     path('viajes/<int:viaje_pk>/asientos/', views.AsientosDisponiblesView.as_view(), name='asientos_disponibles'),
     path('obtener-precio/', views.ObtenerPrecioView.as_view(), name='obtener_precio'),
+    
+    # APIs para facturación
+    path('api/buscar-clientes/', views.BuscarClientesFacturaView.as_view(), name='api_buscar_clientes'),
+    path('api/items-pendientes/', views.ObtenerItemsPendientesClienteView.as_view(), name='api_items_pendientes'),
+    path('api/buscar-clientes-registrados/', views.BuscarClientesRegistradosView.as_view(), name='api_buscar_clientes_registrados'),
+    
+    # API para obtener paradas de un viaje
+    path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
 ]
+

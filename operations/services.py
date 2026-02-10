@@ -596,3 +596,178 @@ class TicketService:
         commands += CUT
         
         return commands
+
+
+class EncomiendaTicketService:
+    """
+    Servicio para impresión de tickets de encomienda.
+    """
+    
+    @staticmethod
+    def generar_qr_encomienda(encomienda):
+        """
+        Genera el código QR para rastreo de la encomienda.
+        
+        Args:
+            encomienda: Instancia de Encomienda
+            
+        Returns:
+            String base64 de la imagen QR o None si no está disponible
+        """
+        if not HAS_QRCODE:
+            return None
+        
+        # URL de tracking para el QR
+        qr_data = (
+            f"TRACKING:{encomienda.codigo}|"
+            f"ORIGEN:{encomienda.parada_origen.nombre}|"
+            f"DESTINO:{encomienda.parada_destino.nombre}|"
+            f"REMITENTE:{encomienda.remitente.cedula}|"
+            f"FECHA:{encomienda.fecha_registro.strftime('%Y%m%d')}"
+        )
+        
+        # Generar QR
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=4,
+            border=2,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convertir a base64
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    @staticmethod
+    def preparar_contexto_ticket(encomienda):
+        """
+        Prepara el contexto para renderizar el ticket de encomienda.
+        
+        Args:
+            encomienda: Instancia de Encomienda
+            
+        Returns:
+            dict con el contexto para el template
+        """
+        from fleet.models import Empresa
+        
+        # Obtener empresa (usar la primera si hay varias)
+        empresa = Empresa.objects.first()
+        
+        # Verificar si ya está facturada
+        tiene_factura = encomienda.detalles_factura.filter(
+            factura__estado='emitida'
+        ).exists()
+        
+        return {
+            'encomienda': encomienda,
+            'empresa': empresa,
+            'tiene_factura': tiene_factura,
+            'qr_image': EncomiendaTicketService.generar_qr_encomienda(encomienda),
+        }
+    
+    @staticmethod
+    def generar_comandos_impresora(encomienda):
+        """
+        Genera comandos ESC/POS para impresión directa de ticket encomienda.
+        
+        Args:
+            encomienda: Instancia de Encomienda
+            
+        Returns:
+            bytes con comandos ESC/POS
+        """
+        from fleet.models import Empresa
+        
+        empresa = Empresa.objects.first()
+        
+        # Comandos ESC/POS básicos
+        ESC = b'\x1b'
+        GS = b'\x1d'
+        
+        INIT = ESC + b'@'  # Inicializar impresora
+        CENTER = ESC + b'a' + b'\x01'  # Centrar
+        LEFT = ESC + b'a' + b'\x00'  # Alinear izquierda
+        RIGHT = ESC + b'a' + b'\x02'  # Alinear derecha
+        BOLD_ON = ESC + b'E' + b'\x01'
+        BOLD_OFF = ESC + b'E' + b'\x00'
+        DOUBLE_HEIGHT = GS + b'!' + b'\x10'
+        NORMAL = GS + b'!' + b'\x00'
+        CUT = GS + b'V' + b'\x00'  # Corte total
+        
+        def line(text):
+            return text.encode('cp850', errors='replace') + b'\n'
+        
+        commands = INIT
+        
+        # Encabezado
+        commands += CENTER + BOLD_ON + DOUBLE_HEIGHT
+        if empresa:
+            commands += line(empresa.nombre)
+        commands += NORMAL + BOLD_OFF
+        commands += line("-" * 42)
+        
+        # Tipo de documento
+        commands += BOLD_ON + DOUBLE_HEIGHT
+        commands += line("TICKET DE ENCOMIENDA")
+        commands += NORMAL + BOLD_OFF
+        commands += BOLD_ON
+        commands += line(encomienda.codigo)
+        commands += BOLD_OFF
+        commands += line("-" * 42)
+        commands += LEFT
+        
+        # Ruta
+        commands += BOLD_ON
+        commands += line(f"{encomienda.parada_origen.nombre} -> {encomienda.parada_destino.nombre}")
+        commands += BOLD_OFF
+        if encomienda.viaje:
+            commands += line(f"Fecha: {encomienda.viaje.fecha_viaje.strftime('%d/%m/%Y')}")
+            commands += line(f"Bus: {encomienda.viaje.bus.placa}")
+        commands += line("-" * 42)
+        
+        # Remitente
+        commands += BOLD_ON
+        commands += line("REMITENTE:")
+        commands += BOLD_OFF
+        commands += line(encomienda.remitente.nombre_completo[:42])
+        commands += line(f"C.I.: {encomienda.remitente.cedula}")
+        commands += line("-" * 42)
+        
+        # Destinatario
+        commands += BOLD_ON
+        commands += line("DESTINATARIO:")
+        commands += BOLD_OFF
+        commands += line(encomienda.destinatario.nombre_completo[:42])
+        commands += line(f"C.I.: {encomienda.destinatario.cedula}")
+        commands += line("-" * 42)
+        
+        # Detalle
+        commands += line(f"Tipo: {encomienda.get_tipo_display()}")
+        if encomienda.peso_kg:
+            commands += line(f"Peso: {encomienda.peso_kg} kg")
+        commands += line(f"Descripcion: {encomienda.descripcion[:35]}")
+        commands += line("-" * 42)
+        
+        # Total
+        commands += CENTER + BOLD_ON + DOUBLE_HEIGHT
+        commands += line(f"TOTAL: Gs. {int(encomienda.precio):,}")
+        commands += NORMAL + BOLD_OFF
+        
+        # Fecha
+        commands += line("")
+        commands += line(encomienda.fecha_registro.strftime("%d/%m/%Y %H:%M"))
+        commands += line("GRACIAS POR SU PREFERENCIA")
+        
+        # Corte
+        commands += line("") * 3
+        commands += CUT
+        
+        return commands
