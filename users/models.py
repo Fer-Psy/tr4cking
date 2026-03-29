@@ -8,7 +8,7 @@ class Localidad(models.Model):
     Representa una localidad o ciudad.
     Las coordenadas se almacenan como latitud/longitud para compatibilidad con SQLite.
     """
-    nombre = models.CharField(max_length=100, verbose_name="Nombre")
+    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre")
     latitud = models.DecimalField(
         max_digits=9, decimal_places=6, 
         null=True, blank=True,
@@ -60,8 +60,20 @@ class Persona(models.Model):
     email = models.EmailField(max_length=254, blank=True, null=True, verbose_name="Email")
     direccion = models.TextField(blank=True, null=True, verbose_name="Dirección")
     
+    empresa = models.ForeignKey(
+        'fleet.Empresa', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='personas',
+        verbose_name="Empresa",
+        help_text="Empresa a la que pertenece (choferes/ayudantes)"
+    )
+    
     # Roles (booleanos para simplificar permisos rápidos)
     es_empleado = models.BooleanField(default=False, verbose_name="Es empleado")
+    es_chofer = models.BooleanField(default=False, verbose_name="Es chofer")
+    es_ayudante = models.BooleanField(default=False, verbose_name="Es ayudante de transporte")
     es_cliente = models.BooleanField(default=False, verbose_name="Es cliente")
     es_pasajero = models.BooleanField(default=False, verbose_name="Es pasajero")
 

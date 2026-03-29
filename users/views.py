@@ -7,7 +7,8 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.db.models import Q
-
+from django.db.models.deletion import ProtectedError
+from django.http import JsonResponse
 from .models import Persona, Localidad
 from .forms import PersonaForm, LocalidadForm
 
@@ -44,6 +45,10 @@ class PersonaListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(es_cliente=True)
         elif rol == 'pasajero':
             queryset = queryset.filter(es_pasajero=True)
+        elif rol == 'chofer':
+            queryset = queryset.filter(es_chofer=True)
+        elif rol == 'ayudante':
+            queryset = queryset.filter(es_ayudante=True)
         
         return queryset
     
@@ -85,6 +90,17 @@ class PersonaDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'users/persona_confirm_delete.html'
     success_url = reverse_lazy('users:persona_list')
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar a '{self.get_object().nombre_completo}' porque tiene registros "
+                "relacionados que están protegidos (ej. ventas o asignaciones)."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Persona {self.object.nombre_completo} eliminada exitosamente.")
         return super().form_valid(form)
@@ -148,6 +164,51 @@ class LocalidadDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'users/localidad_confirm_delete.html'
     success_url = reverse_lazy('users:localidad_list')
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar la localidad '{self.get_object().nombre}' porque está siendo utilizada "
+                "por paradas u otros registros protegidos."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Localidad {self.object.nombre} eliminada exitosamente.")
         return super().form_valid(form)
+
+
+class LocalidadCreateAjaxView(LoginRequiredMixin, CreateView):
+    """Crear una nueva localidad vía AJAX."""
+    model = Localidad
+    form_class = LocalidadForm
+    
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({
+            'success': True,
+            'id': self.object.id,
+            'nombre': self.object.nombre
+        }, status=201)
+        
+    def form_invalid(self, form):
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors
+        }, status=400)
+
+
+def get_localidad_coords_ajax(request, pk):
+    """Retorna las coordenadas de una localidad en formato JSON."""
+    try:
+        localidad = Localidad.objects.get(pk=pk)
+        return JsonResponse({
+            'success': True,
+            'latitud': float(localidad.latitud) if localidad.latitud else None,
+            'longitud': float(localidad.longitud) if localidad.longitud else None,
+            'nombre': localidad.nombre
+        })
+    except Localidad.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Localidad no encontrada'}, status=404)

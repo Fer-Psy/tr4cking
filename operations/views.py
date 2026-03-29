@@ -31,7 +31,7 @@ from .forms import (
 )
 from users.models import Persona
 from fleet.models import Bus, Parada, Empresa
-from itineraries.models import Itinerario, Precio
+from itineraries.models import Itinerario, Precio, Horario
 
 
 # =============================================================================
@@ -95,7 +95,7 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
         context['proximos_viajes'] = Viaje.objects.filter(
             fecha_viaje=hoy,
             estado='programado'
-        ).select_related('itinerario', 'bus', 'chofer').order_by('itinerario__detalles__hora_salida')[:5]
+        ).select_related('itinerario', 'bus', 'chofer').order_by('horario__hora_salida')[:5]
         
         # === VIAJES EN CURSO ===
         context['viajes_activos'] = Viaje.objects.filter(
@@ -161,8 +161,8 @@ class ViajeListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = super().get_queryset().select_related(
-            'itinerario', 'bus', 'chofer'
-        ).annotate(
+            'itinerario', 'bus', 'chofer', 'horario'
+        ).prefetch_related('ayudantes').annotate(
             num_pasajes=Count('pasajes', filter=Q(pasajes__estado__in=['vendido', 'reservado']))
         )
         
@@ -220,11 +220,25 @@ class ViajeDetailView(LoginRequiredMixin, DetailView):
         # Incidencias
         context['incidencias'] = viaje.incidencias.order_by('-fecha_reporte')
         
-        # Mapa de asientos
+        # Mapa de asientos con info de segmentos
         context['asientos_bus'] = viaje.bus.asientos.all().order_by('piso', 'numero_asiento')
+        
+        # Obtener mapa de ocupación por segmentos
+        from operations.utils import obtener_mapa_ocupacion
+        context['mapa_ocupacion'] = obtener_mapa_ocupacion(viaje)
+        
+        # Lista de asientos con al menos un pasaje activo  
         context['asientos_ocupados'] = list(viaje.pasajes.filter(
             estado__in=['reservado', 'vendido', 'abordado']
-        ).values_list('asiento_id', flat=True))
+        ).values_list('asiento_id', flat=True).distinct())
+        
+        # Detalles del itinerario (paradas en orden)
+        context['detalles_itinerario'] = viaje.itinerario.detalles.select_related(
+            'parada', 'parada__localidad'
+        ).order_by('orden')
+        
+        # Hora de salida programada
+        context['hora_salida_programada'] = viaje.hora_salida_programada
         
         # Estadísticas
         context['stats'] = {
@@ -249,6 +263,13 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     template_name = 'operations/viaje_form.html'
     success_url = reverse_lazy('operations:viaje_list')
     success_message = "Viaje programado exitosamente."
+
+    def get_initial(self):
+        initial = super().get_initial()
+        itinerario_id = self.request.GET.get('itinerario')
+        if itinerario_id:
+            initial['itinerario'] = itinerario_id
+        return initial
 
 
 class ViajeUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
@@ -358,21 +379,58 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
         pasaje = form.save(commit=False)
         
         # Obtener o crear pasajero
-        cedula = form.cleaned_data.get('cedula_pasajero')
+        cedula_pasajero = form.cleaned_data.get('cedula_pasajero')
+        nombre_pasajero = form.cleaned_data.get('nombre_pasajero')
+        apellido_pasajero = form.cleaned_data.get('apellido_pasajero')
+        telefono_pasajero = form.cleaned_data.get('telefono_pasajero')
+
         try:
-            pasajero = Persona.objects.get(cedula=cedula)
+            pasajero = Persona.objects.get(cedula=cedula_pasajero)
+            # Actualizar datos si viene del formulario
+            actualizado = False
+            if nombre_pasajero and pasajero.nombre != nombre_pasajero:
+                pasajero.nombre = nombre_pasajero
+                actualizado = True
+            if apellido_pasajero and pasajero.apellido != apellido_pasajero:
+                pasajero.apellido = apellido_pasajero
+                actualizado = True
+            if telefono_pasajero and pasajero.telefono != telefono_pasajero:
+                pasajero.telefono = telefono_pasajero
+                actualizado = True
+            if actualizado:
+                pasajero.save()
         except Persona.DoesNotExist:
             pasajero = Persona.objects.create(
-                cedula=cedula,
-                nombre=form.cleaned_data.get('nombre_pasajero', 'Sin nombre'),
-                apellido=form.cleaned_data.get('apellido_pasajero', ''),
-                telefono=form.cleaned_data.get('telefono_pasajero', ''),
+                cedula=cedula_pasajero,
+                nombre=nombre_pasajero or 'Sin nombre',
+                apellido=apellido_pasajero or '',
+                telefono=telefono_pasajero or '',
                 es_pasajero=True
             )
         
         pasaje.pasajero = pasajero
+        
+        # Obtener opcionalmente el cliente (quien paga)
+        cedula_cliente = form.cleaned_data.get('cedula_cliente')
+        if cedula_cliente and cedula_cliente != cedula_pasajero:
+            try:
+                cliente = Persona.objects.get(cedula=cedula_cliente)
+                pasaje.cliente = cliente
+            except Persona.DoesNotExist:
+                # Si el cliente no existe, lo creamos con datos mínimos (se completarán en facturación)
+                pasaje.cliente = Persona.objects.create(
+                    cedula=cedula_cliente,
+                    nombre='Cliente',
+                    apellido='Registrado',
+                    es_cliente=True
+                )
+        
         pasaje.vendedor = self.request.user
         pasaje.estado = 'vendido'
+        
+        # Asignar órdenes de origen/destino para gestión por segmentos
+        pasaje.orden_origen = form.cleaned_data.get('orden_origen', 1)
+        pasaje.orden_destino = form.cleaned_data.get('orden_destino', 2)
         
         # Obtener precio del itinerario
         try:
@@ -383,8 +441,10 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
             )
             pasaje.precio = precio_obj.precio
         except Precio.DoesNotExist:
-            messages.warning(self.request, "No se encontró precio para este tramo. Configure precios.")
-            pasaje.precio = Decimal('0.00')
+            # Si no hay precio fijo, usamos el del formulario (que el vendedor puede haber editado)
+            if not pasaje.precio or pasaje.precio == 0:
+                messages.warning(self.request, "No se encontró precio configurado. Se usó el precio manual.")
+                # pasaje.precio ya viene del form.precio si se ingresó
         
         pasaje.save()
         
@@ -1603,4 +1663,80 @@ class ViajeParadasView(LoginRequiredMixin, View):
                 'bus': viaje.bus.placa
             },
             'paradas': paradas_data
+        })
+
+
+class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
+    """Retorna las opciones de horario y buses para un itinerario específico (HTMX)."""
+    def get(self, request):
+        itinerario_id = request.GET.get('itinerario')
+        fecha_str = request.GET.get('fecha')
+        empresa_id = request.GET.get('empresa')
+        
+        # Filtros iniciales vacíos
+        horarios_data = []
+        itinerarios = Itinerario.objects.filter(activo=True)
+        buses = Bus.objects.none()
+        choferes = Persona.objects.none()
+        ayudantes = Persona.objects.none()
+        
+        # Si se seleccionó empresa, filtrar todo por esa empresa
+        if empresa_id:
+            try:
+                emp_id = int(empresa_id)
+                itinerarios = itinerarios.filter(empresa_id=emp_id)
+                buses = Bus.objects.filter(empresa_id=emp_id).order_by('placa')
+                choferes = Persona.objects.filter(empresa_id=emp_id, es_chofer=True).order_by('apellido', 'nombre')
+                ayudantes = Persona.objects.filter(empresa_id=emp_id, es_ayudante=True).order_by('apellido', 'nombre')
+            except (ValueError, TypeError):
+                pass
+
+        if itinerario_id:
+            try:
+                itinerario = Itinerario.objects.get(pk=itinerario_id)
+                
+                # Obtener todos los horarios activos del itinerario
+                todos_horarios = Horario.objects.filter(itinerario=itinerario, activo=True).order_by('hora_salida')
+                
+                # Filtrar si la fecha es hoy
+                ahora = timezone.localtime(timezone.now())
+                hoy = ahora.date()
+                fecha_viaje = None
+                
+                if fecha_str:
+                    try:
+                        from datetime import datetime
+                        fecha_viaje = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+
+                # Analizar horarios
+                for h in todos_horarios:
+                    es_pasado = False
+                    if fecha_viaje == hoy:
+                        if h.hora_salida < ahora.time():
+                            es_pasado = True
+                    
+                    horarios_data.append({
+                        'id': h.id,
+                        'hora': h.hora_salida.strftime('%H:%M'),
+                        'es_pasado': es_pasado
+                    })
+                
+                # Si no se seleccionó empresa explícitamente, filtrar por la empresa del itinerario
+                if not empresa_id and itinerario.empresa:
+                    buses = Bus.objects.filter(empresa=itinerario.empresa).order_by('placa')
+                    choferes = Persona.objects.filter(empresa=itinerario.empresa, es_chofer=True).order_by('apellido', 'nombre')
+                    ayudantes = Persona.objects.filter(empresa=itinerario.empresa, es_ayudante=True).order_by('apellido', 'nombre')
+            except (ValueError, TypeError, Itinerario.DoesNotExist):
+                pass
+        
+        return render(request, 'operations/partials/horario_options.html', {
+            'horarios': horarios_data,
+            'itinerarios': itinerarios,
+            'buses': buses,
+            'choferes': choferes,
+            'ayudantes': ayudantes,
+            'empresa_id': empresa_id,
+            'itinerario_id': itinerario_id
         })

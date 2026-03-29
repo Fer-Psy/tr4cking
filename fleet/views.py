@@ -8,6 +8,8 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.db.models import Q, Count
+from django.db.models.deletion import ProtectedError
+from django.http import JsonResponse
 
 from .models import Empresa, Parada, Bus, Asiento
 from .forms import EmpresaForm, ParadaForm, BusForm, AsientoForm
@@ -76,6 +78,17 @@ class EmpresaDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'fleet/empresa_confirm_delete.html'
     success_url = reverse_lazy('fleet:empresa_list')
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar la empresa '{self.get_object().nombre}' porque está referenciada "
+                "en otras partes del sistema."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Empresa {self.object.nombre} eliminada exitosamente.")
         return super().form_valid(form)
@@ -113,6 +126,26 @@ class ParadaListView(LoginRequiredMixin, ListView):
         context['search'] = self.request.GET.get('search', '')
         context['empresa_filter'] = self.request.GET.get('empresa', '')
         context['empresas'] = Empresa.objects.all()
+        
+        # Datos para el mapa del dashboard
+        import json
+        paradas_data = []
+        for p in context['paradas']:
+            lat = p.latitud_gps or (p.localidad.latitud if p.localidad else None)
+            lng = p.longitud_gps or (p.localidad.longitud if p.localidad else None)
+            
+            if lat and lng:
+                paradas_data.append({
+                    'id': p.id,
+                    'nombre': p.nombre,
+                    'lat': float(lat),
+                    'lng': float(lng),
+                    'empresa': p.empresa.nombre,
+                    'localidad': p.localidad.nombre,
+                    'is_agencia': p.es_agencia,
+                    'url': reverse('fleet:parada_detail', args=[p.id])
+                })
+        context['paradas_json'] = json.dumps(paradas_data)
         return context
 
 
@@ -131,6 +164,12 @@ class ParadaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     success_url = reverse_lazy('fleet:parada_list')
     success_message = "Parada %(nombre)s creada exitosamente."
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from users.forms import LocalidadForm
+        context['localidad_form'] = LocalidadForm()
+        return context
+
 
 class ParadaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     """Editar una parada."""
@@ -140,6 +179,12 @@ class ParadaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     success_url = reverse_lazy('fleet:parada_list')
     success_message = "Parada %(nombre)s actualizada exitosamente."
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from users.forms import LocalidadForm
+        context['localidad_form'] = LocalidadForm()
+        return context
+
 
 class ParadaDeleteView(LoginRequiredMixin, DeleteView):
     """Eliminar una parada."""
@@ -147,6 +192,17 @@ class ParadaDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'fleet/parada_confirm_delete.html'
     success_url = reverse_lazy('fleet:parada_list')
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar la parada '{self.get_object().nombre}' porque está siendo utilizada "
+                "en otras partes del sistema (ej. precios o itinerarios)."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Parada {self.object.nombre} eliminada exitosamente.")
         return super().form_valid(form)
@@ -204,21 +260,116 @@ class BusDetailView(LoginRequiredMixin, DetailView):
 
 
 class BusCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    """Crear un nuevo bus."""
+    """Crear un nuevo bus con generación automática de asientos."""
     model = Bus
     form_class = BusForm
     template_name = 'fleet/bus_form.html'
     success_url = reverse_lazy('fleet:bus_list')
-    success_message = "Bus %(placa)s creado exitosamente."
+    
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        
+        # Obtener el tipo de asiento seleccionado
+        tipo_asiento = form.cleaned_data.get('tipo_asiento', 'convencional')
+        bus = self.object
+        capacidad = bus.capacidad_asientos
+        pisos = bus.capacidad_pisos
+        
+        # Generar los asientos automáticamente
+        asientos = []
+        for i in range(1, capacidad + 1):
+            # Distribuir asientos entre pisos
+            if pisos == 2:
+                piso = 1 if i <= capacidad // 2 else 2
+            else:
+                piso = 1
+            
+            asientos.append(Asiento(
+                bus=bus,
+                numero_asiento=i,
+                piso=piso,
+                tipo_asiento=tipo_asiento,
+            ))
+        
+        Asiento.objects.bulk_create(asientos)
+        
+        messages.success(
+            self.request, 
+            f"Bus {bus.placa} creado exitosamente con {capacidad} asientos de tipo "
+            f"'{dict(Asiento.TIPO_ASIENTO_CHOICES).get(tipo_asiento, tipo_asiento)}'."
+        )
+        return response
 
 
 class BusUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
-    """Editar un bus."""
+    """Editar un bus con opción de regenerar asientos."""
     model = Bus
     form_class = BusForm
     template_name = 'fleet/bus_form.html'
     success_url = reverse_lazy('fleet:bus_list')
-    success_message = "Bus %(placa)s actualizado exitosamente."
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        # Pre-seleccionar el tipo de asiento más común del bus actual
+        bus = self.get_object()
+        asiento_mas_comun = (
+            bus.asientos
+            .values('tipo_asiento')
+            .annotate(total=Count('tipo_asiento'))
+            .order_by('-total')
+            .first()
+        )
+        if asiento_mas_comun:
+            initial['tipo_asiento'] = asiento_mas_comun['tipo_asiento']
+        return initial
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['asientos_actuales'] = self.object.asientos.count()
+        return context
+    
+    def form_valid(self, form):
+        bus = self.object
+        capacidad_anterior = Bus.objects.get(pk=bus.pk).capacidad_asientos
+        nueva_capacidad = form.cleaned_data['capacidad_asientos']
+        tipo_asiento = form.cleaned_data.get('tipo_asiento', 'convencional')
+        pisos = form.cleaned_data['capacidad_pisos']
+        regenerar = form.cleaned_data.get('regenerar_asientos')
+        
+        response = super().form_valid(form)
+        
+        if regenerar:
+            # Eliminar asientos existentes y regenerar
+            bus.asientos.all().delete()
+            
+            asientos = []
+            for i in range(1, nueva_capacidad + 1):
+                if pisos == 2:
+                    piso = 1 if i <= nueva_capacidad // 2 else 2
+                else:
+                    piso = 1
+                
+                asientos.append(Asiento(
+                    bus=bus,
+                    numero_asiento=i,
+                    piso=piso,
+                    tipo_asiento=tipo_asiento,
+                ))
+            
+            Asiento.objects.bulk_create(asientos)
+            
+            messages.success(
+                self.request, 
+                f"Bus {bus.placa} actualizado y {nueva_capacidad} asientos regenerados con tipo "
+                f"'{dict(Asiento.TIPO_ASIENTO_CHOICES).get(tipo_asiento, tipo_asiento)}'."
+            )
+        else:
+            messages.success(
+                self.request, 
+                f"Bus {bus.placa} actualizado exitosamente. Los asientos no fueron modificados."
+            )
+        
+        return response
 
 
 class BusDeleteView(LoginRequiredMixin, DeleteView):
@@ -227,6 +378,17 @@ class BusDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'fleet/bus_confirm_delete.html'
     success_url = reverse_lazy('fleet:bus_list')
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar el bus '{self.get_object().placa}' porque tiene registros relacionados "
+                "que están protegidos (ej. viajes realizados)."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Bus {self.object.placa} eliminado exitosamente.")
         return super().form_valid(form)
@@ -307,6 +469,39 @@ class AsientoDeleteView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         return reverse('fleet:asiento_list', kwargs={'bus_pk': self.object.bus.pk})
     
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError:
+            messages.error(
+                request, 
+                f"No se puede eliminar el asiento {self.get_object().numero_asiento} porque está relacionado "
+                "con registros de ventas o reservas."
+            )
+            return self.get(request, *args, **kwargs)
+
     def form_valid(self, form):
         messages.success(self.request, f"Asiento {self.object.numero_asiento} eliminado exitosamente.")
         return super().form_valid(form)
+
+
+class ParadaCreateAjaxView(LoginRequiredMixin, CreateView):
+    """Crear una nueva parada vía AJAX."""
+    model = Parada
+    form_class = ParadaForm
+    
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({
+            'success': True,
+            'id': self.object.id,
+            'nombre': f"{self.object.nombre} ({self.object.localidad.nombre})",
+            'empresa': self.object.empresa.nombre,
+            'localidad': self.object.localidad.nombre,
+        })
+    
+    def form_invalid(self, form):
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors.as_json()
+        })

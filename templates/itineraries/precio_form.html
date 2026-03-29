@@ -67,3 +67,50 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<!-- Modal container for HTMX -->
+<div class="modal modal-blur fade" id="modal-itinerario" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-3">Cargando formulario...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Escuchar el evento de creación de itinerario (HTMX)
+        document.body.addEventListener('itinerarioCreated', function(evt) {
+            const data = evt.detail;
+            const select = document.getElementById('id_itinerario');
+            
+            if (select && data.id && data.nombre) {
+                // Crear y añadir la nueva opción
+                const newOption = new Option(data.nombre, data.id, true, true);
+                select.appendChild(newOption);
+                
+                // Disparar cambio si se usa Select2 u otros
+                $(select).trigger('change');
+                
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modal-itinerario'));
+                if (modal) modal.hide();
+            }
+        });
+
+        // Limpiar modal al cerrar
+        document.getElementById('modal-itinerario').addEventListener('hidden.bs.modal', function () {
+            this.querySelector('.modal-content').innerHTML = `
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <div class="mt-3">Cargando formulario...</div>
+                </div>
+            `;
+        });
+    });
+</script>
+{% endblock %}

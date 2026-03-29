@@ -13,10 +13,17 @@
         <h1 class="page-title mb-1">Itinerarios</h1>
         <p class="page-subtitle mb-0">Gestiona rutas y recorridos de buses</p>
     </div>
-    <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-2"></i>
-        Nuevo Itinerario
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{% url 'itineraries:itinerario_create' %}" 
+           class="btn btn-primary"
+           hx-get="{% url 'itineraries:itinerario_create' %}?refresh=true"
+           hx-target="#modal-itinerario .modal-content"
+           data-bs-toggle="modal"
+           data-bs-target="#modal-itinerario">
+            <i class="bi bi-plus-lg me-2"></i>
+            Nuevo Itinerario
+        </a>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -117,7 +124,11 @@
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}"
-                                    class="btn btn-ghost btn-icon btn-sm" title="Editar">
+                                    class="btn btn-ghost btn-icon btn-sm" title="Editar"
+                                    hx-get="{% url 'itineraries:itinerario_update' itinerario.pk %}"
+                                    hx-target="#modal-itinerario .modal-content"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-itinerario">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <a href="{% url 'itineraries:itinerario_delete' itinerario.pk %}"
@@ -200,4 +211,31 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Modal container for HTMX -->
+<div class="modal modal-blur fade" id="modal-itinerario" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <!-- Content will be loaded via HTMX -->
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-3">Cargando formulario...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Reset modal content when closed
+    document.getElementById('modal-itinerario').addEventListener('hidden.bs.modal', function () {
+        this.querySelector('.modal-content').innerHTML = `
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-3">Cargando formulario...</div>
+            </div>
+        `;
+    });
+</script>
 {% endblock %}

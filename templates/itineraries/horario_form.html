@@ -1,0 +1,106 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Nuevo Horario {% if itinerario %}- {{ itinerario.nombre }} {% endif %}- TR4CKING{% endblock %}
+
+{% block title_content %}
+    {% if object %}Editar{% else %}Nuevo{% endif %} Horario
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a></li>
+{% if itinerario %}
+<li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}">{{ itinerario.nombre }}</a></li>
+{% else %}
+<li class="breadcrumb-item"><a href="{% url 'itineraries:horario_list' %}">Horarios</a></li>
+{% endif %}
+<li class="breadcrumb-item active" aria-current="page">{% if object %}Editar{% else %}Nuevo{% endif %} Horario</li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-title mb-1">Agregar Horario de Salida</h1>
+        {% if itinerario %}
+            <p class="page-subtitle mb-0 text-muted">{{ itinerario.nombre }}</p>
+            <p class="mb-0 text-primary">
+                <i class="bi bi-geo-alt-fill me-1"></i>
+                <small>
+                    Saldrá de <strong>{{ itinerario.primera_parada.parada.nombre|default:"Orígen Desconocido" }}</strong> en este horario
+                </small>
+            </p>
+        {% else %}
+            <p class="page-subtitle mb-0 text-muted" id="itinerario-text">Seleccione un itinerario</p>
+            <p class="mb-0 text-primary d-none" id="origen-text">
+                <i class="bi bi-geo-alt-fill me-1"></i>
+                <small>Saldrá de <strong id="origen-name"></strong> en este horario</small>
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {% load crispy_forms_tags %}
+            {% crispy form %}
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-2"></i>Agregar Horario
+                </button>
+                {% if itinerario %}
+                <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+                {% else %}
+                <a href="{% url 'itineraries:horario_list' %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not itinerario %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Collect all active itineraries
+    const origenesDict = {
+        {% for it in form.fields.itinerario.queryset %}
+            "{{ it.pk }}": {
+                nombre: "{{ it.nombre|escapejs }}",
+                origen: "{{ it.primera_parada.parada.nombre|default:'Orígen Desconocido'|escapejs }}"
+            }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+
+    const select = document.getElementById("id_itinerario");
+    const origenTextContainer = document.getElementById("origen-text");
+    const origenName = document.getElementById("origen-name");
+    const subTitle = document.getElementById("itinerario-text");
+
+    if (select) {
+        select.addEventListener("change", function(e) {
+            const val = e.target.value;
+            if (val && origenesDict[val]) {
+                const info = origenesDict[val];
+                origenTextContainer.classList.remove("d-none");
+                origenName.textContent = info.origen;
+                subTitle.textContent = info.nombre;
+            } else {
+                origenTextContainer.classList.add("d-none");
+                subTitle.textContent = "Seleccione un itinerario";
+            }
+        });
+        
+        // Trigger manually on page load in case one is already selected by browser form refill
+        select.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -3,7 +3,7 @@ Forms for fleet app.
 """
 from django import forms
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit, HTML, Div
+from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit, HTML, Div, Field
 
 from .models import Empresa, Parada, Bus, Asiento
 from users.models import Localidad
@@ -48,7 +48,7 @@ class ParadaForm(forms.ModelForm):
     
     class Meta:
         model = Parada
-        fields = ['empresa', 'localidad', 'nombre', 'direccion', 'latitud_gps', 'longitud_gps', 'es_sucursal']
+        fields = ['empresa', 'localidad', 'nombre', 'direccion', 'latitud_gps', 'longitud_gps', 'es_agencia']
         widgets = {
             'nombre': forms.TextInput(attrs={'placeholder': 'Ej: Terminal de Asunción'}),
             'direccion': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Dirección de la parada'}),
@@ -58,6 +58,7 @@ class ParadaForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['localidad'].queryset = Localidad.objects.all().order_by('nombre')
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -65,7 +66,14 @@ class ParadaForm(forms.ModelForm):
                 'Información de la Parada',
                 Row(
                     Column('empresa', css_class='col-md-6'),
-                    Column('localidad', css_class='col-md-6'),
+                    Column(
+                        Div(
+                            Field('localidad', wrapper_class='flex-grow-1 mb-0'),
+                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalLocalidad" title="Nueva Localidad"><i class="bi bi-plus-lg"></i></button>'),
+                            css_class='d-flex align-items-start'
+                        ),
+                        css_class='col-md-6'
+                    ),
                 ),
                 'nombre',
                 'direccion',
@@ -79,13 +87,54 @@ class ParadaForm(forms.ModelForm):
             ),
             Fieldset(
                 'Opciones',
-                Div('es_sucursal', css_class='form-check form-switch'),
+                Div('es_agencia', css_class='form-check form-switch'),
             ),
         )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        empresa = cleaned_data.get('empresa')
+        localidad = cleaned_data.get('localidad')
+        nombre = cleaned_data.get('nombre')
+        
+        if empresa and localidad and nombre:
+            # Check for existing parada with same name in same locality for same company
+            existe = Parada.objects.filter(
+                empresa=empresa, 
+                localidad=localidad, 
+                nombre__iexact=nombre
+            )
+            if self.instance.pk:
+                existe = existe.exclude(pk=self.instance.pk)
+            
+            if existe.exists():
+                raise forms.ValidationError(
+                    f"Ya existe una parada llamada '{nombre}' registrada para la empresa '{empresa}' "
+                    f"en '{localidad}'."
+                )
+        return cleaned_data
 
 
 class BusForm(forms.ModelForm):
     """Formulario para crear/editar buses."""
+    
+    # Campo extra para tipo de asiento (no pertenece al modelo Bus)
+    tipo_asiento = forms.ChoiceField(
+        choices=Asiento.TIPO_ASIENTO_CHOICES,
+        initial='convencional',
+        required=True,
+        label='Tipo de asiento',
+        help_text='Tipo de asiento que se asignará a todos los asientos generados automáticamente.',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    
+    # Campo para regenerar asientos (solo para edición)
+    regenerar_asientos = forms.BooleanField(
+        required=False,
+        label='Regenerar todos los asientos',
+        help_text='Si se marca, se eliminarán los asientos actuales y se volverán a generar según la nueva capacidad y tipo.',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
     
     class Meta:
         model = Bus
@@ -102,6 +151,10 @@ class BusForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
+        
+        # Si es edición, mostramos el campo para regenerar
+        mostrar_regenerar = self.instance.pk is not None
+        
         self.helper.layout = Layout(
             Fieldset(
                 'Información del Bus',
@@ -115,12 +168,35 @@ class BusForm(forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Capacidad',
+                'Capacidad y Estado',
                 Row(
                     Column('capacidad_pisos', css_class='col-md-4'),
                     Column('capacidad_asientos', css_class='col-md-4'),
                     Column('estado', css_class='col-md-4'),
                 ),
+            ),
+            Fieldset(
+                'Configuración de Asientos',
+                Row(
+                    Column('tipo_asiento', css_class='col-md-6'),
+                ),
+                Div(
+                    'regenerar_asientos',
+                    css_class='form-check mb-3' if mostrar_regenerar else 'd-none'
+                ),
+                HTML(f'''
+                    <div class="alert alert-info mt-2" style="font-size: 0.85rem;">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-info-circle me-2 mt-1"></i>
+                            <div>
+                                <strong>Generación automática:</strong> {'Al guardar,' if mostrar_regenerar else 'Al crear el bus,'} se generarán 
+                                automáticamente todos los asientos con el tipo seleccionado, numerados del 1 al 
+                                total de la capacidad indicada.
+                                { '<br><span class="text-danger"><strong>Atención:</strong> Si marca "Regenerar", se perderán los cambios manuales hechos a los asientos actuales.</span>' if mostrar_regenerar else '' }
+                            </div>
+                        </div>
+                    </div>
+                '''),
             ),
         )
 

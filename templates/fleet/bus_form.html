@@ -26,7 +26,7 @@
     <div class="col-12 col-lg-8">
         <div class="card">
             <div class="card-body">
-                <form method="post" novalidate>
+                <form method="post" novalidate id="busForm">
                     {% csrf_token %}
                     {% crispy form %}
 
@@ -48,27 +48,109 @@
     </div>
 
     <div class="col-12 col-lg-4">
-        <div class="card">
+        <div class="card mb-3">
             <div class="card-header">
                 <h5 class="card-title">
                     <i class="bi bi-info-circle me-2"></i>
-                    Información
+                    Resumen de Asientos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="seatSummary">
+                    <p class="text-secondary small mb-2">Ingresa la capacidad y el tipo de asiento para ver el detalle.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-question-circle me-2"></i>
+                    Ayuda
                 </h5>
             </div>
             <div class="card-body">
                 <h6 class="fw-semibold mb-2">Estados del Bus</h6>
                 <ul class="list-unstyled small text-secondary mb-3">
-                    <li><span class="badge badge-success me-1">Activo</span> Disponible para viajes</li>
-                    <li class="mt-1"><span class="badge badge-warning me-1">Mantenimiento</span> En reparación</li>
-                    <li class="mt-1"><span class="badge badge-secondary me-1">Inactivo</span> Fuera de servicio</li>
+                    <li><span class="badge bg-success me-1">Activo</span> Disponible para viajes</li>
+                    <li class="mt-1"><span class="badge bg-warning me-1">Mantenimiento</span> En reparación</li>
+                    <li class="mt-1"><span class="badge bg-secondary me-1">Inactivo</span> Fuera de servicio</li>
                 </ul>
 
-                <h6 class="fw-semibold mb-2">Asientos</h6>
+                <h6 class="fw-semibold mb-2">Generación Automática</h6>
                 <p class="text-secondary small mb-0">
-                    Luego de crear el bus, podrás configurar los asientos individualmente.
+                    El sistema creará automáticamente los registros de cada asiento. Si el bus tiene 2 pisos, 
+                    los asientos se dividirán equitativamente entre ambos pisos.
                 </p>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const capacityInput = document.querySelector('input[name="capacidad_asientos"]');
+        const floorsInput = document.querySelector('input[name="capacidad_pisos"]');
+        const typeSelect = document.querySelector('select[name="tipo_asiento"]');
+        const summaryDiv = document.getElementById('seatSummary');
+        
+        function updateSummary() {
+            const capacity = parseInt(capacityInput.value) || 0;
+            const floors = parseInt(floorsInput.value) || 1;
+            const type = typeSelect.options[typeSelect.selectedIndex].text;
+            
+            if (capacity > 0) {
+                let html = `
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Asientos:</span>
+                        <span class="fw-bold">${capacity}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tipo:</span>
+                        <span class="badge bg-primary">${type}</span>
+                    </div>
+                `;
+                
+                if (floors === 2) {
+                    const floor1 = Math.floor(capacity / 2);
+                    const floor2 = capacity - floor1;
+                    html += `
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>Piso 1:</span>
+                                <span>${floor1} asientos</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span>Piso 2:</span>
+                                <span>${floor2} asientos</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between small">
+                                <span>Piso 1:</span>
+                                <span>${capacity} asientos</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                summaryDiv.innerHTML = html;
+            } else {
+                summaryDiv.innerHTML = '<p class="text-secondary small mb-2">Ingresa la capacidad y el tipo de asiento para ver el detalle.</p>';
+            }
+        }
+        
+        capacityInput.addEventListener('input', updateSummary);
+        floorsInput.addEventListener('input', updateSummary);
+        typeSelect.addEventListener('change', updateSummary);
+        
+        // Initial update
+        updateSummary();
+    });
+</script>
 {% endblock %}

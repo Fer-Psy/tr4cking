@@ -1,4 +1,15 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load static users_filters %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+    #map { z-index: 1; }
+    .leaflet-popup-content-wrapper { border-radius: 8px; padding: 5px; }
+    .parada-popup h4 { margin-bottom: 4px; color: #206bc4; }
+    .parada-popup p { margin-bottom: 8px; font-size: 0.85rem; }
+</style>
+{% endblock %}
 
 {% block title %}Paradas - TR4CKING{% endblock %}
 
@@ -17,6 +28,20 @@
         <i class="bi bi-plus-lg me-2"></i>
         Nueva Parada
     </a>
+</div>
+
+<!-- Map Dashboard -->
+<div class="card mb-4 border-primary-subtle shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center bg-primary-lt">
+        <h3 class="card-title">
+            <i class="bi bi-map me-2"></i>
+            Mapa de Paradas
+        </h3>
+        <span class="badge bg-primary text-primary-fg">{{ paradas|length }} ubicaciones en esta vista</span>
+    </div>
+    <div class="card-body p-0">
+        <div id="map" style="height: 350px; width: 100%; border-radius: 0 0 8px 8px;"></div>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -82,16 +107,21 @@
                         </td>
                         <td>{{ parada.localidad.nombre }}</td>
                         <td>
-                            {% if parada.es_sucursal %}
-                            <span class="badge badge-primary">Sucursal</span>
+                            {% if parada.es_agencia %}
+                            <span class="badge badge-primary">Agencia</span>
                             {% else %}
                             <span class="badge badge-secondary">Parada</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if parada.latitud_gps and parada.longitud_gps %}
-                            <a href="https://www.google.com/maps?q={{ parada.latitud_gps }},{{ parada.longitud_gps }}"
-                                target="_blank" class="btn btn-sm btn-ghost" title="Ver en mapa">
+                            <a href="https://www.google.com/maps?q={{ parada.latitud_gps|dot_decimal }},{{ parada.longitud_gps|dot_decimal }}"
+                                target="_blank" class="btn btn-sm btn-outline-primary" title="Ver en mapa">
+                                <i class="bi bi-geo-alt me-1"></i>Ver Mapa
+                            </a>
+                            {% elif parada.localidad.latitud and parada.localidad.longitud %}
+                            <a href="https://www.google.com/maps?q={{ parada.localidad.latitud|dot_decimal }},{{ parada.localidad.longitud|dot_decimal }}"
+                                target="_blank" class="btn btn-sm btn-outline-primary text-azure" title="Ubicación aproximada (Localidad)">
                                 <i class="bi bi-geo-alt me-1"></i>Ver Mapa
                             </a>
                             {% else %}
@@ -184,4 +214,73 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const paradas = {{ paradas_json|safe }};
+        if (paradas.length === 0) {
+            document.getElementById('map').innerHTML = `
+                <div class="d-flex align-items-center justify-content-center h-100 bg-light text-muted">
+                    <div class="text-center">
+                        <i class="bi bi-geo-alt fs-1 d-block mb-2"></i>
+                        No hay paradas con coordenadas para mostrar en el mapa
+                    </div>
+                </div>`;
+            return;
+        }
+
+        const map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // Icono unificado: Azul para Parada, Dorado para Agencia
+        const stopMarkerHtml = "<div style='background-color:#206bc4; width:14px; height:14px; border:2px solid white; border-radius:1px; box-shadow:0 0 5px rgba(0,0,0,0.5);'></div>";
+        const agencyMarkerHtml = "<div style='background-color:#f7ba1e; width:14px; height:14px; border:2px solid white; border-radius:1px; box-shadow:0 0 5px rgba(0,0,0,0.5);'></div>";
+
+        const stopIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: stopMarkerHtml,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+
+        const agencyIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: agencyMarkerHtml,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+
+        const bounds = [];
+        paradas.forEach(p => {
+            const marker = L.marker([p.lat, p.lng], {
+                icon: p.is_agencia ? agencyIcon : stopIcon
+            }).addTo(map);
+            
+            marker.bindPopup(`
+                <div class="parada-popup" style="min-width: 150px;">
+                    <h4 class="h5 mb-1">${p.nombre}</h4>
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-building me-1"></i>${p.empresa}<br>
+                        <i class="bi bi-geo-alt me-1"></i>${p.localidad}
+                    </p>
+                    <a href="${p.url}" class="btn btn-sm btn-primary w-100">
+                        Ver Detalles
+                    </a>
+                </div>
+            `);
+            bounds.push([p.lat, p.lng]);
+        });
+
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, { padding: [40, 40] });
+        } else {
+            map.setView([-25.3, -57.5], 7);
+        }
+    });
+</script>
 {% endblock %}

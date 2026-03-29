@@ -5,6 +5,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <meta name="referrer" content="no-referrer-when-downgrade"/>
     <title>{% block title %}TR4CKING{% endblock %}</title>
     <!-- CSS files -->
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css" rel="stylesheet"/>
@@ -113,7 +114,7 @@
                                 <li class="list-inline-item">
                                     Copyright &copy; 2026
                                     <a href="." class="link-secondary">TR4CKING</a>.
-                                    All rights reserved.
+                                    
                                 </li>
                             </ul>
                         </div>
@@ -123,8 +124,35 @@
         </div>
     </div>
     <!-- Libs JS -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/demo.min.js" defer></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+    </script>
+    
+    <script>
+        $(document).ready(function() {
+            // Inicializar Select2
+            $('.form-select.select2').select2({
+                placeholder: "Seleccione una opción",
+                allowClear: true,
+                width: '100%'
+            });
+            $('.form-select.select2-multiple').select2({
+                placeholder: "Seleccione opciones",
+                allowClear: true,
+                width: '100%'
+            });
+        });
+    </script>
     
     <!-- Custom JS -->
     {% block extra_js %}{% endblock %}

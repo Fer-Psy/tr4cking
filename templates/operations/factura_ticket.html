@@ -458,8 +458,8 @@
                 {{ primer_pasaje.parada_origen.nombre|upper }} - {{ primer_pasaje.parada_destino.nombre|upper }}
                 {{ primer_pasaje.viaje.fecha_viaje|date:"d/m/Y" }}
             </div>
-            {% if primer_pasaje.viaje.itinerario.hora_salida %}
-            <div style="font-size: 11px;">{{ primer_pasaje.viaje.itinerario.hora_salida|time:"H:i" }}</div>
+            {% if primer_pasaje.viaje.horario.hora_salida %}
+            <div style="font-size: 11px;">{{ primer_pasaje.viaje.horario.hora_salida|time:"H:i" }}</div>
             {% endif %}
         </div>
         <div class="divider"></div>

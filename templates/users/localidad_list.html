@@ -1,4 +1,6 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load users_filters %}
+
 
 {% block title %}Localidades - TR4CKING{% endblock %}
 
@@ -78,8 +80,8 @@
                             <td>
                                 {% if localidad.latitud and localidad.longitud %}
                                 <span class="d-inline-flex align-items-center gap-2">
-                                    <code class="text-muted">{{ localidad.latitud }}, {{ localidad.longitud }}</code>
-                                    <a href="https://www.google.com/maps?q={{ localidad.latitud }},{{ localidad.longitud }}" target="_blank" class="text-secondary" title="Ver en mapa">
+                                    <code class="text-muted">{{ localidad.latitud|dot_decimal }}, {{ localidad.longitud|dot_decimal }}</code>
+                                    <a href="https://www.google.com/maps?q={{ localidad.latitud|dot_decimal }},{{ localidad.longitud|dot_decimal }}" target="_blank" class="text-secondary" title="Ver en mapa">
                                         <i class="bi bi-box-arrow-up-right"></i>
                                     </a>
                                 </span>

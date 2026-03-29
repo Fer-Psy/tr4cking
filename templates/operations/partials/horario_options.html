@@ -1,0 +1,47 @@
+<option value="">-- Seleccione un horario --</option>
+{% for h in horarios %}
+    <option value="{{ h.id }}" {% if h.es_pasado %}disabled data-warning="true"{% endif %}>
+        {{ h.hora }}{% if h.es_pasado %} (YA PASÓ){% endif %}
+    </option>
+{% empty %}
+    {% if request.GET.itinerario %}
+        <option value="" disabled>Sin horarios configurados para este itinerario</option>
+    {% endif %}
+{% endfor %}
+
+{% if itinerarios %}
+<select id="id_itinerario" name="itinerario" class="form-select" hx-swap-oob="true">
+    <option value="">-- Seleccione un itinerario --</option>
+    {% for it in itinerarios %}
+        <option value="{{ it.id }}" {% if it.id|stringformat:"s" == itinerario_id %}selected{% endif %}>{{ it.nombre }}</option>
+    {% endfor %}
+</select>
+{% endif %}
+
+<select id="id_bus" name="bus" class="form-select" hx-swap-oob="true">
+    <option value="">---------</option>
+    {% for bus in buses %}
+        <option value="{{ bus.id }}">{{ bus.placa }} - {{ bus.marca }} {{ bus.modelo }}</option>
+    {% empty %}
+        {% if request.GET.itinerario or request.GET.empresa %}
+            <option value="" disabled>No hay buses registrados para esta empresa</option>
+        {% endif %}
+    {% endfor %}
+</select>
+
+<select id="id_chofer" name="chofer" class="form-select" hx-swap-oob="true">
+    <option value="">---------</option>
+    {% for c in choferes %}
+        <option value="{{ c.cedula }}">{{ c.apellido }}, {{ c.nombre }} ({{ c.cedula }})</option>
+    {% empty %}
+        {% if request.GET.empresa %}
+            <option value="" disabled>No hay choferes para esta empresa</option>
+        {% endif %}
+    {% endfor %}
+</select>
+
+<select id="id_ayudantes" name="ayudantes" class="form-select select2-multiple" multiple hx-swap-oob="true">
+    {% for a in ayudantes %}
+        <option value="{{ a.cedula }}">{{ a.apellido }}, {{ a.nombre }}</option>
+    {% endfor %}
+</select>

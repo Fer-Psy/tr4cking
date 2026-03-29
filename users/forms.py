@@ -25,7 +25,7 @@ class PersonaForm(forms.ModelForm):
         model = Persona
         fields = [
             'cedula', 'nombre', 'apellido', 'telefono', 'email', 
-            'direccion', 'es_empleado', 'es_cliente', 'es_pasajero', 'user'
+            'direccion', 'empresa', 'es_empleado', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_pasajero', 'user'
         ]
         widgets = {
             'cedula': forms.NumberInput(attrs={'placeholder': 'Ej: 4567890'}),
@@ -57,8 +57,9 @@ class PersonaForm(forms.ModelForm):
                     Column('apellido', css_class='col-md-4'),
                 ),
                 Row(
-                    Column('telefono', css_class='col-md-6'),
-                    Column('email', css_class='col-md-6'),
+                    Column('telefono', css_class='col-md-4'),
+                    Column('email', css_class='col-md-4'),
+                    Column('empresa', css_class='col-md-4'),
                 ),
                 'direccion',
             ),
@@ -69,6 +70,16 @@ class PersonaForm(forms.ModelForm):
                         Div('es_empleado', css_class='form-check form-switch'),
                         css_class='col-md-4'
                     ),
+                    Column(
+                        Div('es_chofer', css_class='form-check form-switch'),
+                        css_class='col-md-4'
+                    ),
+                    Column(
+                        Div('es_ayudante', css_class='form-check form-switch'),
+                        css_class='col-md-4'
+                    ),
+                ),
+                Row(
                     Column(
                         Div('es_cliente', css_class='form-check form-switch'),
                         css_class='col-md-4'
@@ -101,25 +112,38 @@ class LocalidadForm(forms.ModelForm):
         model = Localidad
         fields = ['nombre', 'latitud', 'longitud']
         widgets = {
-            'nombre': forms.TextInput(attrs={'placeholder': 'Ej: Asunción'}),
-            'latitud': forms.NumberInput(attrs={'placeholder': 'Ej: -25.2867', 'step': '0.000001'}),
-            'longitud': forms.NumberInput(attrs={'placeholder': 'Ej: -57.3333', 'step': '0.000001'}),
+            'nombre': forms.TextInput(attrs={
+                'placeholder': 'Ej: Asunción',
+                'class': 'form-control',
+            }),
+            'latitud': forms.TextInput(attrs={
+                'placeholder': 'Ej: -25.2867',
+                'class': 'form-control',
+                'readonly': 'readonly',
+            }),
+            'longitud': forms.TextInput(attrs={
+                'placeholder': 'Ej: -57.3333',
+                'class': 'form-control',
+                'readonly': 'readonly',
+            }),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Desactivar localización para que use punto decimal, no coma
+        self.fields['latitud'].localize = False
+        self.fields['longitud'].localize = False
         self.helper = FormHelper()
         self.helper.form_tag = False
-        self.helper.layout = Layout(
-            'nombre',
-            Row(
-                Column('latitud', css_class='col-md-6'),
-                Column('longitud', css_class='col-md-6'),
-            ),
-            HTML('''
-                <div class="form-text mb-3">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Las coordenadas son opcionales. Puedes obtenerlas desde Google Maps.
-                </div>
-            '''),
-        )
+
+    def clean_nombre(self):
+        nombre = self.cleaned_data.get('nombre')
+        if nombre:
+            # Check for existing locality with same name (ignoring case)
+            existe = Localidad.objects.filter(nombre__iexact=nombre)
+            if self.instance.pk:
+                existe = existe.exclude(pk=self.instance.pk)
+            if existe.exists():
+                raise forms.ValidationError(f"La localidad '{nombre}' ya existe en el sistema.")
+        return nombre
+

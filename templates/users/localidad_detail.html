@@ -1,6 +1,38 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load users_filters %}
 
 {% block title %}{{ localidad.nombre }} - TR4CKING{% endblock %}
+
+{% block extra_css %}
+{% if localidad.latitud and localidad.longitud %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""/>
+<style>
+    #detail-map {
+        height: 350px;
+        width: 100%;
+        border-radius: 0 0 8px 8px;
+        z-index: 1;
+    }
+    .coord-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #1a569d, #206bc4);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.82rem;
+        font-weight: 500;
+    }
+    .coord-badge i {
+        font-size: 0.9rem;
+    }
+</style>
+{% endif %}
+{% endblock %}
 
 {% block page_header %}
 <div class="page-header d-print-none">
@@ -39,26 +71,42 @@
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header">
-                <h3 class="card-title">Información Geográfica</h3>
+                <h3 class="card-title">
+                    <i class="bi bi-geo-alt-fill me-2 text-primary"></i>
+                    Información Geográfica
+                </h3>
             </div>
             <div class="card-body">
                 <div class="datagrid">
                     <div class="datagrid-item">
                         <div class="datagrid-title">Nombre</div>
-                        <div class="datagrid-content">{{ localidad.nombre }}</div>
+                        <div class="datagrid-content">
+                            <span class="fw-bold">{{ localidad.nombre }}</span>
+                        </div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">Coordenadas</div>
                         <div class="datagrid-content">
                             {% if localidad.latitud and localidad.longitud %}
-                                <div class="d-flex align-items-center gap-2">
-                                    <code>{{ localidad.latitud }}, {{ localidad.longitud }}</code>
-                                    <a href="https://www.google.com/maps?q={{ localidad.latitud }},{{ localidad.longitud }}" target="_blank" class="btn btn-icon btn-ghost-secondary btn-sm" title="Ver en mapa">
-                                        <i class="bi bi-box-arrow-up-right"></i>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="coord-badge">
+                                        <i class="bi bi-pin-map-fill"></i>
+                                        {{ localidad.latitud|dot_decimal }}, {{ localidad.longitud|dot_decimal }}
+                                    </span>
+                                    <a href="https://www.google.com/maps?q={{ localidad.latitud|dot_decimal }},{{ localidad.longitud|dot_decimal }}" 
+                                       target="_blank" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Abrir en Google Maps">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>
+                                        Google Maps
                                     </a>
                                 </div>
                             {% else %}
-                            <span class="text-secondary italic">No especificadas</span>
+                            <span class="text-secondary fst-italic">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                No especificadas — 
+                                <a href="{% url 'users:localidad_update' localidad.pk %}">Agregar coordenadas</a>
+                            </span>
                             {% endif %}
                         </div>
                     </div>
@@ -67,7 +115,22 @@
         </div>
     </div>
 
+    {% if localidad.latitud and localidad.longitud %}
     <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-map me-2 text-primary"></i>
+                    Ubicación en el Mapa
+                </h3>
+            </div>
+            <div id="detail-map"></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-lg-6">
+    {% endif %}
+
         <div class="card h-100">
             <div class="card-header">
                 <h3 class="card-title">
@@ -75,8 +138,8 @@
                 </h3>
             </div>
             <div class="list-group list-group-flush">
-                {% if localidad.parada_set.exists %}
-                    {% for parada in localidad.parada_set.all %}
+                {% if localidad.paradas.exists %}
+                    {% for parada in localidad.paradas.all %}
                     <div class="list-group-item">
                         <div class="row align-items-center">
                             <div class="col-auto">
@@ -114,4 +177,49 @@
         Volver a la lista
     </a>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if localidad.latitud and localidad.longitud %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lat = {{ localidad.latitud|dot_decimal }};
+    const lng = {{ localidad.longitud|dot_decimal }};
+
+    const map = L.map('detail-map', {
+        center: [lat, lng],
+        zoom: 14,
+        zoomControl: true,
+        scrollWheelZoom: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+    }).addTo(map);
+
+    const customIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="position: relative; width: 30px; height: 42px;">
+            <svg viewBox="0 0 30 42" width="30" height="42" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 0 C6.7 0 0 6.7 0 15 C0 25 15 42 15 42 C15 42 30 25 30 15 C30 6.7 23.3 0 15 0Z" 
+                      fill="#206bc4" stroke="#1a569d" stroke-width="1.5"/>
+                <circle cx="15" cy="14" r="6" fill="white"/>
+            </svg>
+        </div>`,
+        iconSize: [30, 42],
+        iconAnchor: [15, 42],
+        popupAnchor: [0, -42]
+    });
+
+    L.marker([lat, lng], { icon: customIcon })
+        .addTo(map)
+        .bindPopup(`<strong>{{ localidad.nombre }}</strong><br>Lat: ${lat}<br>Lng: ${lng}`)
+        .openPopup();
+});
+</script>
+{% endif %}
 {% endblock %}

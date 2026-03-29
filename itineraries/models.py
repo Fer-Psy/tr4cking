@@ -1,7 +1,8 @@
 from django.db import models
 from django.urls import reverse
+from datetime import datetime, timedelta
 
-from fleet.models import Parada
+from fleet.models import Parada, Empresa
 
 
 class Itinerario(models.Model):
@@ -9,6 +10,13 @@ class Itinerario(models.Model):
     Define una ruta o recorrido de buses.
     Contiene la información general del itinerario y los días de operación.
     """
+    empresa = models.ForeignKey(
+        Empresa, 
+        on_delete=models.CASCADE, 
+        related_name='itinerarios',
+        verbose_name="Empresa",
+        null=True, blank=True  # Temporal para migración
+    )
     nombre = models.CharField(
         max_length=100, 
         verbose_name="Nombre del itinerario",
@@ -53,10 +61,16 @@ class Itinerario(models.Model):
         return reverse('itineraries:itinerario_detail', kwargs={'pk': self.pk})
 
     @property
+    def primera_parada(self):
+        """Retorna el primer DetalleItinerario (parada de origen) si existe."""
+        return self.detalles.order_by('orden').first()
+
+    @property
     def dias_operacion_texto(self):
         """
         Retorna los días de operación en formato legible.
         Ej: 1111100 -> 'Lun, Mar, Mié, Jue, Vie'
+
         """
         dias_nombres = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
         dias_activos = []
@@ -75,10 +89,51 @@ class Itinerario(models.Model):
         return False
 
 
+class Horario(models.Model):
+    """
+    Representa un horario de salida para un itinerario.
+    Ej: Itinerario "Asunción-Cnel. Oviedo" tiene horarios 11:00, 14:00, 17:00.
+    Cada horario genera un Viaje distinto en la misma fecha.
+    """
+    itinerario = models.ForeignKey(
+        Itinerario,
+        on_delete=models.CASCADE,
+        related_name='horarios',
+        verbose_name="Itinerario"
+    )
+    hora_salida = models.TimeField(
+        verbose_name="Hora de salida programada",
+        help_text="Hora en que el bus parte de la primera parada"
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo"
+    )
+
+    class Meta:
+        verbose_name = "Horario"
+        verbose_name_plural = "Horarios"
+        ordering = ['itinerario', 'hora_salida']
+        unique_together = ['itinerario', 'hora_salida']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['itinerario', 'hora_salida'],
+                name='unique_horario_por_itinerario'
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.itinerario.nombre} - {self.hora_salida.strftime('%H:%M')}"
+
+    def get_absolute_url(self):
+        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.itinerario.pk})
+
+
 class DetalleItinerario(models.Model):
     """
     Define la secuencia de paradas de un itinerario.
-    Ej: Asunción(1) -> Caaguazú(2) -> CDE(3)
+    Las horas se calculan dinámicamente según el Horario asignado al viaje.
+    Ej: Asunción(1) -> San Lorenzo(2) -> Caacupé(3) -> CDE(4)
     """
     itinerario = models.ForeignKey(
         Itinerario, 
@@ -92,17 +147,19 @@ class DetalleItinerario(models.Model):
         related_name='detalles_itinerario',
         verbose_name="Parada"
     )
-    hora_salida = models.TimeField(
-        verbose_name="Hora de salida"
-    )
     orden = models.PositiveSmallIntegerField(
         verbose_name="Orden",
         help_text="Posición de la parada en la secuencia (1, 2, 3...)"
     )
     minutos_desde_origen = models.PositiveIntegerField(
-        null=True, blank=True,
+        default=0,
         verbose_name="Minutos desde origen",
-        help_text="Para calcular ETA. Ej: 0, 120, 300"
+        help_text="Minutos estimados desde la primera parada. Ej: 0, 30, 60, 120"
+    )
+    distancia_desde_origen_km = models.DecimalField(
+        max_digits=6, decimal_places=2,
+        null=True, blank=True,
+        verbose_name="Distancia desde origen (km)"
     )
 
     class Meta:
@@ -129,6 +186,15 @@ class DetalleItinerario(models.Model):
 
     def get_absolute_url(self):
         return reverse('itineraries:detalle_detail', kwargs={'pk': self.pk})
+
+    def hora_estimada(self, hora_salida_origen):
+        """
+        Calcula la hora estimada de llegada a esta parada dado un horario de salida.
+        hora_salida_origen: time object de la hora de salida de la primera parada.
+        """
+        dt = datetime.combine(datetime.today(), hora_salida_origen)
+        dt += timedelta(minutes=self.minutos_desde_origen or 0)
+        return dt.time()
 
 
 class Precio(models.Model):

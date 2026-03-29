@@ -1,8 +1,6 @@
 from django.db import models
 from django.urls import reverse
 
-from users.models import Localidad
-
 
 class Empresa(models.Model):
     """
@@ -62,7 +60,7 @@ class Parada(models.Model):
         verbose_name="Empresa"
     )
     localidad = models.ForeignKey(
-        Localidad, 
+        'users.Localidad', 
         on_delete=models.PROTECT, 
         related_name='paradas',
         verbose_name="Localidad"
@@ -88,16 +86,23 @@ class Parada(models.Model):
         null=True, blank=True,
         verbose_name="Longitud GPS"
     )
-    es_sucursal = models.BooleanField(
+    es_agencia = models.BooleanField(
         default=False, 
-        verbose_name="Es sucursal",
-        help_text="Indica si esta parada es una sucursal de la empresa"
+        verbose_name="Es agencia",
+        help_text="Indica si esta parada es una agencia de la empresa"
     )
 
     class Meta:
         verbose_name = "Parada"
         verbose_name_plural = "Paradas"
         ordering = ['empresa', 'localidad', 'nombre']
+        unique_together = ['empresa', 'localidad', 'nombre']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'localidad', 'nombre'],
+                name='unique_parada_por_empresa'
+            )
+        ]
 
     def __str__(self):
         return f"{self.nombre} ({self.localidad})"

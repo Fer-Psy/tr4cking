@@ -24,4 +24,10 @@ urlpatterns = [
     path('precios/nuevo/', views.PrecioCreateView.as_view(), name='precio_create'),
     path('precios/<int:pk>/editar/', views.PrecioUpdateView.as_view(), name='precio_update'),
     path('precios/<int:pk>/eliminar/', views.PrecioDeleteView.as_view(), name='precio_delete'),
+    
+    # Horarios
+    path('horarios/', views.HorarioListView.as_view(), name='horario_list'),
+    path('horarios/nuevo/', views.HorarioCreateView.as_view(), name='horario_create_generic'),
+    path('<int:itinerario_pk>/horarios/nuevo/', views.HorarioCreateView.as_view(), name='horario_create'),
+    path('horarios/<int:pk>/eliminar/', views.HorarioDeleteView.as_view(), name='horario_delete'),
 ]

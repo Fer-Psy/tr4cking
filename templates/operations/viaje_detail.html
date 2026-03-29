@@ -110,8 +110,17 @@ Viaje: {{ viaje.itinerario.nombre }}
                         <div class="datagrid-content">{{ viaje.fecha_viaje|date:"l, d F Y" }}</div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">Itinerario</div>
-                        <div class="datagrid-content">{{ viaje.itinerario.nombre }}</div>
+                        <div class="datagrid-title">Itinerario y Horario</div>
+                        <div class="datagrid-content">
+                            <div class="fw-bold">{{ viaje.itinerario.nombre }}</div>
+                            {% if viaje.horario %}
+                            <span class="badge bg-primary text-white mt-1">
+                                <i class="bi bi-clock me-1"></i>{{ viaje.horario.hora_salida|time:"H:i" }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary-lt mt-1">Sin horario</span>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">Bus</div>
@@ -123,6 +132,16 @@ Viaje: {{ viaje.itinerario.nombre }}
                     <div class="datagrid-item">
                         <div class="datagrid-title">Chofer</div>
                         <div class="datagrid-content">{{ viaje.chofer.nombre_completo }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Ayudantes</div>
+                        <div class="datagrid-content">
+                            {% for ayudante in viaje.ayudantes.all %}
+                                {{ ayudante.nombre_completo }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                <span class="text-muted">-</span>
+                            {% endfor %}
+                        </div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">Capacidad</div>

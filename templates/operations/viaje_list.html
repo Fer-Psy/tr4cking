@@ -70,14 +70,28 @@
                     <td>#{{ viaje.pk }}</td>
                     <td><strong>{{ viaje.fecha_viaje|date:"d/m/Y" }}</strong></td>
                     <td>
-                        <a href="{% url 'operations:viaje_detail' viaje.pk %}">
-                            {{ viaje.itinerario.nombre }}
+                        <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="text-decoration-none">
+                            <div class="fw-bold text-dark">{{ viaje.itinerario.nombre }}</div>
+                            {% if viaje.horario %}
+                            <span class="badge bg-primary text-white mt-1">
+                                <i class="bi bi-clock me-1"></i>{{ viaje.horario.hora_salida|time:"H:i" }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary-lt mt-1">Sin horario asignado</span>
+                            {% endif %}
                         </a>
                     </td>
                     <td>
                         <span class="badge bg-secondary-lt">{{ viaje.bus.placa }}</span>
                     </td>
-                    <td>{{ viaje.chofer.nombre_completo }}</td>
+                    <td>
+                        <div class="fw-medium">{{ viaje.chofer.nombre_completo }}</div>
+                        {% for ayudante in viaje.ayudantes.all %}
+                            <small class="text-muted d-block"><i class="bi bi-person me-1"></i>{{ ayudante.nombre_completo }}</small>
+                        {% empty %}
+                            <small class="text-muted d-block">Sin ayudantes</small>
+                        {% endfor %}
+                    </td>
                     <td class="text-center">
                         <span class="badge bg-azure-lt">{{ viaje.num_pasajes|default:0 }}</span>
                     </td>

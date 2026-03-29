@@ -9,8 +9,10 @@ from .models import (
     Viaje, Pasaje, Encomienda, Timbrado, Factura, 
     DetalleFactura, SesionCaja, MovimientoCaja, Incidencia
 )
-from fleet.models import Parada
-from itineraries.models import Itinerario
+from .utils import obtener_asientos_disponibles, obtener_orden_parada
+from fleet.models import Parada, Empresa, Bus
+from users.models import Persona
+from itineraries.models import Itinerario, Precio, Horario
 
 
 # =============================================================================
@@ -20,12 +22,29 @@ from itineraries.models import Itinerario
 class ViajeForm(forms.ModelForm):
     """Formulario para crear/editar viajes."""
     
+    empresa = forms.ModelChoiceField(
+        queryset=Empresa.objects.all(),
+        required=False,
+        label="Filtrar por Empresa",
+        empty_label="-- Todas las Empresas --",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_itinerario',
+            'hx-trigger': 'change',
+            'hx-include': '[name="fecha_via_viaje"]' # Just in case
+        })
+    )
+
     class Meta:
         model = Viaje
-        fields = ['itinerario', 'bus', 'chofer', 'fecha_viaje', 'observaciones']
+        fields = ['empresa', 'itinerario', 'horario', 'fecha_viaje', 'bus', 'chofer', 'ayudantes', 'observaciones']
         widgets = {
             'fecha_viaje': forms.DateInput(
                 attrs={'type': 'date', 'class': 'form-control'}
+            ),
+            'ayudantes': forms.SelectMultiple(
+                attrs={'class': 'form-select', 'data-placeholder': 'Seleccione ayudantes...'}
             ),
             'observaciones': forms.Textarea(
                 attrs={'rows': 3, 'class': 'form-control'}
@@ -37,30 +56,190 @@ class ViajeForm(forms.ModelForm):
         # Filtrar solo itinerarios activos
         self.fields['itinerario'].queryset = Itinerario.objects.filter(activo=True)
         
+        # Inicialmente vacío si no hay itinerario seleccionado
+        self.fields['horario'].queryset = Horario.objects.none()
+        self.fields['horario'].required = False
+        
+        # Obtener valores actuales (de la instancia o del POST)
+        itinerario_id = None
+        empresa_id = None
+        
+        if self.instance.pk:
+            itinerario_id = self.instance.itinerario_id
+            if self.instance.empresa_id:
+                empresa_id = self.instance.empresa_id
+                self.fields['empresa'].initial = empresa_id
+            elif self.instance.itinerario and self.instance.itinerario.empresa:
+                empresa_id = self.instance.itinerario.empresa_id
+                self.fields['empresa'].initial = empresa_id
+        
+        if self.data.get('itinerario'):
+            itinerario_id = self.data.get('itinerario')
+        elif self.initial.get('itinerario'):
+            itinerario_id = self.initial.get('itinerario')
+
+        if self.data.get('empresa'):
+            empresa_id = self.data.get('empresa')
+        elif self.initial.get('empresa'):
+            empresa_id = self.initial.get('empresa')
+        
+        # Si tenemos itinerario pero no empresa, intentar obtenerla del itinerario
+        if itinerario_id and not empresa_id:
+            try:
+                it_obj = Itinerario.objects.get(pk=int(itinerario_id))
+                if it_obj.empresa:
+                    empresa_id = it_obj.empresa_id
+                    self.fields['empresa'].initial = empresa_id
+            except (ValueError, TypeError, Itinerario.DoesNotExist):
+                pass
+        
+        # Filtrar por empresa si está seleccionada
+        if empresa_id:
+            try:
+                emp_id = int(empresa_id)
+                self.fields['itinerario'].queryset = Itinerario.objects.filter(
+                    empresa_id=emp_id, activo=True
+                )
+                self.fields['bus'].queryset = Bus.objects.filter(
+                    empresa_id=emp_id
+                ).order_by('placa')
+                self.fields['chofer'].queryset = Persona.objects.filter(
+                    empresa_id=emp_id, es_chofer=True
+                ).order_by('apellido', 'nombre')
+                self.fields['ayudantes'].queryset = Persona.objects.filter(
+                    empresa_id=emp_id, es_ayudante=True
+                ).order_by('apellido', 'nombre')
+            except (ValueError, TypeError):
+                pass
+
+        if itinerario_id:
+            try:
+                it_id = int(itinerario_id)
+                itinerario_obj = Itinerario.objects.get(pk=it_id)
+                
+                # Filtrar horarios
+                self.fields['horario'].queryset = Horario.objects.filter(
+                    itinerario_id=it_id, activo=True
+                ).order_by('hora_salida')
+                
+                # Si no se seleccionó empresa explícitamente, filtrar por la empresa del itinerario
+                if not empresa_id and itinerario_obj.empresa:
+                    self.fields['bus'].queryset = Bus.objects.filter(
+                        empresa=itinerario_obj.empresa
+                    ).order_by('placa')
+                    self.fields['chofer'].queryset = Persona.objects.filter(
+                        empresa=itinerario_obj.empresa, es_chofer=True
+                    ).order_by('apellido', 'nombre')
+                    self.fields['ayudantes'].queryset = Persona.objects.filter(
+                        empresa=itinerario_obj.empresa, es_ayudante=True
+                    ).order_by('apellido', 'nombre')
+            except (ValueError, TypeError, Itinerario.DoesNotExist):
+                pass
+        
+        # Atributos HTMX para actualizar horarios y otros recursos dinámicamente
+        self.fields['itinerario'].widget.attrs.update({
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_horario',
+            'hx-trigger': 'change',
+            'hx-vals': 'js:{itinerario: this.value, fecha: document.getElementById("id_fecha_viaje").value, empresa: document.getElementById("id_empresa").value}'
+        })
+        
+        self.fields['fecha_viaje'].widget.attrs.update({
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_horario',
+            'hx-trigger': 'change, input',
+            'hx-vals': 'js:{itinerario: document.getElementById("id_itinerario").value, fecha: this.value, empresa: document.getElementById("id_empresa").value}'
+        })
+        
+        self.fields['empresa'].widget.attrs.update({
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_itinerario',
+            'hx-trigger': 'change',
+            'hx-vals': 'js:{empresa: this.value, fecha: document.getElementById("id_fecha_viaje").value}'
+        })
+        
         # Aplicar clases Bootstrap
         for field_name, field in self.fields.items():
             if not isinstance(field.widget, forms.Textarea):
-                field.widget.attrs['class'] = 'form-select' if isinstance(
-                    field, forms.ModelChoiceField
-                ) else 'form-control'
+                if isinstance(field, forms.ModelMultipleChoiceField):
+                    field.widget.attrs['class'] = 'form-select select2-multiple'
+                else:
+                    field.widget.attrs['class'] = 'form-select' if isinstance(
+                        field, forms.ModelChoiceField
+                    ) else 'form-control'
 
     def clean(self):
         cleaned_data = super().clean()
         itinerario = cleaned_data.get('itinerario')
+        empresa = cleaned_data.get('empresa')
+        
+        if itinerario and not empresa:
+            cleaned_data['empresa'] = itinerario.empresa
+        
+        horario = cleaned_data.get('horario')
         bus = cleaned_data.get('bus')
         fecha = cleaned_data.get('fecha_viaje')
         
-        if itinerario and bus and fecha:
-            # Verificar que no exista otro viaje igual
+        # Validar que no sea una fecha pasada
+        ahora = timezone.localtime(timezone.now())
+        hoy = ahora.date()
+        
+        if fecha:
+            if fecha < hoy:
+                raise ValidationError("No se puede programar un viaje en una fecha que ya pasó.")
+            
+            if fecha == hoy and horario:
+                # Comparar hora
+                if horario.hora_salida < ahora.time():
+                    raise ValidationError(
+                        f"El horario seleccionado ({horario.hora_salida.strftime('%H:%M')}) "
+                        f"ya no es válido para el día de hoy, porque esa hora ya pasó."
+                    )
+        
+        # Validar que el horario pertenece al itinerario
+        if itinerario and horario and horario.itinerario != itinerario:
+            raise ValidationError(
+                "El horario seleccionado no pertenece al itinerario elegido."
+            )
+        
+        if itinerario and horario and fecha:
+            # Verificar que no exista otro viaje para ese itinerario+horario+fecha
             exists = Viaje.objects.filter(
                 itinerario=itinerario,
-                bus=bus,
+                horario=horario,
                 fecha_viaje=fecha
             ).exclude(pk=self.instance.pk if self.instance else None).exists()
             
             if exists:
                 raise ValidationError(
-                    "Ya existe un viaje programado para este itinerario, bus y fecha."
+                    "Ya existe un viaje programado para este itinerario, horario y fecha."
+                )
+        
+        if bus and horario and fecha:
+            # Verificar que el bus no esté en otro viaje ese horario/fecha
+            bus_exists = Viaje.objects.filter(
+                bus=bus,
+                horario=horario,
+                fecha_viaje=fecha
+            ).exclude(pk=self.instance.pk if self.instance else None).exists()
+            
+            if bus_exists:
+                raise ValidationError(
+                    "Este bus ya está asignado a otro viaje en este horario y fecha."
+                )
+        
+        chofer = cleaned_data.get('chofer')
+        if chofer and itinerario and fecha:
+            # Verificar que un solo chofer puede hacer un viaje por itinerario en el día
+            chofer_exists = Viaje.objects.filter(
+                chofer=chofer,
+                itinerario=itinerario,
+                fecha_viaje=fecha
+            ).exclude(pk=self.instance.pk if self.instance else None).exists()
+            
+            if chofer_exists:
+                raise ValidationError(
+                    "Este chofer ya tiene asignado un viaje para este itinerario en esta fecha."
                 )
         
         return cleaned_data
@@ -90,7 +269,7 @@ class ViajeEstadoForm(forms.ModelForm):
 # =============================================================================
 
 class PasajeVentaForm(forms.ModelForm):
-    """Formulario para venta de pasajes."""
+    """Formulario para venta de pasajes con disponibilidad por segmento."""
     
     cedula_pasajero = forms.IntegerField(
         label="Cédula del Pasajero",
@@ -119,6 +298,37 @@ class PasajeVentaForm(forms.ModelForm):
         })
     )
 
+    # Campos del Pasajero (para crear nuevo si no existe)
+    nombre_pasajero = forms.CharField(
+        label="Nombre del Pasajero",
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nombre'
+        })
+    )
+    
+    apellido_pasajero = forms.CharField(
+        label="Apellido del Pasajero",
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Apellido'
+        })
+    )
+    
+    telefono_pasajero = forms.CharField(
+        label="Teléfono del Pasajero",
+        max_length=30,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Número de teléfono'
+        })
+    )
+
     class Meta:
         model = Pasaje
         fields = ['viaje', 'asiento', 'parada_origen', 'parada_destino', 'precio']
@@ -136,21 +346,15 @@ class PasajeVentaForm(forms.ModelForm):
             self.fields['viaje'].initial = viaje
             self.fields['viaje'].widget = forms.HiddenInput()
             
-            # Filtrar asientos disponibles del bus del viaje
-            asientos_vendidos = Pasaje.objects.filter(
-                viaje=viaje,
-                estado__in=['reservado', 'vendido']
-            ).values_list('asiento_id', flat=True)
-            
-            self.fields['asiento'].queryset = viaje.bus.asientos.exclude(
-                id__in=asientos_vendidos
-            ).order_by('numero_asiento')
-            
             # Filtrar paradas del itinerario
             paradas_ids = viaje.itinerario.detalles.values_list('parada_id', flat=True)
             paradas_queryset = Parada.objects.filter(id__in=list(paradas_ids)).order_by('nombre')
             self.fields['parada_origen'].queryset = paradas_queryset
             self.fields['parada_destino'].queryset = paradas_queryset
+            
+            # Inicialmente mostrar todos los asientos del bus
+            # (se refiltra dinámicamente vía AJAX cuando se seleccionan origen/destino)
+            self.fields['asiento'].queryset = viaje.bus.asientos.all().order_by('numero_asiento')
         
         for field_name, field in self.fields.items():
             if 'class' not in field.widget.attrs:
@@ -162,9 +366,35 @@ class PasajeVentaForm(forms.ModelForm):
         cleaned_data = super().clean()
         origen = cleaned_data.get('parada_origen')
         destino = cleaned_data.get('parada_destino')
+        viaje = cleaned_data.get('viaje')
+        asiento = cleaned_data.get('asiento')
         
         if origen and destino and origen == destino:
             raise ValidationError("El origen y destino no pueden ser iguales.")
+        
+        # Validar disponibilidad por segmento
+        if viaje and asiento and origen and destino:
+            orden_origen = obtener_orden_parada(viaje, origen)
+            orden_destino = obtener_orden_parada(viaje, destino)
+            
+            if orden_origen is None or orden_destino is None:
+                raise ValidationError("Las paradas seleccionadas no pertenecen a este itinerario.")
+            
+            if orden_origen >= orden_destino:
+                raise ValidationError("La parada de origen debe ser anterior a la de destino en el recorrido.")
+            
+            # Verificar disponibilidad del asiento en el tramo
+            from .utils import asiento_disponible_en_tramo
+            if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
+                raise ValidationError(
+                    f"El asiento {asiento.numero_asiento} no está disponible en el tramo "
+                    f"{origen.nombre} → {destino.nombre}. Otro pasajero lo tiene reservado "
+                    f"en parte de ese recorrido."
+                )
+            
+            # Guardar los órdenes para uso posterior en la vista
+            cleaned_data['orden_origen'] = orden_origen
+            cleaned_data['orden_destino'] = orden_destino
         
         return cleaned_data
 
@@ -321,9 +551,8 @@ class EncomiendaForm(forms.ModelForm):
             self.fields['viaje'].queryset = viajes_disponibles
             
             def get_viaje_label(obj):
-                # Obtener hora de salida del primer detalle del itinerario
-                primer_detalle = obj.itinerario.detalles.order_by('orden').first()
-                hora_str = primer_detalle.hora_salida.strftime('%H:%M') if primer_detalle and primer_detalle.hora_salida else 'Sin hora'
+                # Obtener hora de salida del horario asignado al viaje
+                hora_str = obj.horario.hora_salida.strftime('%H:%M') if obj.horario else 'Sin horario'
                 return (
                     f"{obj.fecha_viaje.strftime('%d/%m/%Y')} - {obj.itinerario.nombre} - "
                     f"Bus: {obj.bus.placa} ({hora_str})"

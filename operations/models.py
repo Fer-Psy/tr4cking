@@ -18,6 +18,7 @@ class Viaje(models.Model):
     """
     Representa una instancia ejecutable de un itinerario en una fecha específica.
     Es el viaje real que sale, con bus y chofer asignados.
+    Se vincula a un Horario para saber la hora programada de salida.
     """
     ESTADO_CHOICES = [
         ('programado', 'Programado'),
@@ -25,12 +26,27 @@ class Viaje(models.Model):
         ('completado', 'Completado'),
         ('cancelado', 'Cancelado'),
     ]
-    
+    empresa = models.ForeignKey(
+        'fleet.Empresa',
+        on_delete=models.PROTECT,
+        related_name='viajes',
+        verbose_name="Empresa",
+        null=True, blank=True  # Temporal para migración
+    )
     itinerario = models.ForeignKey(
         'itineraries.Itinerario',
         on_delete=models.PROTECT,
         related_name='viajes',
         verbose_name="Itinerario"
+    )
+    horario = models.ForeignKey(
+        'itineraries.Horario',
+        on_delete=models.PROTECT,
+        related_name='viajes',
+        verbose_name="Horario de salida",
+        help_text="El horario programado para esta salida",
+        null=True,
+        blank=True,
     )
     bus = models.ForeignKey(
         'fleet.Bus',
@@ -43,7 +59,14 @@ class Viaje(models.Model):
         on_delete=models.PROTECT,
         related_name='viajes_como_chofer',
         verbose_name="Chofer",
-        limit_choices_to={'es_empleado': True}
+        limit_choices_to=models.Q(es_chofer=True) | models.Q(es_empleado=True)
+    )
+    ayudantes = models.ManyToManyField(
+        'users.Persona',
+        blank=True,
+        related_name='viajes_como_ayudante',
+        verbose_name="Ayudantes",
+        limit_choices_to=models.Q(es_ayudante=True) | models.Q(es_empleado=True)
     )
     fecha_viaje = models.DateField(
         verbose_name="Fecha del viaje"
@@ -73,34 +96,50 @@ class Viaje(models.Model):
         verbose_name = "Viaje"
         verbose_name_plural = "Viajes"
         ordering = ['-fecha_viaje', '-created_at']
-        unique_together = ['itinerario', 'bus', 'fecha_viaje']
         constraints = [
+            # Un itinerario+horario solo puede tener un viaje por fecha
             models.UniqueConstraint(
-                fields=['itinerario', 'bus', 'fecha_viaje'],
-                name='unique_viaje_por_dia'
-            )
+                fields=['itinerario', 'horario', 'fecha_viaje'],
+                name='unique_viaje_por_horario_dia'
+            ),
+            # Un bus solo puede estar en un viaje por horario/fecha
+            models.UniqueConstraint(
+                fields=['bus', 'horario', 'fecha_viaje'],
+                name='unique_bus_por_horario_dia'
+            ),
+            # Un chofer solo puede hacer un viaje por itinerario en el día
+            models.UniqueConstraint(
+                fields=['chofer', 'itinerario', 'fecha_viaje'],
+                name='unique_chofer_por_itinerario_dia'
+            ),
         ]
 
     def __str__(self):
-        return f"{self.itinerario.nombre} - {self.fecha_viaje} ({self.bus.placa})"
+        hora = self.horario.hora_salida.strftime('%H:%M') if self.horario else 'Sin horario'
+        return f"{self.itinerario.nombre} - {self.fecha_viaje} {hora} ({self.bus.placa})"
 
     def get_absolute_url(self):
         return reverse('operations:viaje_detail', kwargs={'pk': self.pk})
 
     @property
+    def hora_salida_programada(self):
+        """Retorna la hora de salida programada del horario."""
+        return self.horario.hora_salida if self.horario else None
+
+    @property
     def asientos_disponibles(self):
-        """Retorna la cantidad de asientos disponibles."""
+        """Retorna la cantidad de asientos no ocupados en NINGÚN segmento (ocupación máxima)."""
         vendidos = self.pasajes.filter(
             estado__in=['vendido', 'reservado']
-        ).count()
+        ).values('asiento_id').distinct().count()
         return self.bus.capacidad_asientos - vendidos
 
     @property
     def porcentaje_ocupacion(self):
-        """Retorna el porcentaje de ocupación del bus."""
+        """Retorna el porcentaje de ocupación del bus (asientos usados en al menos un segmento)."""
         vendidos = self.pasajes.filter(
             estado__in=['vendido', 'reservado']
-        ).count()
+        ).values('asiento_id').distinct().count()
         if self.bus.capacidad_asientos > 0:
             return round((vendidos / self.bus.capacidad_asientos) * 100, 1)
         return 0
@@ -162,6 +201,8 @@ class TrackingViaje(models.Model):
 class Pasaje(models.Model):
     """
     Representa la venta/reserva de un asiento en un viaje específico.
+    Incluye orden_origen y orden_destino para gestión de asientos por segmento.
+    Un mismo asiento puede venderse a diferentes pasajeros en segmentos no solapados.
     """
     ESTADO_CHOICES = [
         ('reservado', 'Reservado'),
@@ -209,6 +250,17 @@ class Pasaje(models.Model):
         related_name='pasajes_destino',
         verbose_name="Parada de destino"
     )
+    # Campos de orden para gestión de segmentos
+    orden_origen = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Orden parada origen",
+        help_text="Posición ordinal de la parada origen en el itinerario"
+    )
+    orden_destino = models.PositiveSmallIntegerField(
+        default=2,
+        verbose_name="Orden parada destino",
+        help_text="Posición ordinal de la parada destino en el itinerario"
+    )
     precio = models.DecimalField(
         max_digits=12, decimal_places=2,
         verbose_name="Precio"
@@ -248,14 +300,8 @@ class Pasaje(models.Model):
         verbose_name = "Pasaje"
         verbose_name_plural = "Pasajes"
         ordering = ['-fecha_venta']
-        unique_together = ['viaje', 'asiento']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['viaje', 'asiento'],
-                name='unique_asiento_por_viaje',
-                condition=models.Q(estado__in=['reservado', 'vendido', 'abordado'])
-            )
-        ]
+        # Ya NO se usa unique_together = ['viaje', 'asiento']
+        # La validación se hace por segmentos solapados (programáticamente)
 
     def __str__(self):
         return f"{self.codigo} - {self.pasajero.nombre_completo}"
@@ -267,7 +313,7 @@ class Pasaje(models.Model):
         if not self.codigo:
             # Generar código único: PAS-YYYYMMDD-XXXX
             fecha = timezone.now().strftime('%Y%m%d')
-            random_part = uuid.uuid4().hex[:4].upper()
+            random_part = str(uuid.uuid4().hex)[:4].upper()
             self.codigo = f"PAS-{fecha}-{random_part}"
         super().save(*args, **kwargs)
 
@@ -401,7 +447,7 @@ class Encomienda(models.Model):
         if not self.codigo:
             # Generar código único: ENC-YYYYMMDD-XXXX
             fecha = timezone.now().strftime('%Y%m%d')
-            random_part = uuid.uuid4().hex[:4].upper()
+            random_part = str(uuid.uuid4().hex)[:4].upper()
             self.codigo = f"ENC-{fecha}-{random_part}"
         super().save(*args, **kwargs)
 

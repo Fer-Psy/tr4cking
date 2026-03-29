@@ -84,6 +84,15 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if 'horario' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'itineraries:horario_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-clock"></i>
+                        </span>
+                        <span class="nav-link-title">Horarios</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if 'precio' in request.resolver_match.url_name %}active{% endif %}"
                         href="{% url 'itineraries:precio_list' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">

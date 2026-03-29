@@ -103,5 +103,6 @@ urlpatterns = [
     
     # API para obtener paradas de un viaje
     path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
+    path('obtener-horarios/', views.ObtenerHorariosItinerarioView.as_view(), name='obtener_horarios'),
 ]
 

@@ -23,6 +23,10 @@
             <i class="bi bi-plus-lg me-2"></i>
             Agregar Parada
         </a>
+        <a href="{% url 'itineraries:horario_create' itinerario.pk %}" class="btn btn-outline-success">
+            <i class="bi bi-clock me-2"></i>
+            Agregar Horario
+        </a>
         <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}" class="btn btn-secondary">
             <i class="bi bi-pencil me-2"></i>
             Editar
@@ -49,23 +53,23 @@
     </div>
     <div class="col-12 col-sm-6 col-md-3">
         <div class="stat-card">
+            <div class="stat-card-icon info">
+                <i class="bi bi-clock"></i>
+            </div>
+            <div class="stat-card-content">
+                <div class="stat-card-title">Horarios</div>
+                <div class="stat-card-value">{{ itinerario.horarios.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+        <div class="stat-card">
             <div class="stat-card-icon success">
                 <i class="bi bi-rulers"></i>
             </div>
             <div class="stat-card-content">
                 <div class="stat-card-title">Distancia</div>
                 <div class="stat-card-value">{{ itinerario.distancia_total_km|default:"--" }} km</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-md-3">
-        <div class="stat-card">
-            <div class="stat-card-icon warning">
-                <i class="bi bi-clock"></i>
-            </div>
-            <div class="stat-card-content">
-                <div class="stat-card-title">Duración</div>
-                <div class="stat-card-value">{{ itinerario.duracion_estimada_hs|default:"--" }} hs</div>
             </div>
         </div>
     </div>
@@ -81,6 +85,153 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Horarios de salida -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="bi bi-clock me-2"></i>
+            Horarios de Salida
+        </h5>
+        <a href="{% url 'itineraries:horario_create' itinerario.pk %}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-plus-lg me-1"></i>Nuevo Horario
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if itinerario.horarios.exists %}
+        <div class="table-wrapper">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Hora de Salida</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for horario in itinerario.horarios.all %}
+                    <tr>
+                        <td>
+                            <i class="bi bi-alarm me-2 text-primary"></i>
+                            <strong>{{ horario.hora_salida|time:"H:i" }}</strong>
+                        </td>
+                        <td>
+                            {% if horario.activo %}
+                            <span class="badge badge-success">Activo</span>
+                            {% else %}
+                            <span class="badge badge-danger">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="table-actions justify-content-end">
+                                <a href="{% url 'itineraries:horario_delete' horario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-clock"></i>
+            </div>
+            <h5 class="empty-state-title">Sin horarios configurados</h5>
+            <p class="empty-state-text">
+                Agregue horarios de salida para este itinerario (ej: 11:00, 14:00, 17:00).
+            </p>
+            <a href="{% url 'itineraries:horario_create' itinerario.pk %}" class="btn btn-success">
+                <i class="bi bi-plus-lg me-2"></i>
+                Agregar Primer Horario
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- Próximos Viajes Asignados -->
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary-subtle text-primary border-primary">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-bus-front-fill me-2"></i>
+            Próximos Viajes Asignados
+        </h5>
+        <a href="{% url 'operations:viaje_create' %}?itinerario={{ itinerario.pk }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-calendar-plus me-1"></i>Asignar Viaje
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if proximos_viajes %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Horario</th>
+                        <th>Bus Asignado (Capacidad)</th>
+                        <th>Personal</th>
+                        <th class="text-end">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for viaje in proximos_viajes %}
+                    <tr>
+                        <td class="align-middle">
+                            <i class="bi bi-calendar-event text-muted me-1"></i>
+                            {{ viaje.fecha_viaje|date:"d/m/Y" }}
+                        </td>
+                        <td class="align-middle">
+                            <span class="badge bg-primary text-white">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ viaje.horario.hora_salida|time:"H:i" }}
+                            </span>
+                        </td>
+                        <td class="align-middle">
+                            <strong>{{ viaje.bus.codigo_interno }}</strong>
+                            <small class="text-muted d-block">
+                                {{ viaje.bus.marca }} {{ viaje.bus.modelo }}
+                                · <i class="bi bi-people-fill mx-1"></i>{{ viaje.bus.capacidad_asientos }} asientos
+                            </small>
+                        </td>
+                        <td class="align-middle">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar avatar-sm bg-primary-subtle text-primary rounded-circle me-2">
+                                    <i class="bi bi-person-vcard"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-medium">{{ viaje.chofer.nombres }} {{ viaje.chofer.apellidos }}</div>
+                                    {% for ayudante in viaje.ayudantes.all %}
+                                        <small class="text-muted d-block">Ayd: {{ ayudante.nombres }}</small>
+                                    {% empty %}
+                                        <small class="text-muted">Sin ayudante</small>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-end align-middle">
+                            <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="btn btn-sm btn-outline-secondary">
+                                Ver Detalles <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-calendar-x display-6 mb-3 opacity-50"></i>
+            <h6>No hay viajes programados próximos</h6>
+            <p class="mb-0 small">Los viajes planificados con buses asignados para este itinerario aparecerán aquí.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -104,8 +255,8 @@
                         <th style="width: 60px;">#</th>
                         <th>Parada</th>
                         <th>Localidad</th>
-                        <th>Hora Salida</th>
                         <th>Min. desde Origen</th>
+                        <th>Distancia (km)</th>
                         <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
@@ -117,18 +268,21 @@
                         </td>
                         <td>
                             <strong>{{ detalle.parada.nombre }}</strong>
-                            {% if detalle.parada.es_sucursal %}
-                            <i class="bi bi-building text-muted ms-1" title="Sucursal"></i>
+                            {% if detalle.parada.es_agencia %}
+                            <i class="bi bi-building text-muted ms-1" title="Agencia"></i>
                             {% endif %}
                         </td>
                         <td>{{ detalle.parada.localidad.nombre }}</td>
                         <td>
-                            <i class="bi bi-clock me-1"></i>
-                            {{ detalle.hora_salida|time:"H:i" }}
-                        </td>
-                        <td>
                             {% if detalle.minutos_desde_origen is not None %}
                             {{ detalle.minutos_desde_origen }} min
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detalle.distancia_desde_origen_km %}
+                            {{ detalle.distancia_desde_origen_km }} km
                             {% else %}
                             <span class="text-muted">-</span>
                             {% endif %}

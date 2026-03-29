@@ -17,6 +17,7 @@ urlpatterns = [
     # Paradas
     path('paradas/', views.ParadaListView.as_view(), name='parada_list'),
     path('paradas/nuevo/', views.ParadaCreateView.as_view(), name='parada_create'),
+    path('paradas/nuevo/ajax/', views.ParadaCreateAjaxView.as_view(), name='parada_create_ajax'),
     path('paradas/<int:pk>/', views.ParadaDetailView.as_view(), name='parada_detail'),
     path('paradas/<int:pk>/editar/', views.ParadaUpdateView.as_view(), name='parada_update'),
     path('paradas/<int:pk>/eliminar/', views.ParadaDeleteView.as_view(), name='parada_delete'),

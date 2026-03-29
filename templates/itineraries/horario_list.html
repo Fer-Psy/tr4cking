@@ -1,0 +1,167 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Horarios de Salida - TR4CKING{% endblock %}
+
+{% block breadcrumb %}
+<span class="separator">/</span>
+<span class="current">Horarios</span>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="page-title mb-1">Horarios de Salida</h1>
+        <p class="page-subtitle mb-0">Gestione los horarios de salida de cada itinerario</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'itineraries:horario_create_generic' %}" class="btn btn-primary">
+            <i class="bi bi-clock-fill me-2"></i>Nuevo Horario
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Buscar</label>
+                <input type="text" id="search" name="search" class="form-control"
+                    placeholder="Buscar por itinerario..." value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <label for="itinerario" class="form-label">Itinerario</label>
+                <select name="itinerario" id="itinerario" class="form-select">
+                    <option value="">Todos los itinerarios</option>
+                    {% for it in itinerarios %}
+                    <option value="{{ it.pk }}" {% if itinerario_filter == it.pk|stringformat:"d" %}selected{% endif %}>
+                        {{ it.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="estado" class="form-label">Estado</label>
+                <select name="estado" id="estado" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activos</option>
+                    <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search me-1"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla de Horarios -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title">
+            <i class="bi bi-clock me-2"></i>
+            Horarios ({{ horarios|length }} resultados)
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if horarios %}
+        <div class="table-wrapper">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Itinerario</th>
+                        <th>Hora de Salida</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for horario in horarios %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'itineraries:itinerario_detail' horario.itinerario.pk %}"
+                                class="text-decoration-none fw-semibold">
+                                {{ horario.itinerario.nombre }}
+                            </a>
+                        </td>
+                        <td>
+                            <i class="bi bi-alarm me-2 text-primary"></i>
+                            <strong>{{ horario.hora_salida|time:"H:i" }}</strong>
+                        </td>
+                        <td>
+                            {% if horario.activo %}
+                            <span class="badge badge-success">Activo</span>
+                            {% else %}
+                            <span class="badge badge-danger">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="table-actions justify-content-end">
+                                <a href="{% url 'itineraries:itinerario_detail' horario.itinerario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm" title="Ver itinerario">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'itineraries:horario_delete' horario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Paginación -->
+        {% if is_paginated %}
+        <div class="card-footer d-flex justify-content-center">
+            <nav aria-label="Pagination">
+                <ul class="pagination mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if itinerario_filter %}&itinerario={{ itinerario_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-clock"></i>
+            </div>
+            <h5 class="empty-state-title">Sin horarios</h5>
+            <p class="empty-state-text">
+                No se encontraron horarios. Para agregar un horario, vaya al detalle de un itinerario 
+                y haga clic en "Agregar Horario".
+            </p>
+            <a href="{% url 'itineraries:itinerario_list' %}" class="btn btn-primary">
+                <i class="bi bi-map me-2"></i>
+                Ver Itinerarios
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

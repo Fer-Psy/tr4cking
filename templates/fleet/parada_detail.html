@@ -1,4 +1,5 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load users_filters %}
 
 {% block title %}{{ parada.nombre }} - TR4CKING{% endblock %}
 
@@ -56,9 +57,9 @@
                 <div class="mb-3">
                     <label class="form-label text-secondary small">Tipo</label>
                     <p class="mb-0">
-                        {% if parada.es_sucursal %}
+                        {% if parada.es_agencia %}
                         <span class="badge badge-primary py-2 px-3">
-                            <i class="bi bi-building me-1"></i> Sucursal
+                            <i class="bi bi-building me-1"></i> Agencia
                         </span>
                         {% else %}
                         <span class="badge badge-secondary py-2 px-3">
@@ -92,15 +93,31 @@
             <div class="card-body">
                 {% if parada.latitud_gps and parada.longitud_gps %}
                 <div class="mb-3">
-                    <label class="form-label text-secondary small">Coordenadas GPS</label>
+                    <label class="form-label text-secondary small">Coordenadas GPS (Exacta)</label>
                     <p class="mb-0">
                         <code>{{ parada.latitud_gps }}, {{ parada.longitud_gps }}</code>
                     </p>
                 </div>
-                <a href="https://www.google.com/maps?q={{ parada.latitud_gps }},{{ parada.longitud_gps }}"
-                    target="_blank" class="btn btn-outline-primary">
+                <a href="https://www.google.com/maps?q={{ parada.latitud_gps|dot_decimal }},{{ parada.longitud_gps|dot_decimal }}"
+                    target="_blank" class="btn btn-primary w-100">
                     <i class="bi bi-map me-2"></i>
                     Ver en Google Maps
+                </a>
+                {% elif parada.localidad.latitud and parada.localidad.longitud %}
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Coordenadas (Aproximada - Localidad)</label>
+                    <p class="mb-0 text-azure">
+                        <code>{{ parada.localidad.latitud }}, {{ parada.localidad.longitud }}</code>
+                    </p>
+                </div>
+                <div class="alert alert-info py-2 small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Esta parada no tiene coordenadas específicas. Se muestra la ubicación de la localidad.
+                </div>
+                <a href="https://www.google.com/maps?q={{ parada.localidad.latitud|dot_decimal }},{{ parada.localidad.longitud|dot_decimal }}"
+                    target="_blank" class="btn btn-outline-azure w-100">
+                    <i class="bi bi-geo me-2"></i>
+                    Ver Ubicación Localidad
                 </a>
                 {% else %}
                 <div class="text-center text-muted py-4">

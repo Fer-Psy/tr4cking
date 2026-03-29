@@ -101,6 +101,16 @@
                         Empleado
                     </span>
                     {% endif %}
+                    {% if persona.es_chofer %}
+                    <span class="badge bg-yellow text-yellow-fg">
+                        Chofer
+                    </span>
+                    {% endif %}
+                    {% if persona.es_ayudante %}
+                    <span class="badge bg-orange text-orange-fg">
+                        Ayudante
+                    </span>
+                    {% endif %}
                     {% if persona.es_cliente %}
                     <span class="badge bg-green text-green-fg">
                         Cliente
@@ -111,7 +121,7 @@
                         Pasajero
                     </span>
                     {% endif %}
-                    {% if not persona.es_empleado and not persona.es_cliente and not persona.es_pasajero %}
+                    {% if not persona.es_empleado and not persona.es_chofer and not persona.es_ayudante and not persona.es_cliente and not persona.es_pasajero %}
                     <span class="text-secondary italic">Sin roles asignados</span>
                     {% endif %}
                 </div>

@@ -14,8 +14,8 @@ class EmpresaAdmin(admin.ModelAdmin):
 @admin.register(Parada)
 class ParadaAdmin(admin.ModelAdmin):
     """Admin para gestionar paradas y terminales."""
-    list_display = ('nombre', 'empresa', 'localidad', 'es_sucursal')
-    list_filter = ('empresa', 'localidad', 'es_sucursal')
+    list_display = ('nombre', 'empresa', 'localidad', 'es_agencia')
+    list_filter = ('empresa', 'localidad', 'es_agencia')
     search_fields = ('nombre', 'direccion')
     ordering = ('empresa', 'localidad', 'nombre')
     autocomplete_fields = ('empresa', 'localidad')

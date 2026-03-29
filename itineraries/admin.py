@@ -1,15 +1,23 @@
 from django.contrib import admin
 
-from .models import Itinerario, DetalleItinerario, Precio
+from .models import Itinerario, DetalleItinerario, Precio, Horario
 
 
 class DetalleItinerarioInline(admin.TabularInline):
     """Inline para ver/editar paradas de un itinerario."""
     model = DetalleItinerario
     extra = 1
-    fields = ('orden', 'parada', 'hora_salida', 'minutos_desde_origen')
+    fields = ('orden', 'parada', 'minutos_desde_origen', 'distancia_desde_origen_km')
     ordering = ('orden',)
     autocomplete_fields = ('parada',)
+
+
+class HorarioInline(admin.TabularInline):
+    """Inline para ver/editar horarios de un itinerario."""
+    model = Horario
+    extra = 1
+    fields = ('hora_salida', 'activo')
+    ordering = ('hora_salida',)
 
 
 class PrecioInline(admin.TabularInline):
@@ -23,14 +31,14 @@ class PrecioInline(admin.TabularInline):
 @admin.register(Itinerario)
 class ItinerarioAdmin(admin.ModelAdmin):
     """Admin para gestionar itinerarios/rutas."""
-    list_display = ('nombre', 'ruta', 'distancia_total_km', 'duracion_estimada_hs', 'dias_operacion_texto', 'activo')
-    list_filter = ('activo', 'ruta')
-    search_fields = ('nombre', 'ruta')
+    list_display = ('nombre', 'empresa', 'ruta', 'distancia_total_km', 'duracion_estimada_hs', 'dias_operacion_texto', 'activo')
+    list_filter = ('empresa', 'activo', 'ruta')
+    search_fields = ('nombre', 'ruta', 'empresa__nombre')
     ordering = ('nombre',)
-    inlines = [DetalleItinerarioInline, PrecioInline]
+    inlines = [HorarioInline, DetalleItinerarioInline, PrecioInline]
     fieldsets = (
         ('Información General', {
-            'fields': ('nombre', 'ruta', 'activo')
+            'fields': ('empresa', 'nombre', 'ruta', 'activo')
         }),
         ('Distancia y Duración', {
             'fields': ('distancia_total_km', 'duracion_estimada_hs'),
@@ -46,10 +54,19 @@ class ItinerarioAdmin(admin.ModelAdmin):
     dias_operacion_texto.short_description = 'Días de operación'
 
 
+@admin.register(Horario)
+class HorarioAdmin(admin.ModelAdmin):
+    """Admin para gestionar horarios de salida."""
+    list_display = ('itinerario', 'hora_salida', 'activo')
+    list_filter = ('itinerario', 'activo')
+    search_fields = ('itinerario__nombre',)
+    ordering = ('itinerario', 'hora_salida')
+
+
 @admin.register(DetalleItinerario)
 class DetalleItinerarioAdmin(admin.ModelAdmin):
     """Admin para gestionar detalles de itinerario."""
-    list_display = ('itinerario', 'orden', 'parada', 'hora_salida', 'minutos_desde_origen')
+    list_display = ('itinerario', 'orden', 'parada', 'minutos_desde_origen')
     list_filter = ('itinerario',)
     search_fields = ('itinerario__nombre', 'parada__nombre')
     ordering = ('itinerario', 'orden')

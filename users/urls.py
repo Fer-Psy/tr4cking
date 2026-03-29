@@ -17,6 +17,8 @@ urlpatterns = [
     # Localidades
     path('localidades/', views.LocalidadListView.as_view(), name='localidad_list'),
     path('localidades/nuevo/', views.LocalidadCreateView.as_view(), name='localidad_create'),
+    path('localidades/nuevo-ajax/', views.LocalidadCreateAjaxView.as_view(), name='localidad_create_ajax'),
+    path('localidades/<int:pk>/coords/', views.get_localidad_coords_ajax, name='localidad_coords_ajax'),
     path('localidades/<int:pk>/', views.LocalidadDetailView.as_view(), name='localidad_detail'),
     path('localidades/<int:pk>/editar/', views.LocalidadUpdateView.as_view(), name='localidad_update'),
     path('localidades/<int:pk>/eliminar/', views.LocalidadDeleteView.as_view(), name='localidad_delete'),

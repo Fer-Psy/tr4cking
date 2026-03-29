@@ -1,7 +1,178 @@
 {% extends 'layouts/base_tabler.html' %}
-{% load crispy_forms_tags %}
+{% load crispy_forms_tags users_filters %}
 
 {% block title %}{% if object %}Editar{% else %}Nueva{% endif %} Localidad - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""/>
+<style>
+    #map-container {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+    #map {
+        height: 450px;
+        width: 100%;
+        z-index: 1;
+        cursor: crosshair;
+    }
+    .map-instructions {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        background: rgba(32, 107, 196, 0.92);
+        color: white;
+        padding: 8px 18px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+        white-space: nowrap;
+    }
+    .map-instructions.hidden {
+        opacity: 0;
+    }
+    .map-coords-badge {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        z-index: 1000;
+        background: rgba(0,0,0,0.75);
+        color: #66d9ef;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.8rem;
+        backdrop-filter: blur(8px);
+        pointer-events: none;
+        transition: all 0.3s ease;
+    }
+    .map-search-container {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 1000;
+        width: 280px;
+    }
+    .map-search-container .form-control {
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        border-radius: 8px;
+        padding: 10px 14px 10px 36px;
+        font-size: 0.85rem;
+    }
+    .map-search-container .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    .map-search-container .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 0 0 10px 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        max-height: 280px;
+        overflow-y: auto;
+        display: none;
+        z-index: 1050;
+        border: 1px solid rgba(0,0,0,0.1);
+        border-top: none;
+    }
+    .map-search-container .search-results.active {
+        display: block;
+    }
+    .map-search-container .search-result-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f4f9;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+        line-height: 1.4;
+        color: #444;
+    }
+    .map-search-container .search-result-item:hover {
+        background: #f0f7ff;
+        color: #206bc4;
+        padding-left: 20px;
+    }
+    .map-search-container .search-result-item:last-child {
+        border-bottom: none;
+    }
+    .coord-input-group {
+        position: relative;
+    }
+    .coord-input-group .coord-icon {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #206bc4;
+        font-size: 0.9rem;
+        pointer-events: none;
+    }
+    .btn-locate {
+        transition: all 0.2s ease;
+    }
+    .btn-locate:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(32, 107, 196, 0.3);
+    }
+    .map-action-btns {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        z-index: 1000;
+        display: flex;
+        gap: 6px;
+    }
+    .map-action-btns .btn {
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
+        border: none;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        border-radius: 8px;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #333;
+        font-size: 1rem;
+    }
+    .map-action-btns .btn:hover {
+        background: white;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        transform: translateY(-1px);
+    }
+    @keyframes markerDrop {
+        0% { transform: translateY(-30px); opacity: 0; }
+        60% { transform: translateY(4px); opacity: 1; }
+        100% { transform: translateY(0); opacity: 1; }
+    }
+    .leaflet-marker-icon {
+        animation: markerDrop 0.4s ease-out;
+    }
+</style>
+{% endblock %}
 
 {% block page_header %}
 <div class="page-header d-print-none">
@@ -22,13 +193,91 @@
 
 {% block content %}
 <div class="row g-4">
-    <div class="col-lg-6">
+    <div class="col-lg-5">
         <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-geo-alt-fill me-2 text-primary"></i>
+                    Datos de la Localidad
+                </h3>
+            </div>
             <div class="card-body">
-                <div class="card-title">Datos Geográficos</div>
-                <form method="post" novalidate>
+                <form method="post" novalidate id="localidad-form">
                     {% csrf_token %}
-                    {% crispy form %}
+                    
+                    <div class="mb-3">
+                        <label for="id_nombre" class="form-label required">Nombre</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon">
+                                <i class="bi bi-building"></i>
+                            </span>
+                            <input type="text" 
+                                   name="nombre" 
+                                   id="id_nombre" 
+                                   class="form-control {% if form.nombre.errors %}is-invalid{% endif %}" 
+                                   placeholder="Ej: Asunción"
+                                   value="{{ form.nombre.value|default:'' }}"
+                                   maxlength="100"
+                                   required>
+                        </div>
+                        {% if form.nombre.errors %}
+                        <div class="invalid-feedback">{{ form.nombre.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="id_latitud" class="form-label">Latitud</label>
+                            <div class="coord-input-group">
+                                <input type="text" 
+                                       name="latitud" 
+                                       id="id_latitud" 
+                                       class="form-control {% if form.latitud.errors %}is-invalid{% endif %}"
+                                       placeholder="-25.2867" 
+                                       value="{% if form.latitud.value %}{{ form.latitud.value|dot_decimal }}{% endif %}"
+                                       readonly>
+                                <span class="coord-icon"><i class="bi bi-arrow-down-up"></i></span>
+                            </div>
+                            {% if form.latitud.errors %}
+                            <div class="invalid-feedback">{{ form.latitud.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            <label for="id_longitud" class="form-label">Longitud</label>
+                            <div class="coord-input-group">
+                                <input type="text" 
+                                       name="longitud" 
+                                       id="id_longitud" 
+                                       class="form-control {% if form.longitud.errors %}is-invalid{% endif %}"
+                                       placeholder="-57.3333" 
+                                       value="{% if form.longitud.value %}{{ form.longitud.value|dot_decimal }}{% endif %}"
+                                       readonly>
+                                <span class="coord-icon"><i class="bi bi-arrow-left-right"></i></span>
+                            </div>
+                            {% if form.longitud.errors %}
+                            <div class="invalid-feedback">{{ form.longitud.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm btn-locate w-100" id="btn-my-location">
+                            <i class="bi bi-crosshair me-1"></i> Mi Ubicación
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="btn-clear-coords">
+                            <i class="bi bi-x-circle me-1"></i> Limpiar
+                        </button>
+                    </div>
+
+                    <div class="alert alert-info mb-3" style="font-size: 0.83rem;">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-info-circle me-2 mt-1"></i>
+                            <div>
+                                <strong>Seleccionar ubicación:</strong> Haz clic en el mapa para marcar la localidad. 
+                                También puedes buscar por nombre usando el buscador del mapa.
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="form-footer d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
@@ -44,26 +293,316 @@
         </div>
     </div>
 
-    <div class="col-lg-6">
+    <div class="col-lg-7">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="bi bi-map me-2"></i>
-                    Información
+                    <i class="bi bi-map me-2 text-primary"></i>
+                    Seleccionar Ubicación en el Mapa
                 </h3>
             </div>
-            <div class="card-body">
-                <p class="text-secondary mb-3">
-                    Define las localidades que se usarán como puntos de origen, destino o paradas intermedias en los itinerarios.
-                </p>
-                <div class="alert alert-info">
-                    <h4 class="alert-title">Coordenadas GPS</h4>
-                    <div class="text-secondary">
-                        Las coordenadas (Latitud/Longitud) son opcionales pero recomendadas para visualizar las rutas en el mapa.
+            <div class="card-body p-0">
+                <div id="map-container">
+                    <div class="map-instructions" id="map-instructions">
+                        <i class="bi bi-cursor me-1"></i> Haz clic en el mapa para seleccionar la ubicación
                     </div>
+                    <div class="map-coords-badge" id="map-coords-badge" style="display:none;">
+                        <span id="coords-display">--</span>
+                    </div>
+                    <div class="map-search-container">
+                        <div class="position-relative">
+                            <i class="bi bi-search search-icon"></i>
+                            <input type="text" class="form-control" id="map-search" 
+                                   placeholder="Buscar lugar..." autocomplete="off">
+                            <div class="search-results" id="search-results"></div>
+                        </div>
+                    </div>
+                    <div class="map-action-btns">
+                        <button type="button" class="btn" id="btn-center-py" title="Centrar en Paraguay">
+                            <i class="bi bi-geo"></i>
+                        </button>
+                        <button type="button" class="btn" id="btn-fullscreen" title="Pantalla completa">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                    </div>
+                    <div id="map"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Coordenadas por defecto: centro de Paraguay
+    const DEFAULT_LAT = -23.4425;
+    const DEFAULT_LNG = -58.4438;
+    const DEFAULT_ZOOM = 6;
+
+    // Obtener valores existentes del formulario
+    const latInput = document.getElementById('id_latitud');
+    const lngInput = document.getElementById('id_longitud');
+    const coordsBadge = document.getElementById('map-coords-badge');
+    const coordsDisplay = document.getElementById('coords-display');
+    const mapInstructions = document.getElementById('map-instructions');
+
+    let existingLat = latInput.value ? parseFloat(latInput.value) : null;
+    let existingLng = lngInput.value ? parseFloat(lngInput.value) : null;
+
+    let initLat = existingLat || DEFAULT_LAT;
+    let initLng = existingLng || DEFAULT_LNG;
+    let initZoom = existingLat ? 14 : DEFAULT_ZOOM;
+
+    // Inicializar mapa
+    const map = L.map('map', {
+        center: [initLat, initLng],
+        zoom: initZoom,
+        zoomControl: true
+    });
+
+    // Capa de tiles OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+    }).addTo(map);
+
+    // Icono personalizado para el marcador
+    const customIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="
+            position: relative;
+            width: 30px;
+            height: 42px;
+        ">
+            <svg viewBox="0 0 30 42" width="30" height="42" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 0 C6.7 0 0 6.7 0 15 C0 25 15 42 15 42 C15 42 30 25 30 15 C30 6.7 23.3 0 15 0Z" 
+                      fill="#206bc4" stroke="#1a569d" stroke-width="1.5"/>
+                <circle cx="15" cy="14" r="6" fill="white"/>
+            </svg>
+        </div>`,
+        iconSize: [30, 42],
+        iconAnchor: [15, 42],
+        popupAnchor: [0, -42]
+    });
+
+    let marker = null;
+
+    // Si hay coordenadas existentes, colocar marcador
+    if (existingLat && existingLng) {
+        marker = L.marker([existingLat, existingLng], { 
+            icon: customIcon, 
+            draggable: true 
+        }).addTo(map);
+        marker.bindPopup(`<strong>Ubicación seleccionada</strong><br>Lat: ${existingLat.toFixed(6)}<br>Lng: ${existingLng.toFixed(6)}`);
+        updateCoordsBadge(existingLat, existingLng);
+        mapInstructions.classList.add('hidden');
+
+        // Permitir arrastrar el marcador
+        marker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            updateCoordinates(pos.lat, pos.lng);
+        });
+    }
+
+    // Evento click en el mapa
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        placeMarker(lat, lng);
+    });
+
+    function placeMarker(lat, lng) {
+        if (marker) {
+            marker.setLatLng([lat, lng]);
+        } else {
+            marker = L.marker([lat, lng], { 
+                icon: customIcon, 
+                draggable: true 
+            }).addTo(map);
+
+            marker.on('dragend', function(e) {
+                const pos = e.target.getLatLng();
+                updateCoordinates(pos.lat, pos.lng);
+            });
+        }
+
+        updateCoordinates(lat, lng);
+        marker.bindPopup(`<strong>Ubicación seleccionada</strong><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+        mapInstructions.classList.add('hidden');
+    }
+
+    function updateCoordinates(lat, lng) {
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        updateCoordsBadge(lat, lng);
+
+        // Efecto visual en los inputs
+        latInput.style.transition = 'background 0.3s';
+        lngInput.style.transition = 'background 0.3s';
+        latInput.style.background = '#e7f5ff';
+        lngInput.style.background = '#e7f5ff';
+        setTimeout(() => {
+            latInput.style.background = '';
+            lngInput.style.background = '';
+        }, 800);
+    }
+
+    function updateCoordsBadge(lat, lng) {
+        coordsBadge.style.display = 'block';
+        coordsDisplay.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+
+    // Botón "Mi Ubicación"
+    document.getElementById('btn-my-location').addEventListener('click', function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1 spin-animation"></i> Localizando...';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 15);
+                placeMarker(lat, lng);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-crosshair me-1"></i> Mi Ubicación';
+            }, function(error) {
+                let msg = 'No se pudo obtener la ubicación.';
+                if (error.code === 1) msg = 'Permiso de ubicación denegado.';
+                else if (error.code === 2) msg = 'Ubicación no disponible.';
+                else if (error.code === 3) msg = 'Tiempo de espera agotado.';
+                alert(msg);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-crosshair me-1"></i> Mi Ubicación';
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        } else {
+            alert('Tu navegador no soporta geolocalización.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-crosshair me-1"></i> Mi Ubicación';
+        }
+    });
+
+    // Botón "Limpiar coordenadas"
+    document.getElementById('btn-clear-coords').addEventListener('click', function() {
+        latInput.value = '';
+        lngInput.value = '';
+        if (marker) {
+            map.removeLayer(marker);
+            marker = null;
+        }
+        coordsBadge.style.display = 'none';
+        mapInstructions.classList.remove('hidden');
+        map.setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
+    });
+
+    // Botón centrar en Paraguay
+    document.getElementById('btn-center-py').addEventListener('click', function() {
+        map.setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
+    });
+
+    // Botón pantalla completa
+    document.getElementById('btn-fullscreen').addEventListener('click', function() {
+        const mapEl = document.getElementById('map-container');
+        if (!document.fullscreenElement) {
+            mapEl.requestFullscreen().then(() => {
+                map.invalidateSize();
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    });
+
+    document.addEventListener('fullscreenchange', function() {
+        setTimeout(() => map.invalidateSize(), 100);
+    });
+
+    // ==========================================
+    // Búsqueda de lugares con Nominatim (OSM)
+    // ==========================================
+    const searchInput = document.getElementById('map-search');
+    const searchResults = document.getElementById('search-results');
+    let searchTimeout = null;
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        if (query.length < 3) {
+            searchResults.classList.remove('active');
+            return;
+        }
+
+        searchTimeout = setTimeout(function() {
+            // Priorizar Paraguay en la búsqueda
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=py&limit=5&addressdetails=1`, {
+                headers: { 'Accept-Language': 'es' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                searchResults.innerHTML = '';
+                if (data.length === 0) {
+                    searchResults.innerHTML = '<div class="search-result-item text-secondary"><i class="bi bi-emoji-frown me-1"></i> Sin resultados</div>';
+                    searchResults.classList.add('active');
+                    return;
+                }
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'search-result-item';
+                    div.innerHTML = `<i class="bi bi-geo-alt me-1 text-primary"></i> ${item.display_name}`;
+                    div.addEventListener('click', function() {
+                        const lat = parseFloat(item.lat);
+                        const lng = parseFloat(item.lon);
+                        map.setView([lat, lng], 15);
+                        placeMarker(lat, lng);
+                        searchResults.classList.remove('active');
+                        searchInput.value = item.display_name.split(',')[0];
+
+                        // Auto-fill nombre si está vacío
+                        const nombreInput = document.getElementById('id_nombre');
+                        if (!nombreInput.value) {
+                            nombreInput.value = item.display_name.split(',')[0];
+                        }
+                    });
+                    searchResults.appendChild(div);
+                });
+                searchResults.classList.add('active');
+            })
+            .catch(err => {
+                console.error('Error en búsqueda:', err);
+                searchResults.innerHTML = '<div class="search-result-item text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Error en la búsqueda</div>';
+                searchResults.classList.add('active');
+            });
+        }, 500);
+    });
+
+    // Cerrar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.remove('active');
+        }
+    });
+
+    // Cerrar resultados con Escape
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            searchResults.classList.remove('active');
+            searchInput.blur();
+        }
+    });
+});
+</script>
+
+<style>
+    .spin-animation {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        100% { transform: rotate(360deg); }
+    }
+</style>
 {% endblock %}

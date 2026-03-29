@@ -18,9 +18,9 @@ print(f"Configurando detalles para itinerario: {itinerario.nombre}")
 
 # Crear los detalles del itinerario (paradas en orden)
 detalles_data = [
-    {'parada': terminal_asuncion, 'orden': 1, 'hora_salida': time(6, 0), 'minutos_desde_origen': 0},
-    {'parada': terminal_oviedo, 'orden': 2, 'hora_salida': time(8, 30), 'minutos_desde_origen': 150},
-    {'parada': terminal_santa_rita, 'orden': 3, 'hora_salida': time(11, 0), 'minutos_desde_origen': 300},
+    {'parada': terminal_asuncion, 'orden': 1, 'minutos_desde_origen': 0},
+    {'parada': terminal_oviedo, 'orden': 2, 'minutos_desde_origen': 150},
+    {'parada': terminal_santa_rita, 'orden': 3, 'minutos_desde_origen': 300},
 ]
 
 for data in detalles_data:
@@ -29,7 +29,6 @@ for data in detalles_data:
         parada=data['parada'],
         defaults={
             'orden': data['orden'],
-            'hora_salida': data['hora_salida'],
             'minutos_desde_origen': data['minutos_desde_origen']
         }
     )

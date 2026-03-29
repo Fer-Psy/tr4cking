@@ -23,7 +23,10 @@
                     {% csrf_token %}
 
                     <div class="row">
-                        <div class="col-md-12 mb-3">
+                        <div class="col-12 mb-4">
+                            <h5 class="text-primary border-bottom pb-2">1. Planificación del Viaje</h5>
+                        </div>
+                        <div class="col-md-5 mb-3">
                             <label class="form-label">Itinerario</label>
                             {{ form.itinerario }}
                             {% if form.itinerario.errors %}
@@ -31,23 +34,15 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Bus</label>
-                            {{ form.bus }}
-                            {% if form.bus.errors %}
-                            <div class="invalid-feedback d-block">{{ form.bus.errors.0 }}</div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Horario</label>
+                            {{ form.horario }}
+                            {% if form.horario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.horario.errors.0 }}</div>
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Chofer</label>
-                            {{ form.chofer }}
-                            {% if form.chofer.errors %}
-                            <div class="invalid-feedback d-block">{{ form.chofer.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Fecha del Viaje</label>
                             {{ form.fecha_viaje }}
                             {% if form.fecha_viaje.errors %}
@@ -55,8 +50,40 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-12 mb-3">
-                            <label class="form-label">Observaciones</label>
+                        <div class="col-12 mt-3 mb-4">
+                            <h5 class="text-success border-bottom pb-2">2. Asignación de Recursos</h5>
+                            <small class="text-muted d-block mb-3">
+                                <i class="bi bi-info-circle"></i> Puedes cambiar el vehículo o el personal asignado en cualquier momento si hay un imprevisto, sin afectar el itinerario.
+                            </small>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Vehículo (Bus)</label>
+                            {{ form.bus }}
+                            {% if form.bus.errors %}
+                            <div class="invalid-feedback d-block">{{ form.bus.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Chofer Asignado</label>
+                            {{ form.chofer }}
+                            {% if form.chofer.errors %}
+                            <div class="invalid-feedback d-block">{{ form.chofer.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Ayudantes Asignados</label>
+                            {{ form.ayudantes }}
+                            <small class="text-muted">Mantén presionado Ctrl para seleccionar varios</small>
+                            {% if form.ayudantes.errors %}
+                            <div class="invalid-feedback d-block">{{ form.ayudantes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12 mt-3 mb-3">
+                            <label class="form-label">Observaciones Adicionales</label>
                             {{ form.observaciones }}
                             {% if form.observaciones.errors %}
                             <div class="invalid-feedback d-block">{{ form.observaciones.errors.0 }}</div>
