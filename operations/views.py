@@ -21,7 +21,8 @@ from datetime import timedelta
 
 from .models import (
     Viaje, TrackingViaje, Pasaje, Encomienda, Timbrado, 
-    Factura, DetalleFactura, SesionCaja, MovimientoCaja, Incidencia
+    Factura, DetalleFactura, SesionCaja, MovimientoCaja, Incidencia,
+    UbicacionAyudante
 )
 from .forms import (
     ViajeForm, ViajeEstadoForm, PasajeVentaForm, PasajeCancelacionForm,
@@ -31,7 +32,7 @@ from .forms import (
 )
 from users.models import Persona
 from fleet.models import Bus, Parada, Empresa
-from itineraries.models import Itinerario, Precio, Horario
+from itineraries.models import Itinerario, Precio, Horario, DetalleItinerario
 
 
 # =============================================================================
@@ -43,6 +44,9 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'operations/dashboard.html'
     
     def get_context_data(self, **kwargs):
+        from operations.utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+        
         context = super().get_context_data(**kwargs)
         hoy = timezone.now().date()
         ahora = timezone.now()
@@ -143,9 +147,194 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
                 'mensaje': f'Ocupación promedio baja: {context.get("ocupacion_promedio", 0)}%',
                 'icono': 'bi-graph-down'
             })
-        context['alertas'] = alertas
+            
+        # Verificar viajes para mañana (alerta si faltan)
+        mañana = hoy + timedelta(days=1)
+        # Filtramos por horarios activos que operan mañana
+        dia_semana_mañana = mañana.weekday()
+        horarios_mañana = [h for h in Horario.objects.filter(activo=True, itinerario__activo=True) if h.itinerario.opera_en_dia(dia_semana_mañana)]
+        viajes_mañana = Viaje.objects.filter(fecha_viaje=mañana).count()
         
+        if len(horarios_mañana) > 0 and viajes_mañana < len(horarios_mañana):
+            alertas.append({
+                'tipo': 'warning',
+                'mensaje': 'Faltan viajes programados para mañana. Clientes no pueden comprar pasajes aún.',
+                'icono': 'bi-calendar-event'
+            })
+            context['mostrar_generador'] = True
+
+        context['alertas'] = alertas
         return context
+
+
+class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
+    """
+    Panel de control específico para el Ayudante de transporte.
+    Incluye rastreo, venta rápida, gestión de caja y encomiendas.
+    """
+    template_name = 'operations/dashboard_ayudante.html'
+
+    def get_context_data(self, **kwargs):
+        from operations.utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+
+        context = super().get_context_data(**kwargs)
+        persona = getattr(self.request.user, 'persona', None)
+        hoy = timezone.now().date()
+        ahora = timezone.now()
+
+        if not persona or not (persona.es_ayudante or persona.es_chofer or persona.es_empleado):
+            messages.warning(self.request, "No tienes permisos de ayudante o empleado.")
+            return context
+
+        # 1. Viaje activo (en curso)
+        viaje_activo = Viaje.objects.filter(
+            Q(chofer=persona) | Q(ayudantes=persona),
+            estado='en_curso',
+            fecha_viaje=hoy
+        ).select_related('itinerario', 'bus', 'horario').first()
+
+        # Si no hay uno en curso, buscar el próximo programado para hoy
+        if not viaje_activo:
+            viaje_activo = Viaje.objects.filter(
+                Q(chofer=persona) | Q(ayudantes=persona),
+                estado='programado',
+                fecha_viaje=hoy
+            ).select_related('itinerario', 'bus', 'horario').order_by('horario__hora_salida').first()
+
+        context['viaje_activo'] = viaje_activo
+
+        # 2. Estado de rastreo
+        tracking_activo = UbicacionAyudante.objects.filter(
+            persona=persona,
+            activo=True
+        ).exists()
+        context['tracking_activo'] = tracking_activo
+
+        # 3. Estado de caja
+        sesion_caja = SesionCaja.objects.filter(
+            cajero=self.request.user,
+            estado='abierta'
+        ).first()
+        context['sesion_caja'] = sesion_caja
+        if sesion_caja:
+            context['total_caja'] = sesion_caja.monto_apertura + sesion_caja.total_ingresos - sesion_caja.total_egresos
+
+        # 4. Encomiendas asignadas al bus (pendientes de entrega)
+        if viaje_activo:
+            # Encomiendas que viajan en este bus y no han sido entregadas
+            context['encomiendas_viaje'] = Encomienda.objects.filter(
+                viaje=viaje_activo,
+                estado__in=['registrado', 'en_transito', 'en_destino']
+            ).select_related('remitente', 'destinatario', 'parada_destino')
+
+            # Pasajes vendidos recientemente en este viaje
+            context['pasajes_recientes'] = Pasaje.objects.filter(
+                viaje=viaje_activo,
+                estado='vendido'
+            ).select_related('pasajero', 'asiento').order_by('-fecha_venta')[:5]
+
+        # 5. Cliente Ocasional (para facturación rápida)
+        # Buscamos si existe la persona con CI 4444440
+        try:
+            cliente_ocasional = Persona.objects.get(cedula=4444440)
+        except Persona.DoesNotExist:
+            cliente_ocasional = Persona.objects.create(
+                cedula=4444440,
+                nombre='Cliente',
+                apellido='Ocasional',
+                es_cliente=True
+            )
+        context['cliente_ocasional'] = cliente_ocasional
+
+        return context
+
+
+class ViajeIniciarView(LoginRequiredMixin, View):
+    """API para que el ayudante inicie el viaje rápidamente."""
+    def post(self, request, pk):
+        from django.utils import timezone
+        viaje = get_object_or_404(Viaje, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        
+        # Validar permisos (debe ser el chofer o ayudante del viaje)
+        if not request.user.is_staff:
+            is_ayudante = viaje.ayudantes.filter(pk=persona.pk).exists() if persona else False
+            if not persona or (viaje.chofer != persona and not is_ayudante):
+                return JsonResponse({'error': 'No autorizado para iniciar este viaje'}, status=403)
+        
+        if viaje.estado != 'programado':
+            return JsonResponse({'error': 'El viaje ya ha sido iniciado o ya está completado'}, status=400)
+            
+        viaje.estado = 'en_curso'
+        viaje.hora_salida_real = timezone.localtime().time()
+        viaje.save()
+
+        # También activar ubicación si no está activa
+        if persona:
+            UbicacionAyudante.objects.update_or_create(
+                persona=persona,
+                defaults={'activo': True, 'viaje': viaje}
+            )
+        
+        return JsonResponse({
+            'ok': True, 
+            'mensaje': '¡Buen viaje! El viaje ahora está en curso y la localización activa.'
+        })
+
+
+
+class GenerarViajesAutomaticosView(LoginRequiredMixin, View):
+    """Genera viajes para los próximos días basados en itinerarios y recursos predeterminados."""
+    def post(self, request):
+        dias = int(request.POST.get('dias', 8))
+        ahora = timezone.localtime(timezone.now())
+        hoy = ahora.date()
+        
+        horarios = Horario.objects.filter(
+            activo=True, 
+            itinerario__activo=True
+        ).select_related('itinerario', 'itinerario__empresa')
+        
+        creados = 0
+        errores = 0
+        
+        for i in range(dias + 1):
+            fecha = hoy + timedelta(days=i)
+            dia_semana = fecha.weekday()
+            
+            for h in horarios:
+                if h.itinerario.opera_en_dia(dia_semana):
+                    if not Viaje.objects.filter(itinerario=h.itinerario, horario=h, fecha_viaje=fecha).exists():
+                        try:
+                            bus = h.bus_predeterminado or h.itinerario.bus_predeterminado
+                            if bus and bus.estado != 'activo': bus = None
+                            
+                            chofer = h.chofer_predeterminado or h.itinerario.chofer_predeterminado
+                            ayudante = h.ayudante_predeterminado or h.itinerario.ayudante_predeterminado
+                            
+                            if bus and chofer:
+                                viaje = Viaje.objects.create(
+                                    itinerario=h.itinerario,
+                                    horario=h,
+                                    fecha_viaje=fecha,
+                                    bus=bus,
+                                    chofer=chofer,
+                                    empresa=h.itinerario.empresa,
+                                    estado='programado'
+                                )
+                                if ayudante:
+                                    viaje.ayudantes.add(ayudante)
+                                creados += 1
+                        except Exception:
+                            errores += 1
+        
+        if creados > 0:
+            messages.success(request, f"Se han generado {creados} viajes para los próximos {dias} días.")
+        else:
+            messages.warning(request, "No se generaron viajes nuevos. Asegúrese de tener recursos predeterminados asignados en Itinerarios/Horarios.")
+            
+        return redirect('operations:dashboard')
 
 
 # =============================================================================
@@ -160,6 +349,9 @@ class ViajeListView(LoginRequiredMixin, ListView):
     paginate_by = 15
     
     def get_queryset(self):
+        from operations.utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+        
         queryset = super().get_queryset().select_related(
             'itinerario', 'bus', 'chofer', 'horario'
         ).prefetch_related('ayudantes').annotate(
@@ -253,6 +445,9 @@ class ViajeDetailView(LoginRequiredMixin, DetailView):
         }
         context['stats']['total_ingresos'] = context['stats']['ingresos_pasajes'] + context['stats']['ingresos_encomiendas']
         
+        # Siguiente fecha sugerida para programar
+        context['proxima_fecha_sugerida'] = (viaje.fecha_viaje + timedelta(days=1)).strftime('%Y-%m-%d')
+        
         return context
 
 
@@ -267,8 +462,46 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     def get_initial(self):
         initial = super().get_initial()
         itinerario_id = self.request.GET.get('itinerario')
+        horario_id = self.request.GET.get('horario')
+        fecha = self.request.GET.get('fecha')
+        
         if itinerario_id:
-            initial['itinerario'] = itinerario_id
+            try:
+                it = Itinerario.objects.get(pk=itinerario_id)
+                initial['itinerario'] = it.pk
+                if it.empresa:
+                    initial['empresa'] = it.empresa_id
+                
+                # Recursos predeterminados del itinerario
+                if it.bus_predeterminado and it.bus_predeterminado.estado == 'activo':
+                    initial['bus'] = it.bus_predeterminado_id
+                if it.chofer_predeterminado:
+                    initial['chofer'] = it.chofer_predeterminado_id
+                if it.ayudante_predeterminado:
+                    initial['ayudantes'] = [it.ayudante_predeterminado_id]
+            except Itinerario.DoesNotExist:
+                pass
+
+        if horario_id:
+            try:
+                h = Horario.objects.get(pk=horario_id)
+                initial['horario'] = h.pk
+                # Predeterminados del horario (sobrescriben)
+                if h.bus_predeterminado and h.bus_predeterminado.estado == 'activo':
+                    initial['bus'] = h.bus_predeterminado_id
+                if h.chofer_predeterminado:
+                    initial['chofer'] = h.chofer_predeterminado_id
+                if h.ayudante_predeterminado:
+                    initial['ayudantes'] = [h.ayudante_predeterminado_id]
+            except Horario.DoesNotExist:
+                pass
+        
+        if fecha:
+            initial['fecha_viaje'] = fecha
+        elif not initial.get('fecha_viaje'):
+            # Por defecto mañana o hoy si no hay fecha
+            initial['fecha_viaje'] = timezone.now().date()
+            
         return initial
 
 
@@ -315,6 +548,9 @@ class PasajeListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
+        from operations.utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+        
         queryset = super().get_queryset().select_related(
             'viaje__itinerario', 'pasajero', 'asiento', 'parada_origen', 'parada_destino'
         )
@@ -404,8 +640,7 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
                 cedula=cedula_pasajero,
                 nombre=nombre_pasajero or 'Sin nombre',
                 apellido=apellido_pasajero or '',
-                telefono=telefono_pasajero or '',
-                es_pasajero=True
+                telefono=telefono_pasajero or ''
             )
         
         pasaje.pasajero = pasajero
@@ -978,9 +1213,9 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Obtener pasajes vendidos no facturados
+        # Obtener pasajes vendidos o reservados no facturados
         pasajes_sin_factura = Pasaje.objects.filter(
-            estado='vendido'
+            estado__in=['vendido', 'reservado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
         ).select_related('pasajero', 'viaje__itinerario', 'asiento')
@@ -1123,10 +1358,15 @@ class FacturaCreateView(LoginRequiredMixin, View):
             encomienda = get_object_or_404(Encomienda, pk=encomienda_pk)
             cliente_cedula = encomienda.remitente.cedula
         
+        from .forms import FacturaForm, EncomiendaForm
+        
+        # ... logic ...
         form = FacturaForm(cliente=cliente_cedula, pasaje=pasaje, encomienda=encomienda)
+        encomienda_form = EncomiendaForm()
         
         return render(request, 'operations/factura_form.html', {
             'form': form,
+            'encomienda_form': encomienda_form,
             'cliente_cedula': cliente_cedula
         })
     
@@ -1521,10 +1761,10 @@ class BuscarClientesFacturaView(LoginRequiredMixin, View):
         
         clientes = []
         for persona in personas:
-            # Verificar si tiene pasajes pendientes
+            # Verificar si tiene pasajes pendientes (vendidos o reservados)
             pasajes_pendientes = Pasaje.objects.filter(
                 pasajero=persona,
-                estado='vendido'
+                estado__in=['vendido', 'reservado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
             ).count()
@@ -1592,10 +1832,10 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
         except Persona.DoesNotExist:
             return JsonResponse({'error': 'Cliente no encontrado'}, status=404)
         
-        # Obtener pasajes pendientes
+        # Obtener pasajes pendientes (vendidos o reservados)
         pasajes = Pasaje.objects.filter(
             pasajero=persona,
-            estado='vendido'
+            estado__in=['vendido', 'reservado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
         ).select_related('viaje__itinerario', 'asiento')
@@ -1690,14 +1930,41 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                 ayudantes = Persona.objects.filter(empresa_id=emp_id, es_ayudante=True).order_by('apellido', 'nombre')
             except (ValueError, TypeError):
                 pass
+        
+        # Obtener recursos predeterminados del itinerario o del horario
+        bus_pred_id = None
+        chofer_pred_cedula = None
+        ayudante_pred_cedula = None
+        horario_id = request.GET.get('horario')
 
         if itinerario_id:
             try:
                 itinerario = Itinerario.objects.get(pk=itinerario_id)
                 
+                # Cargar predeterminados del itinerario primero
+                if itinerario.bus_predeterminado and itinerario.bus_predeterminado.estado == 'activo':
+                    bus_pred_id = itinerario.bus_predeterminado_id
+                if itinerario.chofer_predeterminado:
+                    chofer_pred_cedula = itinerario.chofer_predeterminado.cedula
+                if itinerario.ayudante_predeterminado:
+                    ayudante_pred_cedula = itinerario.ayudante_predeterminado.cedula
+
                 # Obtener todos los horarios activos del itinerario
                 todos_horarios = Horario.objects.filter(itinerario=itinerario, activo=True).order_by('hora_salida')
                 
+                # Si hay un horario seleccionado, ver si tiene sus propios predeterminados
+                if horario_id:
+                    try:
+                        horario_obj = todos_horarios.get(pk=horario_id)
+                        if horario_obj.bus_predeterminado and horario_obj.bus_predeterminado.estado == 'activo':
+                            bus_pred_id = horario_obj.bus_predeterminado_id
+                        if horario_obj.chofer_predeterminado:
+                            chofer_pred_cedula = horario_obj.chofer_predeterminado.cedula
+                        if horario_obj.ayudante_predeterminado:
+                            ayudante_pred_cedula = horario_obj.ayudante_predeterminado.cedula
+                    except (Horario.DoesNotExist, ValueError):
+                        pass
+
                 # Filtrar si la fecha es hoy
                 ahora = timezone.localtime(timezone.now())
                 hoy = ahora.date()
@@ -1738,5 +2005,790 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
             'choferes': choferes,
             'ayudantes': ayudantes,
             'empresa_id': empresa_id,
-            'itinerario_id': itinerario_id
+            'itinerario_id': itinerario_id,
+            'horario_id': horario_id,
+            'bus_pred_id': bus_pred_id,
+            'chofer_pred_cedula': chofer_pred_cedula,
+            'ayudante_pred_cedula': ayudante_pred_cedula,
         })
+
+
+# =============================================================================
+# RASTREO EN TIEMPO REAL
+# =============================================================================
+
+class RastreoMapaView(LoginRequiredMixin, TemplateView):
+    """Vista principal del mapa de rastreo en tiempo real estilo Bolt (MODO ADMIN)."""
+    template_name = 'operations/rastreo_mapa.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Si es un cliente común y no es staff, redirigir a la vista pública
+        if not request.user.is_staff and not request.user.is_superuser:
+            persona = getattr(request.user, 'persona', None)
+            if persona and persona.es_cliente:
+                return redirect('operations:rastreo_publico')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+        hoy = timezone.now().date()
+
+        # Viajes en curso hoy
+        viajes_en_curso = Viaje.objects.filter(
+            estado='en_curso',
+            fecha_viaje=hoy
+        ).select_related(
+            'itinerario', 'bus', 'chofer', 'horario', 'empresa'
+        ).prefetch_related('ayudantes')
+
+        context['viajes_en_curso'] = viajes_en_curso
+        context['total_en_curso'] = viajes_en_curso.count()
+        return context
+
+
+class APIViajosEnCursoView(LoginRequiredMixin, View):
+    """API JSON para obtener viajes en curso con ubicaciones del personal (ADMIN)."""
+
+    def get(self, request):
+        hoy = timezone.now().date()
+        viajes_en_curso = Viaje.objects.filter(
+            estado='en_curso', fecha_viaje=hoy
+        ).select_related(
+            'itinerario', 'bus', 'chofer', 'horario', 'empresa'
+        ).prefetch_related('ayudantes', 'itinerario__detalles__parada__localidad')
+
+        data = []
+        for viaje in viajes_en_curso:
+            ubicacion = None
+            personas = [viaje.chofer] + list(viaje.ayudantes.all())
+            for p in personas:
+                ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
+                if ub:
+                    ubicacion = ub
+                    break
+
+            pasajes_activos = viaje.pasajes.filter(
+                estado__in=['vendido', 'reservado', 'abordado']
+            ).values('asiento_id').distinct().count()
+
+            detalles = viaje.itinerario.detalles.select_related('parada', 'parada__localidad').order_by('orden')
+            paradas = [{
+                'nombre': d.parada.nombre,
+                'orden': d.orden,
+                'lat': float(d.parada.latitud_gps) if d.parada.latitud_gps else None,
+                'lng': float(d.parada.longitud_gps) if d.parada.longitud_gps else None,
+            } for d in detalles]
+
+            viaje_data = {
+                'id': viaje.pk,
+                'itinerario': viaje.itinerario.nombre,
+                'empresa': viaje.empresa.nombre if viaje.empresa else '',
+                'bus_placa': viaje.bus.placa,
+                'bus_marca': f"{viaje.bus.marca or ''} {viaje.bus.modelo or ''}".strip(),
+                'chofer': viaje.chofer.nombre_completo,
+                'hora_salida': viaje.horario.hora_salida.strftime('%H:%M') if viaje.horario else '--:--',
+                'asientos_total': viaje.bus.capacidad_asientos,
+                'asientos_ocupados': pasajes_activos,
+                'asientos_libres': viaje.bus.capacidad_asientos - pasajes_activos,
+                'porcentaje_ocupacion': viaje.porcentaje_ocupacion,
+                'paradas': paradas,
+                'ubicacion': {
+                    'lat': float(ubicacion.latitud),
+                    'lng': float(ubicacion.longitud),
+                    'velocidad': float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh else 0,
+                    'heading': float(ubicacion.heading) if ubicacion.heading else 0,
+                } if ubicacion else None,
+            }
+            data.append(viaje_data)
+
+        return JsonResponse({'viajes': data, 'total': len(data)})
+
+
+class RastreoPublicoView(LoginRequiredMixin, TemplateView):
+
+    """Vista del mapa para clientes (público interno)."""
+    template_name = 'users/rastreo_publico.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = timezone.now().date()
+        viajes_en_curso = Viaje.objects.filter(estado='en_curso', fecha_viaje=hoy)
+        context['viajes_en_curso'] = viajes_en_curso
+        context['total_en_curso'] = viajes_en_curso.count()
+        return context
+
+
+class APIViajesPublicosView(LoginRequiredMixin, View):
+    """API JSON para clientes. Oculta datos sensibles y calcula ETAs."""
+
+    def get(self, request):
+        import math
+        def calcular_km(lat1, lon1, lat2, lon2):
+            R = 6371.0
+            phi1, phi2 = math.radians(lat1), math.radians(lat2)
+            dphi = math.radians(lat2 - lat1)
+            dlambda = math.radians(lon2 - lon1)
+            a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+            return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        hoy = timezone.now().date()
+        viajes_en_curso = Viaje.objects.filter(
+            estado='en_curso', fecha_viaje=hoy
+        ).select_related(
+            'itinerario', 'bus', 'horario', 'empresa'
+        ).prefetch_related('ayudantes', 'itinerario__detalles__parada__localidad')
+
+        data = []
+        for viaje in viajes_en_curso:
+            ubicacion = None
+            personas = [viaje.chofer] + list(viaje.ayudantes.all())
+            for p in personas:
+                ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
+                if ub:
+                    ubicacion = ub
+                    break
+
+            pasajes_activos = viaje.pasajes.filter(
+                estado__in=['vendido', 'reservado', 'abordado']
+            ).values('asiento_id').distinct().count()
+            asientos_libres = viaje.bus.capacidad_asientos - pasajes_activos
+
+            detalles = viaje.itinerario.detalles.select_related('parada', 'parada__localidad').order_by('orden')
+            paradas = []
+            proxima_parada = None
+            eta_minutos = None
+
+            for d in detalles:
+                p_data = {
+                    'nombre': d.parada.nombre,
+                    'lat': float(d.parada.latitud_gps) if d.parada.latitud_gps else None,
+                    'lng': float(d.parada.longitud_gps) if d.parada.longitud_gps else None,
+                }
+                paradas.append(p_data)
+                
+                # Calcular proxima parada si tenemos ubicación
+                if ubicacion and not proxima_parada and p_data['lat']:
+                    dist = calcular_km(float(ubicacion.latitud), float(ubicacion.longitud), p_data['lat'], p_data['lng'])
+                    # Si el bus está a más de 0.5km y es una parada futura (simplificado)
+                    if dist > 0.5:
+                        proxima_parada = d.parada.nombre
+                        velocidad = float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh and ubicacion.velocidad_kmh > 10 else 40
+                        eta_minutos = math.ceil((dist / velocidad) * 60)
+
+            viaje_data = {
+                'id': viaje.pk,
+                'itinerario': viaje.itinerario.nombre,
+                'empresa': viaje.empresa.nombre if viaje.empresa else '',
+                'bus_placa': viaje.bus.placa,
+                'hora_salida': viaje.horario.hora_salida.strftime('%H:%M') if viaje.horario else '--:--',
+                'asientos_libres': asientos_libres,
+                'asientos_ocupados': pasajes_activos,
+                'asientos_totales': viaje.bus.capacidad_asientos,
+                'proxima_parada': proxima_parada,
+                'eta': eta_minutos,
+                'ubicacion': {
+                    'lat': float(ubicacion.latitud),
+                    'lng': float(ubicacion.longitud),
+                    'velocidad': float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh else 0,
+                    'heading': float(ubicacion.heading) if ubicacion.heading else 0,
+                } if ubicacion else None,
+            }
+            data.append(viaje_data)
+
+        return JsonResponse({'viajes': data, 'total': len(data)})
+
+
+
+class APIActualizarUbicacionView(LoginRequiredMixin, View):
+    """API para que los ayudantes/choferes actualicen su ubicación GPS."""
+
+    def post(self, request):
+        import json
+        try:
+            body = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        lat = body.get('latitud')
+        lng = body.get('longitud')
+        velocidad = body.get('velocidad')
+        heading = body.get('heading')
+
+        if lat is None or lng is None:
+            return JsonResponse({'error': 'latitud y longitud son requeridos'}, status=400)
+
+        persona = getattr(request.user, 'persona', None)
+        if not persona:
+            return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
+
+        if not (persona.es_ayudante or persona.es_chofer or persona.es_empleado):
+            return JsonResponse({'error': 'No autorizado para enviar ubicación'}, status=403)
+
+        # Buscar viaje en curso asignado a esta persona
+        hoy = timezone.now().date()
+        viaje_actual = None
+
+        # Primero buscar como chofer
+        viaje_como_chofer = Viaje.objects.filter(
+            chofer=persona, estado='en_curso', fecha_viaje=hoy
+        ).first()
+        if viaje_como_chofer:
+            viaje_actual = viaje_como_chofer
+        else:
+            # Buscar como ayudante
+            viaje_como_ayudante = Viaje.objects.filter(
+                ayudantes=persona, estado='en_curso', fecha_viaje=hoy
+            ).first()
+            if viaje_como_ayudante:
+                viaje_actual = viaje_como_ayudante
+
+        # Actualizar o crear ubicación
+        ub, created = UbicacionAyudante.objects.update_or_create(
+            persona=persona,
+            activo=True,
+            defaults={
+                'latitud': lat,
+                'longitud': lng,
+                'velocidad_kmh': velocidad,
+                'heading': heading,
+                'viaje': viaje_actual,
+            }
+        )
+
+        return JsonResponse({
+            'ok': True,
+            'viaje_id': viaje_actual.pk if viaje_actual else None,
+            'timestamp': ub.timestamp.isoformat(),
+        })
+
+
+class APIDesactivarUbicacionView(LoginRequiredMixin, View):
+    """Desactiva la ubicación cuando el ayudante cierra sesión o sale."""
+
+    def post(self, request):
+        persona = getattr(request.user, 'persona', None)
+        if persona:
+            UbicacionAyudante.objects.filter(persona=persona, activo=True).update(activo=False)
+        return JsonResponse({'ok': True})
+
+
+# =============================================================================
+# RESERVAS DE PASAJES PARA CLIENTES
+# =============================================================================
+
+class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
+    """Vista para que el cliente busque viajes disponibles."""
+    template_name = 'users/buscar_viajes.html'
+    
+    def get(self, request, *args, **kwargs):
+        # Limpiar reservas expiradas antes de mostrar resultados
+        from .utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ahora = timezone.now()
+        hoy = ahora.date()
+        hora_actual = ahora.time()
+
+        # Itinerarios activos (para el selector)
+        context['itinerarios'] = Itinerario.objects.filter(activo=True).order_by('nombre')
+
+        # Obtener filtros
+        itinerario_id = self.request.GET.get('itinerario')
+        origen_id = self.request.GET.get('origen_id')
+        destino_id = self.request.GET.get('destino_id')
+        fecha = self.request.GET.get('fecha')
+
+        # Determinar si se ha realizado una búsqueda activa
+        ha_buscado = any([itinerario_id, origen_id, destino_id, fecha])
+        context['ha_buscado'] = ha_buscado
+
+        if not ha_buscado:
+            # Si no ha buscado, retornar lista vacía y terminar
+            context['viajes'] = []
+            context['viajes_count'] = 0
+            return context
+
+        # Consulta base (solo si hay filtros)
+        viajes = Viaje.objects.filter(
+            Q(fecha_viaje__gt=hoy) | Q(fecha_viaje=hoy, horario__hora_salida__gt=hora_actual),
+            estado='programado',
+        ).select_related(
+            'itinerario', 'bus', 'chofer', 'horario', 'empresa'
+        )
+
+        # Filtrado por tramo (Origen -> Destino) mejorado
+        if origen_id and destino_id:
+            from django.db.models import Subquery, OuterRef, F
+            from itineraries.models import DetalleItinerario
+            
+            # Subconsulta para obtener el orden del origen
+            sub_origen = DetalleItinerario.objects.filter(
+                itinerario_id=OuterRef('itinerario_id'),
+                parada_id=origen_id
+            ).values('orden')[:1]
+            
+            # Subconsulta para obtener el orden del destino
+            sub_destino = DetalleItinerario.objects.filter(
+                itinerario_id=OuterRef('itinerario_id'),
+                parada_id=destino_id
+            ).values('orden')[:1]
+            
+            # Aplicar anotaciones y filtrar por secuencia correcta
+            viajes = viajes.annotate(
+                orden_o=Subquery(sub_origen),
+                orden_d=Subquery(sub_destino)
+            ).filter(
+                orden_o__isnull=False,
+                orden_d__isnull=False,
+                orden_o__lt=F('orden_d')
+            )
+            
+            # Guardar nombres para reconstruir el buscador en el template
+            from fleet.models import Parada
+            context['origen_nombre'] = Parada.objects.filter(pk=origen_id).values_list('nombre', flat=True).first()
+            context['destino_nombre'] = Parada.objects.filter(pk=destino_id).values_list('nombre', flat=True).first()
+            context['origen_id'] = origen_id
+            context['destino_id'] = destino_id
+        
+        elif origen_id:
+            viajes = viajes.filter(itinerario__detalles__parada_id=origen_id).distinct()
+            context['origen_id'] = origen_id
+        elif destino_id:
+            viajes = viajes.filter(itinerario__detalles__parada_id=destino_id).distinct()
+            context['destino_id'] = destino_id
+
+        if itinerario_id:
+            viajes = viajes.filter(itinerario_id=itinerario_id)
+            context['itinerario_seleccionado'] = itinerario_id
+
+        if fecha:
+            viajes = viajes.filter(fecha_viaje=fecha)
+            context['fecha_seleccionada'] = fecha
+
+        # Ordenar y contar
+        context['viajes'] = viajes.order_by('fecha_viaje', 'horario__hora_salida')
+        context['viajes_count'] = context['viajes'].count()
+
+        # Agregar info de ocupación a cada viaje
+        viajes_con_info = []
+        for viaje in viajes[:20]:
+            pasajes_activos = viaje.pasajes.filter(
+                estado__in=['vendido', 'reservado']
+            ).values('asiento_id').distinct().count()
+            viajes_con_info.append({
+                'viaje': viaje,
+                'asientos_libres': viaje.bus.capacidad_asientos - pasajes_activos,
+                'asientos_total': viaje.bus.capacidad_asientos,
+                'porcentaje_ocupacion': viaje.porcentaje_ocupacion,
+            })
+
+        context['viajes'] = viajes_con_info
+        return context
+
+
+class ReservarPasajeView(LoginRequiredMixin, TemplateView):
+    """Vista de reserva de pasaje para clientes con selector gráfico de asientos."""
+    template_name = 'users/reservar_pasaje.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        viaje_pk = self.kwargs.get('viaje_pk')
+        viaje = get_object_or_404(
+            Viaje.objects.select_related('itinerario', 'bus', 'horario', 'empresa', 'chofer'),
+            pk=viaje_pk
+        )
+        context['viaje'] = viaje
+
+        # Paradas del itinerario en orden
+        detalles = viaje.itinerario.detalles.select_related(
+            'parada', 'parada__localidad'
+        ).order_by('orden')
+        context['detalles_itinerario'] = detalles
+
+        # Todos los asientos del bus
+        asientos = viaje.bus.asientos.all().order_by('piso', 'numero_asiento')
+        context['asientos'] = asientos
+
+        return context
+
+
+class APIAsientosSegmentoView(LoginRequiredMixin, View):
+    """API que devuelve la disponibilidad de asientos para un segmento origen→destino."""
+
+    def get(self, request, viaje_pk):
+        viaje = get_object_or_404(Viaje, pk=viaje_pk)
+        parada_origen_id = request.GET.get('origen')
+        parada_destino_id = request.GET.get('destino')
+
+        if not parada_origen_id or not parada_destino_id:
+            return JsonResponse({'error': 'origen y destino requeridos'}, status=400)
+
+        try:
+            parada_origen = Parada.objects.get(pk=parada_origen_id)
+            parada_destino = Parada.objects.get(pk=parada_destino_id)
+        except Parada.DoesNotExist:
+            return JsonResponse({'error': 'Parada no encontrada'}, status=404)
+
+        from .utils import obtener_orden_parada, obtener_asientos_disponibles, obtener_mapa_ocupacion
+
+        orden_origen = obtener_orden_parada(viaje, parada_origen)
+        orden_destino = obtener_orden_parada(viaje, parada_destino)
+
+        if orden_origen is None or orden_destino is None:
+            return JsonResponse({'error': 'Las paradas no pertenecen al itinerario'}, status=400)
+
+        if orden_origen >= orden_destino:
+            return JsonResponse({'error': 'El origen debe estar antes del destino'}, status=400)
+
+        # Asientos disponibles para el segmento
+        asientos_disponibles = obtener_asientos_disponibles(viaje, orden_origen, orden_destino)
+        asientos_disponibles_ids = set(asientos_disponibles.values_list('id', flat=True))
+
+        # Todos los asientos del bus
+        todos = viaje.bus.asientos.all().order_by('piso', 'numero_asiento')
+
+        # Mapa de ocupación
+        mapa_ocupacion = obtener_mapa_ocupacion(viaje)
+
+        # Precio
+        precio = None
+        # 1. Intento exacto: Por paradas e itinerario específico
+        precio_obj = Precio.objects.filter(
+            itinerario=viaje.itinerario,
+            origen=parada_origen,
+            destino=parada_destino
+        ).first()
+
+        if precio_obj:
+            precio = float(precio_obj.precio)
+        else:
+            # 2. Intento por paradas (independientemente del itinerario)
+            precio_alternativo = Precio.objects.filter(
+                origen=parada_origen,
+                destino=parada_destino
+            ).first()
+            if precio_alternativo:
+                precio = float(precio_alternativo.precio)
+            else:
+                # 3. Intento por NOMBRES (cuando hay paradas duplicadas para distintas empresas)
+                # Buscamos cualquier precio que coincida con los nombres de origen y destino
+                precio_por_nombre = Precio.objects.filter(
+                    origen__nombre=parada_origen.nombre,
+                    destino__nombre=parada_destino.nombre
+                ).first()
+                if precio_por_nombre:
+                    precio = float(precio_por_nombre.precio)
+                else:
+                    # 4. Intento por NOMBRES DE LOCALIDAD (Exacto)
+                    precio_localidad = Precio.objects.filter(
+                        origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
+                        destino__localidad__nombre__iexact=parada_destino.localidad.nombre
+                    ).first()
+                    if precio_localidad:
+                        precio = float(precio_localidad.precio)
+                    else:
+                        # 5. Intento SUPER FUZZY (Parcial): ej "Terminal Caaguazu" contiene "Caaguazu"
+                        # Limpiamos el nombre para buscar coincidencias parciales
+                        o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        
+                        if len(o_search) > 3 and len(d_search) > 3:
+                            precio_fuzzy = Precio.objects.filter(
+                                Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
+                                Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
+                            ).first()
+                            if precio_fuzzy:
+                                precio = float(precio_fuzzy.precio)
+
+        asientos_data = []
+        for asiento in todos:
+            info = {
+                'id': asiento.pk,
+                'numero': asiento.numero_asiento,
+                'piso': asiento.piso,
+                'tipo': asiento.get_tipo_asiento_display(),
+                'disponible': asiento.pk in asientos_disponibles_ids,
+            }
+            # Info de ocupación para asientos no disponibles
+            if asiento.pk in mapa_ocupacion:
+                ocupaciones = mapa_ocupacion[asiento.pk]
+                info['ocupaciones'] = []
+                for oc in ocupaciones:
+                    info['ocupaciones'].append({
+                        'pasajero': oc['pasajero'],
+                        'desde': oc['parada_origen'],
+                        'hasta': oc['parada_destino'],
+                        'orden_origen': oc['orden_origen'],
+                        'orden_destino': oc['orden_destino'],
+                    })
+            asientos_data.append(info)
+
+        return JsonResponse({
+            'asientos': asientos_data,
+            'disponibles': len(asientos_disponibles_ids),
+            'total': todos.count(),
+            'precio': precio,
+            'orden_origen': orden_origen,
+            'orden_destino': orden_destino,
+        })
+
+
+class CrearReservaClienteView(LoginRequiredMixin, View):
+    """Crea una reserva de pasaje para un cliente. Le da 30 min para pagar."""
+
+    def post(self, request, viaje_pk):
+        import json
+        viaje = get_object_or_404(Viaje, pk=viaje_pk)
+
+        try:
+            body = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        asiento_ids = body.get('asiento_ids', [])
+        # Caso retrocompatible
+        if not asiento_ids and body.get('asiento_id'):
+            asiento_ids = [body.get('asiento_id')]
+
+        parada_origen_id = body.get('parada_origen_id')
+        parada_destino_id = body.get('parada_destino_id')
+
+        if not all([asiento_ids, parada_origen_id, parada_destino_id]):
+            return JsonResponse({
+                'error': 'Asiento, parada origen y parada destino son requeridos'
+            }, status=400)
+
+        persona = getattr(request.user, 'persona', None)
+        if not persona:
+            return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
+
+        # Validar paradas
+        from .utils import obtener_orden_parada, asiento_disponible_en_tramo
+        from fleet.models import Asiento
+
+        try:
+            parada_origen = Parada.objects.get(pk=parada_origen_id)
+            parada_destino = Parada.objects.get(pk=parada_destino_id)
+        except Parada.DoesNotExist:
+            return JsonResponse({'error': 'Parada no encontrada'}, status=404)
+
+        orden_origen = obtener_orden_parada(viaje, parada_origen)
+        orden_destino = obtener_orden_parada(viaje, parada_destino)
+
+        if orden_origen is None or orden_destino is None:
+            return JsonResponse({'error': 'Paradas no pertenecen al itinerario'}, status=400)
+
+        if orden_origen >= orden_destino:
+            return JsonResponse({'error': 'Origen debe ser anterior al destino'}, status=400)
+
+        # Validar disponibilidad de TODOS los asientos solicitados
+        asientos = []
+        for a_id in asiento_ids:
+            try:
+                asiento = Asiento.objects.get(pk=a_id, bus=viaje.bus)
+                if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
+                    return JsonResponse({
+                        'error': f'El asiento {asiento.numero_asiento} ya no está disponible en ese tramo'
+                    }, status=409)
+                asientos.append(asiento)
+            except Asiento.DoesNotExist:
+                 return JsonResponse({'error': f'Asiento ID {a_id} no encontrado'}, status=404)
+
+        # Calcular precio
+        precio = 0
+        try:
+            precio_obj = Precio.objects.get(
+                itinerario=viaje.itinerario,
+                origen=parada_origen,
+                destino=parada_destino
+            )
+            precio = precio_obj.precio
+        except Precio.DoesNotExist:
+            return JsonResponse({
+                'error': 'No hay precio definido para ese tramo. Contacte a la empresa.'
+            }, status=400)
+
+        from datetime import datetime
+        if viaje.horario:
+            fecha_hora_salida = timezone.make_aware(
+                datetime.combine(viaje.fecha_viaje, viaje.horario.hora_salida)
+            )
+            limite_pago = fecha_hora_salida - timedelta(minutes=30)
+        else:
+            limite_pago = timezone.now() + timedelta(minutes=30)
+            
+        if timezone.now() >= limite_pago:
+            return JsonResponse({
+                'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la salida) ha concluido.'
+            }, status=400)
+
+        # Crear reservas
+        pasajes = []
+        for asiento in asientos:
+            pasaje = Pasaje(
+                viaje=viaje,
+                asiento=asiento,
+                pasajero=persona,
+                parada_origen=parada_origen,
+                parada_destino=parada_destino,
+                orden_origen=orden_origen,
+                orden_destino=orden_destino,
+                precio=precio,
+                estado='reservado',
+                vendedor=request.user,
+                fecha_limite_pago=limite_pago,
+            )
+            pasaje.save()
+            pasajes.append(pasaje)
+
+        # Generar data de respuesta (usamos el primer pasaje para la cabecera)
+        p_main = pasajes[0]
+        codigos = ", ".join([p.codigo for p in pasajes])
+        numero_asientos = ", ".join([str(p.asiento.numero_asiento) for p in pasajes])
+        precio_total = sum([p.precio for p in pasajes])
+
+        comprobante_url = reverse('operations:pasaje_comprobante', kwargs={'pk': p_main.pk})
+        if len(pasajes) > 1:
+             # Nota: Se podría crear una vista de comprobante grupal, por ahora permitimos ver el primero
+             # y listamos todos los códigos si es necesario.
+             pass
+
+        return JsonResponse({
+            'ok': True,
+            'pasaje': {
+                'id': p_main.pk,
+                'codigo': codigos,
+                'asiento': numero_asientos,
+                'origen': parada_origen.nombre,
+                'destino': parada_destino.nombre,
+                'precio': float(precio_total),
+                'fecha_limite_pago': p_main.fecha_limite_pago.strftime('%d/%m/%Y %H:%M'),
+                'estado': 'reservado',
+                'comprobante_url': comprobante_url,
+                'cantidad': len(pasajes),
+            },
+            'mensaje': (
+                f'¡Reserva confirmada de {len(pasajes)} asiento(s)! Asientos: {numero_asientos}. '
+                f'Tiene hasta 30 minutos antes de la salida para poder abonar en la agencia (Límite: {p_main.fecha_limite_pago.strftime("%d/%m/%Y %H:%M")}), '
+                f'de lo contrario su reserva se cancela automáticamente, por lo que dichos asientos quedarán libres. '
+            ),
+        })
+
+
+class PasajeComprobanteView(LoginRequiredMixin, DetailView):
+    """Vista simplificada para imprimir el comprobante de reserva."""
+    model = Pasaje
+    template_name = 'operations/pasaje_comprobante.html'
+    context_object_name = 'pasaje'
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return super().get_queryset()
+        persona = getattr(self.request.user, 'persona', None)
+        return super().get_queryset().filter(pasajero=persona)
+
+
+class PasajeEnviarCorreoView(LoginRequiredMixin, View):
+    """Vista para enviar el comprobante de reserva por correo."""
+
+    def post(self, request, pk):
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        from django.conf import settings
+
+        pasaje = get_object_or_404(Pasaje, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+
+        if not persona or (pasaje.pasajero != persona and not request.user.is_staff):
+            return JsonResponse({'error': 'No tiene permiso para realizar esta acción'}, status=403)
+
+        if not persona.email:
+            return JsonResponse({'error': 'Su perfil no tiene un correo electrónico registrado'}, status=400)
+
+        # Renderizar mensaje
+        mensaje_html = f"""
+        Hola {persona.nombre},
+        
+        Su reserva ha sido confirmada con éxito.
+        
+        CÓDIGO: {pasaje.codigo}
+        ASIENTO: {pasaje.asiento.numero_asiento}
+        VIAJE: {pasaje.viaje.itinerario.nombre}
+        FECHA: {pasaje.viaje.fecha_viaje.strftime('%d/%m/%Y')} a las {pasaje.viaje.horario.hora_salida.strftime('%H:%M')} HS
+        PRECIO: Gs. {int(pasaje.precio)}
+        LÍMITE DE PAGO: {pasaje.fecha_limite_pago.strftime('%d/%m/%Y %H:%M')}
+        
+        Recuerde abonar antes del límite, de lo contrario la reserva será cancelada.
+        
+        Gracias por viajar con TR4CKING.
+        """
+
+        try:
+            send_mail(
+                subject='Comprobante de Reserva - TR4CKING',
+                message=mensaje_html,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[persona.email],
+                fail_silently=False,
+            )
+            return JsonResponse({'ok': True, 'mensaje': f'El comprobante ha sido enviado a {persona.email}'})
+        except Exception as e:
+            return JsonResponse({'error': f'Error al enviar el correo: {str(e)}'}, status=500)
+
+class APICrearEncomiendaFacturacionView(LoginRequiredMixin, View):
+    """API para crear una encomienda rápidamente desde la pantalla de facturación."""
+
+    def post(self, request):
+        import json
+        from .forms import EncomiendaForm
+        
+        # El formulario espera un QueryDict o similar, pero podemos pasarle el POST directamente
+        form = EncomiendaForm(request.POST)
+        
+        if form.is_valid():
+            encomienda = form.save(commit=False)
+            
+            # Obtener remitente
+            remitente_id = form.cleaned_data.get('remitente_id')
+            try:
+                remitente = Persona.objects.get(cedula=remitente_id)
+            except Persona.DoesNotExist:
+                return JsonResponse({'error': 'Remitente no encontrado'}, status=404)
+            
+            # Obtener o crear destinatario
+            cedula_destinatario = form.cleaned_data.get('cedula_destinatario')
+            try:
+                destinatario = Persona.objects.get(cedula=cedula_destinatario)
+            except Persona.DoesNotExist:
+                destinatario = Persona.objects.create(
+                    cedula=cedula_destinatario,
+                    nombre=form.cleaned_data.get('nombre_destinatario'),
+                    apellido=form.cleaned_data.get('apellido_destinatario'),
+                    telefono=form.cleaned_data.get('telefono_destinatario'),
+                    es_cliente=True
+                )
+            
+            encomienda.remitente = remitente
+            encomienda.destinatario = destinatario
+            encomienda.registrador = request.user
+            encomienda.save()
+            
+            return JsonResponse({
+                'ok': True,
+                'encomienda': {
+                    'pk': encomienda.pk,
+                    'codigo': encomienda.codigo,
+                    'tipo': encomienda.get_tipo_display(),
+                    'descripcion': encomienda.descripcion[:30] if encomienda.descripcion else '-',
+                    'destino': encomienda.parada_destino.nombre if encomienda.parada_destino else '-',
+                    'precio': float(encomienda.precio)
+                }
+            })
+        else:
+            # Retornar errores de validación
+            errors = {field: error_list[0]['message'] for field, error_list in form.errors.get_json_data().items()}
+            return JsonResponse({'error': 'Datos inválidos', 'details': errors}, status=400)

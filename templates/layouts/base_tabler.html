@@ -131,12 +131,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/demo.min.js" defer></script>
     
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <script>
-        document.body.addEventListener('htmx:configRequest', (event) => {
-            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-        });
-    </script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     
     <script>
         $(document).ready(function() {
@@ -153,6 +148,61 @@
             });
         });
     </script>
+    
+    {% if request.user.is_authenticated and request.user.persona %}
+    {% if request.user.persona.es_ayudante or request.user.persona.es_chofer %}
+    <!-- GPS Tracking para Ayudantes/Choferes -->
+    <script>
+    (function() {
+        if (!navigator.geolocation) return;
+        
+        const CSRF_TOKEN = '{{ csrf_token }}';
+        const UPDATE_URL = '/operations/api/actualizar-ubicacion/';
+        const DEACTIVATE_URL = '/operations/api/desactivar-ubicacion/';
+        let watchId = null;
+        
+        function enviarUbicacion(pos) {
+            const data = {
+                latitud: pos.coords.latitude,
+                longitud: pos.coords.longitude,
+                velocidad: pos.coords.speed ? (pos.coords.speed * 3.6) : null, // m/s -> km/h
+                heading: pos.coords.heading || null,
+            };
+            
+            fetch(UPDATE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN,
+                },
+                body: JSON.stringify(data),
+            }).catch(() => {});
+        }
+        
+        // Iniciar tracking
+        watchId = navigator.geolocation.watchPosition(
+            enviarUbicacion,
+            function(err) { console.log('GPS error:', err.message); },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+        );
+        
+        // También enviar periódicamente
+        setInterval(function() {
+            navigator.geolocation.getCurrentPosition(enviarUbicacion, function() {}, {
+                enableHighAccuracy: true, maximumAge: 10000
+            });
+        }, 15000);
+        
+        // Al cerrar la sesión/pestaña, desactivar
+        window.addEventListener('beforeunload', function() {
+            navigator.sendBeacon(DEACTIVATE_URL, new URLSearchParams({
+                'csrfmiddlewaretoken': CSRF_TOKEN
+            }));
+        });
+    })();
+    </script>
+    {% endif %}
+    {% endif %}
     
     <!-- Custom JS -->
     {% block extra_js %}{% endblock %}

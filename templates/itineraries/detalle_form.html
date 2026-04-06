@@ -266,6 +266,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const formLoc = document.getElementById('formNuevaLocalidad');
     const btnSaveLoc = document.getElementById('btnGuardarLocalidad');
     
+    // Abrir modal localidad desde el modal de parada sin cerrar el primero
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.btn-open-localidad-modal')) {
+            const modalLoc = new bootstrap.Modal(modalLocEl);
+            modalLoc.show();
+        }
+    });
+    
     let mapLoc = null;
     let markerLoc = null;
     
@@ -362,8 +370,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 1. Actualizar el selector en el modal de parada
                 const selectLoc = document.querySelector('#formNuevaParada #id_localidad');
                 const opt = new Option(data.nombre, data.id, true, true);
-                selectLoc.add(opt);
+                if (selectLoc) {
+                    selectLoc.add(opt);
+                    // Disparar cambio para Select2 si existe
+                    $(selectLoc).trigger('change');
+                }
                 
+                // 1.5. Copiar coordenadas al formulario de parada
+                const latLoc = document.getElementById('id_latitud');
+                const lngLoc = document.getElementById('id_longitud');
+                const latPar = document.querySelector('#formNuevaParada #id_latitud_gps');
+                const lngPar = document.querySelector('#formNuevaParada #id_longitud_gps');
+                
+                if (latLoc && latPar && latLoc.value) latPar.value = latLoc.value;
+                if (lngLoc && lngPar && lngLoc.value) lngPar.value = lngLoc.value;
+
                 // 2. Cerrar el modal de localidad
                 const modalLoc = bootstrap.Modal.getInstance(modalLocEl);
                 modalLoc.hide();
@@ -374,6 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     mapLoc.removeLayer(markerLoc);
                     markerLoc = null;
                 }
+                document.getElementById('map-instructions-loc').classList.remove('hidden');
                 
                 // 4. Actualizar el buscador de localidades a la derecha si existe
                 const pickerList = document.getElementById('localityPickerList');
@@ -405,10 +427,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Fix para scroll en modales anidados
+    // Fix para scroll y backdrop en modales anidados
     modalLocEl.addEventListener('hidden.bs.modal', function () {
         if ($('.modal.show').length > 0) {
             $('body').addClass('modal-open');
+            // Asegurar que el modal de parada tenga el foco
+            const modalPar = bootstrap.Modal.getInstance(modalParEl);
+            if (modalPar) {
+                // Pequeño delay para que Bootstrap termine su animación de cierre
+                setTimeout(() => {
+                    modalParEl.focus();
+                }, 100);
+            }
         }
     });
 

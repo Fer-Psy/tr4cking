@@ -16,9 +16,9 @@ class PersonaAdmin(admin.ModelAdmin):
     """Admin para gestionar personas (clientes, empleados, pasajeros)."""
     list_display = (
         'cedula', 'nombre_completo', 'telefono', 'email',
-        'es_empleado', 'es_cliente', 'es_pasajero'
+        'es_empleado', 'es_cliente'
     )
-    list_filter = ('es_empleado', 'es_cliente', 'es_pasajero')
+    list_filter = ('es_empleado', 'es_cliente')
     search_fields = ('cedula', 'nombre', 'apellido', 'telefono', 'email')
     ordering = ('apellido', 'nombre')
     fieldsets = (
@@ -30,7 +30,7 @@ class PersonaAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
         ('Roles', {
-            'fields': ('es_empleado', 'es_cliente', 'es_pasajero'),
+            'fields': ('es_empleado', 'es_cliente'),
         }),
     )
 

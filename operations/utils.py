@@ -5,6 +5,25 @@ Lógica core del sistema de ocupación de asientos.
 from django.db.models import Q
 
 
+def limpiar_reservas_expiradas():
+    """
+    Cancela automáticamente las reservas cuyo tiempo límite de pago ha expirado.
+    """
+    from .models import Pasaje
+    from django.utils import timezone
+    
+    expiradas = Pasaje.objects.filter(
+        estado='reservado',
+        fecha_limite_pago__lt=timezone.now()
+    )
+    if expiradas.exists():
+        expiradas.update(
+            estado='cancelado',
+            motivo_cancelacion='Reserva cancelada automáticamente (tiempo límite expirado)',
+            fecha_cancelacion=timezone.now()
+        )
+
+
 def asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
     """
     Verifica si un asiento está disponible para un tramo específico del viaje.
@@ -24,6 +43,8 @@ def asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
         bool: True si el asiento está disponible en ese tramo
     """
     from .models import Pasaje
+    
+    limpiar_reservas_expiradas()
     
     pasajes_conflicto = Pasaje.objects.filter(
         viaje=viaje,
@@ -49,6 +70,8 @@ def obtener_asientos_disponibles(viaje, orden_origen, orden_destino):
         QuerySet de Asiento disponibles para ese tramo
     """
     from .models import Pasaje
+    
+    limpiar_reservas_expiradas()
     
     todos_los_asientos = viaje.bus.asientos.all()
     
@@ -86,6 +109,8 @@ def obtener_mapa_ocupacion(viaje):
         }
     """
     from .models import Pasaje
+    
+    limpiar_reservas_expiradas()
     
     pasajes = Pasaje.objects.filter(
         viaje=viaje,

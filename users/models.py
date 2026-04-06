@@ -59,6 +59,18 @@ class Persona(models.Model):
     telefono = models.CharField(max_length=30, verbose_name="Teléfono")
     email = models.EmailField(max_length=254, blank=True, null=True, verbose_name="Email")
     direccion = models.TextField(blank=True, null=True, verbose_name="Dirección")
+    latitud = models.DecimalField(
+        max_digits=9, decimal_places=6, 
+        null=True, blank=True,
+        verbose_name="Latitud",
+        help_text="Coordenada latitud de la dirección"
+    )
+    longitud = models.DecimalField(
+        max_digits=9, decimal_places=6, 
+        null=True, blank=True,
+        verbose_name="Longitud",
+        help_text="Coordenada longitud de la dirección"
+    )
     
     empresa = models.ForeignKey(
         'fleet.Empresa', 
@@ -75,7 +87,7 @@ class Persona(models.Model):
     es_chofer = models.BooleanField(default=False, verbose_name="Es chofer")
     es_ayudante = models.BooleanField(default=False, verbose_name="Es ayudante de transporte")
     es_cliente = models.BooleanField(default=False, verbose_name="Es cliente")
-    es_pasajero = models.BooleanField(default=False, verbose_name="Es pasajero")
+
 
     class Meta:
         verbose_name = "Persona"

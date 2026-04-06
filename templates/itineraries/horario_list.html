@@ -103,6 +103,10 @@
                                     class="btn btn-ghost btn-icon btn-sm" title="Ver itinerario">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                <a href="{% url 'itineraries:horario_edit' horario.pk %}"
+                                    class="btn btn-ghost btn-icon btn-sm text-primary" title="Editar horario">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
                                 <a href="{% url 'itineraries:horario_delete' horario.pk %}"
                                     class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
                                     <i class="bi bi-trash"></i>

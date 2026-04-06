@@ -660,6 +660,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const localidadSelect = document.getElementById('id_localidad');
     const modalEl = document.getElementById('modalLocalidad');
     
+    // Abrir modal localidad
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.btn-open-localidad-modal')) {
+            const modalLoc = new bootstrap.Modal(modalEl);
+            modalLoc.show();
+        }
+    });
+    
     // ==========================================
     // Carga automática de coordenadas al cambiar localidad
     // ==========================================
@@ -871,7 +879,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     const option = new Option(data.nombre, data.id, true, true);
-                    localidadSelect.add(option);
+                    if (localidadSelect) {
+                        localidadSelect.add(option);
+                        // Disparar cambio para Select2 si existe
+                        $(localidadSelect).trigger('change');
+                    }
                     
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     modal.hide();

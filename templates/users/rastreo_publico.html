@@ -1,0 +1,285 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Sigue tu Bus - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #mapa-publico {
+        height: calc(100vh - 220px);
+        min-height: 500px;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        z-index: 1;
+    }
+    .viaje-card-public {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+    .viaje-card-public:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(32, 107, 196, 0.15);
+    }
+    .eta-badge {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .bus-marker-public {
+        background: transparent;
+        border: none;
+    }
+    .bus-marker-inner {
+        width: 44px;
+        height: 44px;
+        background: #206bc4;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 20px rgba(32, 107, 196, 0.5);
+        border: 3px solid white;
+        position: relative;
+    }
+    .bus-marker-inner i { color: white; font-size: 1.2rem; }
+    
+    .bus-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #2fb344;
+        color: white;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        font-size: 10px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .popup-public-header {
+        background: #1e293b;
+        color: white;
+        padding: 12px;
+        border-radius: 12px 12px 0 0;
+        margin: -14px -14px 10px -14px;
+    }
+    .popup-stats {
+        display: flex;
+        justify-content: space-around;
+        background: #f8fafc;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+        border: 1px solid #e2e8f0;
+    }
+    .stat-item { text-align: center; }
+    .stat-value { font-weight: 800; display: block; font-size: 1.1rem; }
+    .stat-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; }
+
+    .btn-reserve-map {
+        background: #2fb344;
+        color: white;
+        border: none;
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        text-align: center;
+        display: block;
+        margin-top: 10px;
+        transition: background 0.2s;
+    }
+    .btn-reserve-map:hover { background: #248a35; color: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-xl">
+    <div class="row row-cards mb-3">
+        <div class="col-md-8">
+            <h2 class="page-title mb-1">Rastreo de Buses en Tiempo Real</h2>
+            <p class="text-muted">Visualiza la ubicación actual de los buses y el tiempo estimado de llegada.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <span class="badge bg-green-lt p-2 px-3">
+                <span class="stat-pulse me-2"></span> Actualizando cada 30 seg
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Mapa Principal -->
+        <div class="col-lg-8">
+            <div id="mapa-publico"></div>
+        </div>
+
+        <!-- Lista de Viajes Activos -->
+        <div class="col-lg-4">
+            <div id="lista-viajes-publicos" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+                {% for viaje in viajes_en_curso %}
+                <div class="card viaje-card-public" id="card-viaje-{{ viaje.pk }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h3 class="h4 mb-0 fw-bold">{{ viaje.itinerario.nombre }}</h3>
+                                <div class="text-muted small">{{ viaje.empresa.nombre }}</div>
+                            </div>
+                            <span class="badge bg-blue-lt">En Camino</span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1"><i class="bi bi-geo-alt me-1"></i>Próxima Parada:</div>
+                            <div class="fw-bold" id="next-stop-{{ viaje.pk }}">Cargando...</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="eta-badge" id="eta-{{ viaje.pk }}">
+                                <i class="bi bi-clock"></i> <span>-- min</span>
+                            </div>
+                            <div id="reserve-btn-container-{{ viaje.pk }}">
+                                <!-- Botón condicional -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="card p-5 text-center text-muted">
+                    <i class="bi bi-bus-front fs-1 opacity-25"></i>
+                    <p class="mt-3">No hay viajes en ruta en este momento.</p>
+                    <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-primary btn-sm">Ver programación</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('mapa-publico', {
+        zoomControl: true,
+        attributionControl: false
+    }).setView([-25.3, -57.5], 8);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+
+    let markers = {};
+
+    function getPopupContent(v) {
+        let etaHtml = v.eta ? `<div class="mt-2 fw-bold text-primary"><i class="bi bi-hourglass-split me-1"></i>Llegada estimada: ${v.eta} min</div>` : '';
+        let reserveBtn = v.asientos_libres > 0 ? `<a href="/operations/reservar/${v.id}/" class="btn-reserve-map">Reservar Asiento</a>` : '<div class="alert alert-warning py-1 mt-2 mb-0 small text-center">Bus Lleno</div>';
+        
+        return `
+            <div style="min-width: 250px;">
+                <div class="popup-public-header">
+                    <div class="fw-bold">${v.itinerario}</div>
+                    <small>${v.empresa}</small>
+                </div>
+                <div class="p-1">
+                    <div class="small mb-1"><i class="bi bi-clock me-1"></i>Salida: ${v.hora_salida} hs</div>
+                    <div class="small mb-1"><i class="bi bi-geo-alt me-1"></i>Próxima: ${v.proxima_parada || 'Confirmando...'}</div>
+                    
+                    <div class="popup-stats">
+                        <div class="stat-item text-success">
+                            <span class="stat-value">${v.asientos_libres}</span>
+                            <span class="stat-label">Libres</span>
+                        </div>
+                        <div class="stat-item text-danger">
+                            <span class="stat-value">${v.asientos_ocupados}</span>
+                            <span class="stat-label">Ocupados</span>
+                        </div>
+                        <div class="stat-item text-muted">
+                            <span class="stat-value">${v.asientos_totales}</span>
+                            <span class="stat-label">Total</span>
+                        </div>
+                    </div>
+
+                    ${etaHtml}
+                    ${reserveBtn}
+                </div>
+            </div>`;
+    }
+
+    function actualizar() {
+        fetch("{% url 'operations:api_viajes_publico' %}")
+            .then(r => r.json())
+            .then(data => {
+                data.viajes.forEach(v => {
+                    // Actualizar UI lateral
+                    const nextStop = document.getElementById(`next-stop-${v.id}`);
+                    if (nextStop) nextStop.textContent = v.proxima_parada || 'En trayecto';
+                    
+                    const etaBox = document.getElementById(`eta-${v.id}`);
+                    if (etaBox) {
+                        etaBox.querySelector('span').textContent = v.eta ? `${v.eta} min` : '--';
+                        etaBox.style.display = v.eta ? 'inline-flex' : 'none';
+                    }
+
+                    const rbContainer = document.getElementById(`reserve-btn-container-${v.id}`);
+                    if (rbContainer) {
+                        rbContainer.innerHTML = v.asientos_libres > 0 
+                            ? `<a href="/operations/reservar/${v.id}/" class="btn btn-success btn-sm rounded-pill">Reservar</a>`
+                            : `<span class="badge bg-secondary-lt">Completo</span>`;
+                    }
+
+                    if (v.ubicacion) {
+                        const latlng = [v.ubicacion.lat, v.ubicacion.lng];
+                        if (markers[v.id]) {
+                            markers[v.id].setLatLng(latlng).setPopupContent(getPopupContent(v));
+                            // Actualizar el número en el icono (badge)
+                            markers[v.id].setIcon(L.divIcon({
+                                className: 'bus-marker-public',
+                                html: `
+                                    <div class="bus-marker-inner">
+                                        <i class="bi bi-bus-front-fill"></i>
+                                        <div class="bus-badge" title="Asientos disponibles">${v.asientos_libres}</div>
+                                    </div>`,
+                                iconSize: [44, 44],
+                                iconAnchor: [22, 22],
+                                popupAnchor: [0, -22]
+                            }));
+                        } else {
+                            const marker = L.marker(latlng, {
+                                icon: L.divIcon({
+                                    className: 'bus-marker-public',
+                                    html: `
+                                        <div class="bus-marker-inner">
+                                            <i class="bi bi-bus-front-fill"></i>
+                                            <div class="bus-badge" title="Asientos disponibles">${v.asientos_libres}</div>
+                                        </div>`,
+                                    iconSize: [44, 44],
+                                    iconAnchor: [22, 22],
+                                    popupAnchor: [0, -22]
+                                })
+                            }).addTo(map).bindPopup(getPopupContent(v));
+                            markers[v.id] = marker;
+                            
+                            // Si es el primero, centrar
+                            if (Object.keys(markers).length === 1) map.setView(latlng, 12);
+                        }
+                    }
+                });
+            });
+    }
+
+    actualizar();
+    setInterval(actualizar, 30000);
+</script>
+{% endblock %}

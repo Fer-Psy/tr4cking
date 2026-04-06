@@ -1,0 +1,173 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Editar Perfil | TR4CKING{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+    #map-container {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e6e7e9;
+    }
+    #map {
+        height: 480px;
+        width: 100%;
+        z-index: 1;
+        cursor: crosshair;
+    }
+    .map-instructions {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        background: rgba(32, 107, 196, 0.9);
+        color: white;
+        padding: 6px 15px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        pointer-events: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    Gestionar Mi Perfil
+                </h2>
+                <div class="text-muted mt-1">Actualiza tus datos de acceso y contacto</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row g-4 justify-content-center">
+            <div class="col-lg-7">
+                <form action="" method="post" class="card shadow-sm border-0" id="perfil-form">
+                    {% csrf_token %}
+                    <div class="card-body p-4">
+                        {% crispy form %}
+                    </div>
+                    <div class="card-footer bg-light p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'users:dashboard_cliente' %}" class="btn btn-link text-muted">
+                                <i class="bi bi-arrow-left me-1"></i> Volver al Panel
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-save me-1"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Map Selection -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="bi bi-geo-alt me-2 text-info"></i>
+                            Mi Dirección de Entrega
+                        </h3>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btn-my-location" title="Usar mi ubicación actual">
+                            <i class="bi bi-crosshair me-1"></i> Mi Ubicación
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="map-container">
+                            <div class="map-instructions" id="map-instructions">
+                                <i class="bi bi-cursor-fill me-1"></i> Haz clic para marcar tu dirección
+                            </div>
+                            <div id="map"></div>
+                        </div>
+                    </div>
+                    <div class="card-footer py-3 text-secondary small">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        Esta ubicación se utilizará para que podamos entregarte tus encomiendas en puerta.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const latInput = document.getElementById('id_latitud');
+    const lngInput = document.getElementById('id_longitud');
+    
+    // Paraguay Default
+    const DEFAULT_LAT = -25.2867;
+    const DEFAULT_LNG = -57.3333;
+    
+    let initLat = latInput.value ? parseFloat(latInput.value) : DEFAULT_LAT;
+    let initLng = lngInput.value ? parseFloat(lngInput.value) : DEFAULT_LNG;
+    let initZoom = latInput.value ? 15 : 6;
+
+    const map = L.map('map').setView([initLat, initLng], initZoom);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    let marker;
+
+    if (latInput.value && lngInput.value) {
+        marker = L.marker([initLat, initLng], {draggable: true}).addTo(map);
+        document.getElementById('map-instructions').style.display = 'none';
+        marker.on('dragend', function(e) {
+            updateCoords(e.target.getLatLng());
+        });
+    }
+
+    map.on('click', function(e) {
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng, {draggable: true}).addTo(map);
+            document.getElementById('map-instructions').style.display = 'none';
+            marker.on('dragend', function(e) {
+                updateCoords(e.target.getLatLng());
+            });
+        }
+        updateCoords(e.latlng);
+    });
+
+    function updateCoords(coords) {
+        latInput.value = coords.lat.toFixed(6);
+        lngInput.value = coords.lng.toFixed(6);
+    }
+
+    document.getElementById('btn-my-location').addEventListener('click', function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 16);
+                const pos = L.latLng(lat, lng);
+                if (marker) {
+                    marker.setLatLng(pos);
+                } else {
+                    marker = L.marker(pos, {draggable: true}).addTo(map);
+                    document.getElementById('map-instructions').style.display = 'none';
+                }
+                updateCoords(pos);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

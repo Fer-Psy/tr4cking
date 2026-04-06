@@ -339,30 +339,38 @@ class BusUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         response = super().form_valid(form)
         
         if regenerar:
-            # Eliminar asientos existentes y regenerar
-            bus.asientos.all().delete()
-            
-            asientos = []
-            for i in range(1, nueva_capacidad + 1):
-                if pisos == 2:
-                    piso = 1 if i <= nueva_capacidad // 2 else 2
-                else:
-                    piso = 1
+            try:
+                # Eliminar asientos existentes y regenerar
+                bus.asientos.all().delete()
                 
-                asientos.append(Asiento(
-                    bus=bus,
-                    numero_asiento=i,
-                    piso=piso,
-                    tipo_asiento=tipo_asiento,
-                ))
-            
-            Asiento.objects.bulk_create(asientos)
-            
-            messages.success(
-                self.request, 
-                f"Bus {bus.placa} actualizado y {nueva_capacidad} asientos regenerados con tipo "
-                f"'{dict(Asiento.TIPO_ASIENTO_CHOICES).get(tipo_asiento, tipo_asiento)}'."
-            )
+                asientos = []
+                for i in range(1, nueva_capacidad + 1):
+                    if pisos == 2:
+                        piso = 1 if i <= nueva_capacidad // 2 else 2
+                    else:
+                        piso = 1
+                    
+                    asientos.append(Asiento(
+                        bus=bus,
+                        numero_asiento=i,
+                        piso=piso,
+                        tipo_asiento=tipo_asiento,
+                    ))
+                
+                Asiento.objects.bulk_create(asientos)
+                
+                messages.success(
+                    self.request, 
+                    f"Bus {bus.placa} actualizado y {nueva_capacidad} asientos regenerados con tipo "
+                    f"'{dict(Asiento.TIPO_ASIENTO_CHOICES).get(tipo_asiento, tipo_asiento)}'."
+                )
+            except ProtectedError:
+                messages.error(
+                    self.request,
+                    "No se pudieron regenerar los asientos porque algunos están asociados a pasajes "
+                    "activos. Por favor, revise y cancele los pasajes antes de regenerar."
+                )
+                return self.form_invalid(form)
         else:
             messages.success(
                 self.request, 
@@ -505,3 +513,22 @@ class ParadaCreateAjaxView(LoginRequiredMixin, CreateView):
             'success': False,
             'errors': form.errors.as_json()
         })
+
+def paradas_autocomplete_ajax(request):
+    """Retorna paradas filtradas por nombre o localidad para autocompletado."""
+    query = request.GET.get('q', '')
+    if len(query) < 2:
+        return JsonResponse([], safe=False)
+    
+    paradas = Parada.objects.filter(
+        Q(nombre__icontains=query) | Q(localidad__nombre__icontains=query)
+    ).select_related('localidad')[:10]
+    
+    results = [
+        {
+            'id': p.id,
+            'text': f"{p.nombre} ({p.localidad.nombre})"
+        } for p in paradas
+    ]
+    
+    return JsonResponse(results, safe=False)

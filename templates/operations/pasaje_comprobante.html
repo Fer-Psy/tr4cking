@@ -1,0 +1,124 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Comprobante de Reserva - {{ pasaje.codigo }} - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        body { background: white !important; }
+    }
+    .comprobante-header {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 1rem;
+        margin-bottom: 2rem;
+    }
+    .ticket-box {
+        border: 2px dashed #ccc;
+        padding: 2rem;
+        border-radius: 12px;
+        background: white;
+    }
+    .qr-placeholder {
+        width: 120px;
+        height: 120px;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #dee2e6;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-tight py-4">
+    <div class="text-center mb-4 no-print">
+        <div class="btn-group">
+            <button onclick="window.print()" class="btn btn-primary">
+                <i class="bi bi-printer me-2"></i>Imprimir Comprobante
+            </button>
+            <a href="{% url 'users:dashboard_cliente' %}" class="btn btn-outline-secondary">
+                Volver al Panel
+            </a>
+        </div>
+    </div>
+
+    <div class="card card-md">
+        <div class="card-body">
+            <div class="ticket-box">
+                <div class="comprobante-header text-center">
+                    <h1 class="mb-1">TR4CKING</h1>
+                    <p class="text-muted">Comprobante de Reserva de Pasaje</p>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 text-center mb-3">
+                        <div class="h3 fw-bold mb-1">CÓDIGO: {{ pasaje.codigo }}</div>
+                        <div class="badge bg-azure-lt">ESTADO: {{ pasaje.get_estado_display|upper }}</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">PASAJERO</div>
+                        <div class="fw-bold">{{ pasaje.pasajero.nombre_completo }}</div>
+                        <div class="small">CI: {{ pasaje.pasajero.cedula }}</div>
+                    </div>
+                    <div class="col-6 text-end">
+                        <div class="text-muted small">FECHA DE RESERVA</div>
+                        <div class="fw-bold">{{ pasaje.fecha_venta|date:"d/m/Y H:i" }}</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="hr-text">DETALLES DEL VIAJE</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">ORIGEN</div>
+                        <div class="fw-bold">{{ pasaje.parada_origen.nombre }}</div>
+                        <div class="small">{{ pasaje.parada_origen.localidad.nombre }}</div>
+                    </div>
+                    <div class="col-6 text-end">
+                        <div class="text-muted small">DESTINO</div>
+                        <div class="fw-bold">{{ pasaje.parada_destino.nombre }}</div>
+                        <div class="small">{{ pasaje.parada_destino.localidad.nombre }}</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">FECHA VIAJE</div>
+                        <div class="fw-bold">{{ pasaje.viaje.fecha_viaje|date:"d/m/Y" }}</div>
+                        <div class="fw-bold text-primary">{{ pasaje.viaje.horario.hora_salida|time:"H:i" }} HS</div>
+                    </div>
+                    <div class="col-6 text-end">
+                        <div class="text-muted small">ASIENTO</div>
+                        <div class="h2 fw-bold mb-0">#{{ pasaje.asiento.numero_asiento }}</div>
+                        <div class="small text-muted">{{ pasaje.asiento.get_tipo_asiento_display }}</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="hr-text">PAGO</div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="text-muted small">MONTO A PAGAR</div>
+                        <div class="h2 text-azure fw-bold mb-0">Gs. {{ pasaje.precio|floatformat:0 }}</div>
+                    </div>
+                    <div class="col-6 text-end text-danger">
+                        <div class="text-muted small">PAGAR ANTES DE</div>
+                        <div class="fw-bold">{{ pasaje.fecha_limite_pago|date:"d/m/Y H:i" }}</div>
+                        <div class="small">De lo contrario se cancelará.</div>
+                    </div>
+                </div>
+
+                <div class="mt-5 text-center">
+                    <div class="qr-placeholder mb-2">
+                        <i class="bi bi-qr-code" style="font-size: 4rem; opacity: 0.2;"></i>
+                    </div>
+                    <p class="text-muted small">Presente este comprobante en ventanilla para abonar y retirar su boleto oficial.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

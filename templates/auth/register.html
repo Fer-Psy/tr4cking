@@ -1,0 +1,156 @@
+{% extends 'layouts/base_tabler.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Registro de Cliente - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+    #map-container {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e6e7e9;
+        margin-top: 10px;
+    }
+    #map {
+        height: 440px;
+        width: 100%;
+        z-index: 1;
+        cursor: crosshair;
+    }
+    .map-instructions {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        background: rgba(32, 107, 196, 0.9);
+        color: white;
+        padding: 6px 15px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        pointer-events: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center g-4">
+    <div class="col-md-7 col-lg-6">
+        <div class="card card-md shadow-sm">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h2 class="h1 mb-2">Crear Cuenta de Cliente</h2>
+                    <p class="text-muted">Complete sus datos para empezar a utilizar el sistema.</p>
+                </div>
+                
+                <form method="post" autocomplete="off" id="register-form">
+                    {% csrf_token %}
+                    {% crispy form %}
+                    
+                    <div class="form-footer mt-4">
+                        <button type="submit" class="btn btn-primary w-100 py-2">
+                            <i class="bi bi-person-plus me-1"></i> Finalizar Registro
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center py-3 bg-light">
+                <span class="text-muted small">¿Ya tiene una cuenta?</span>
+                <a href="{% url 'login' %}" class="small fw-bold ms-1">Iniciar Sesión</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Selection -->
+    <div class="col-md-5 col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">
+                    <i class="bi bi-map me-2 text-info"></i>
+                    Dirección en el Mapa
+                </h3>
+                <button type="button" class="btn btn-sm btn-icon btn-ghost-primary" id="btn-my-location" title="Usar mi ubicación actual">
+                    <i class="bi bi-crosshair"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div id="map-container">
+                    <div class="map-instructions" id="map-instructions">
+                        <i class="bi bi-cursor-fill me-1"></i> Haz clic para marcar tu dirección
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div class="alert alert-info py-2 small mb-0">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Marcas tu lugar de entrega en el mapa nos ayuda a encontrarte más rápido con tus encomiendas.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inputs latitud/longitud están escondidos (HiddenInput)
+    const latInput = document.querySelector('input[name="latitud"]');
+    const lngInput = document.querySelector('input[name="longitud"]');
+    
+    // Asunción, Paraguay
+    const DEFAULT_LAT = -25.2867;
+    const DEFAULT_LNG = -57.3333;
+    
+    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    let marker;
+
+    map.on('click', function(e) {
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng, {draggable: true}).addTo(map);
+            document.getElementById('map-instructions').style.display = 'none';
+            marker.on('dragend', function(e) {
+                updateCoords(e.target.getLatLng());
+            });
+        }
+        updateCoords(e.latlng);
+    });
+
+    function updateCoords(coords) {
+        if(latInput && lngInput) {
+            latInput.value = coords.lat.toFixed(6);
+            lngInput.value = coords.lng.toFixed(6);
+        }
+    }
+
+    document.getElementById('btn-my-location').addEventListener('click', function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 16);
+                const pos = L.latLng(lat, lng);
+                if (marker) {
+                    marker.setLatLng(pos);
+                } else {
+                    marker = L.marker(pos, {draggable: true}).addTo(map);
+                    document.getElementById('map-instructions').style.display = 'none';
+                }
+                updateCoords(pos);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

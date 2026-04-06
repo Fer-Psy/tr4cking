@@ -1,0 +1,27 @@
+Python 3.14.2 (tags/v3.14.2:df79316, Dec  5 2025, 17:18:21) [MSC v.1944 64 bit (AMD64)] on win32
+Type "help", "copyright", "credits" or "license" for more information.
+(InteractiveConsole)
+33 objects imported automatically (use -v 2 for details).
+
+Ctrl click to launch VS Code Native REPL
+>>> >>> >>> >>> ... ... ... ... 
+=== 1: Asunción - Coronel Oviedo ===
+  ord=1 parada_id=11 -> San Lorenzo
+  ord=2 parada_id=12 -> Itacurubi
+  ord=3 parada_id=4 -> Terminal Coronel Oviedo
+
+=== 13: Coronel Oviedo-Caaguazu ===
+  ord=1 parada_id=3 -> Terminal Coronel Oviedo
+  ord=2 parada_id=10 -> Blas Garay (Desvio Troche)
+  ord=3 parada_id=13 -> Terminal Caaguazu
+
+=== 3: Coronel Oviedo-Encarnación ===
+  ord=1 parada_id=6 -> Aguapety
+  ord=2 parada_id=7 -> Mbocajaty
+  ord=3 parada_id=8 -> Terminal de Caazapá
+
+=== 2: Villarrica-Coronel Oviedo ===
+>>> 
+=== PARADAS 12 y 3 ===
+>>> ... ... 
+now exiting InteractiveConsole...

@@ -1,12 +1,12 @@
 <option value="">-- Seleccione un horario --</option>
 {% for h in horarios %}
-    <option value="{{ h.id }}" {% if h.es_pasado %}disabled data-warning="true"{% endif %}>
+    <option value="{{ h.id }}" 
+        {% if h.es_pasado %}disabled data-warning="true"{% endif %}
+        {% if h.id|stringformat:"s" == horario_id %}selected{% endif %}>
         {{ h.hora }}{% if h.es_pasado %} (YA PASÓ){% endif %}
     </option>
 {% empty %}
-    {% if request.GET.itinerario %}
-        <option value="" disabled>Sin horarios configurados para este itinerario</option>
-    {% endif %}
+    <option value="" disabled>Sin horarios configurados para este itinerario</option>
 {% endfor %}
 
 {% if itinerarios %}
@@ -21,7 +21,10 @@
 <select id="id_bus" name="bus" class="form-select" hx-swap-oob="true">
     <option value="">---------</option>
     {% for bus in buses %}
-        <option value="{{ bus.id }}">{{ bus.placa }} - {{ bus.marca }} {{ bus.modelo }}</option>
+        <option value="{{ bus.id }}" {% if bus.id == bus_pred_id %}selected{% endif %}>
+            {{ bus.placa }} - {{ bus.marca }} {{ bus.modelo }}
+            {% if bus.id == bus_pred_id %}(Asignado){% endif %}
+        </option>
     {% empty %}
         {% if request.GET.itinerario or request.GET.empresa %}
             <option value="" disabled>No hay buses registrados para esta empresa</option>
@@ -32,7 +35,10 @@
 <select id="id_chofer" name="chofer" class="form-select" hx-swap-oob="true">
     <option value="">---------</option>
     {% for c in choferes %}
-        <option value="{{ c.cedula }}">{{ c.apellido }}, {{ c.nombre }} ({{ c.cedula }})</option>
+        <option value="{{ c.cedula }}" {% if c.cedula == chofer_pred_cedula %}selected{% endif %}>
+            {{ c.apellido }}, {{ c.nombre }} ({{ c.cedula }})
+            {% if c.cedula == chofer_pred_cedula %}(Asignado){% endif %}
+        </option>
     {% empty %}
         {% if request.GET.empresa %}
             <option value="" disabled>No hay choferes para esta empresa</option>
@@ -42,6 +48,9 @@
 
 <select id="id_ayudantes" name="ayudantes" class="form-select select2-multiple" multiple hx-swap-oob="true">
     {% for a in ayudantes %}
-        <option value="{{ a.cedula }}">{{ a.apellido }}, {{ a.nombre }}</option>
+        <option value="{{ a.cedula }}" {% if a.cedula == ayudante_pred_cedula %}selected{% endif %}>
+            {{ a.apellido }}, {{ a.nombre }}
+            {% if a.cedula == ayudante_pred_cedula %}(Asignado){% endif %}
+        </option>
     {% endfor %}
 </select>

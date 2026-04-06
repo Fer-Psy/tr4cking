@@ -48,6 +48,31 @@ class Itinerario(models.Model):
         default=True, 
         verbose_name="Activo"
     )
+    
+    # Recursos predeterminados
+    bus_predeterminado = models.ForeignKey(
+        'fleet.Bus',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='itinerarios_predeterminados',
+        verbose_name="Bus predeterminado"
+    )
+    chofer_predeterminado = models.ForeignKey(
+        'users.Persona',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='itinerarios_como_chofer_pred',
+        verbose_name="Chofer predeterminado",
+        limit_choices_to={'es_chofer': True}
+    )
+    ayudante_predeterminado = models.ForeignKey(
+        'users.Persona',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='itinerarios_como_ayudante_pred',
+        verbose_name="Ayudante predeterminado",
+        limit_choices_to={'es_ayudante': True}
+    )
 
     class Meta:
         verbose_name = "Itinerario"
@@ -108,6 +133,31 @@ class Horario(models.Model):
     activo = models.BooleanField(
         default=True,
         verbose_name="Activo"
+    )
+    
+    # Recursos predeterminados (sobrescriben los del itinerario si existen)
+    bus_predeterminado = models.ForeignKey(
+        'fleet.Bus',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='horarios_predeterminados',
+        verbose_name="Bus predeterminado"
+    )
+    chofer_predeterminado = models.ForeignKey(
+        'users.Persona',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='horarios_como_chofer_pred',
+        verbose_name="Chofer predeterminado",
+        limit_choices_to={'es_chofer': True}
+    )
+    ayudante_predeterminado = models.ForeignKey(
+        'users.Persona',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='horarios_como_ayudante_pred',
+        verbose_name="Ayudante predeterminado",
+        limit_choices_to={'es_ayudante': True}
     )
 
     class Meta:

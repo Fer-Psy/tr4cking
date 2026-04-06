@@ -15,7 +15,11 @@ class ItinerarioForm(forms.ModelForm):
     
     class Meta:
         model = Itinerario
-        fields = ['empresa', 'nombre', 'ruta', 'distancia_total_km', 'duracion_estimada_hs', 'dias_semana', 'activo']
+        fields = [
+            'empresa', 'nombre', 'ruta', 'distancia_total_km', 'duracion_estimada_hs', 
+            'dias_semana', 'activo', 'bus_predeterminado', 'chofer_predeterminado', 
+            'ayudante_predeterminado'
+        ]
         widgets = {
             'nombre': forms.TextInput(attrs={'placeholder': 'Ej: Asunción - CDE (Directo)'}),
             'ruta': forms.TextInput(attrs={'placeholder': 'Ej: PY02'}),
@@ -56,7 +60,33 @@ class ItinerarioForm(forms.ModelForm):
                     ),
                 ),
             ),
+            Fieldset(
+                'Recursos Predeterminados',
+                Row(
+                    Column('bus_predeterminado', css_class='col-md-4'),
+                    Column('chofer_predeterminado', css_class='col-md-4'),
+                    Column('ayudante_predeterminado', css_class='col-md-4'),
+                ),
+                HTML('''
+                    <div class="form-text mt-n2 mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Estos recursos se asignarán automáticamente al programar un viaje siguiendo este itinerario.
+                    </div>
+                '''),
+            ),
         )
+        
+        # Filtrar si ya existe la empresa (edición o creación con itinerario prefijado)
+        empresa = getattr(self.instance, 'empresa', None)
+        if not empresa and 'empresa' in self.initial:
+            empresa = self.initial['empresa']
+        
+        if empresa:
+            from users.models import Persona
+            from fleet.models import Bus
+            self.fields['bus_predeterminado'].queryset = Bus.objects.filter(empresa=empresa)
+            self.fields['chofer_predeterminado'].queryset = Persona.objects.filter(empresa=empresa, es_chofer=True)
+            self.fields['ayudante_predeterminado'].queryset = Persona.objects.filter(empresa=empresa, es_ayudante=True)
     
     def clean_dias_semana(self):
         dias = self.cleaned_data['dias_semana']
@@ -84,7 +114,13 @@ class DetalleItinerarioForm(forms.ModelForm):
         self.itinerario = itinerario
         
         # Mejorar las etiquetas de las paradas en el selector
-        self.fields['parada'].queryset = Parada.objects.all().select_related('localidad').order_by('localidad__nombre', 'nombre')
+        paradas_qs = Parada.objects.all().select_related('localidad').order_by('localidad__nombre', 'nombre')
+        
+        # Filtrar paradas por la empresa del itinerario si está disponible
+        if self.itinerario and self.itinerario.empresa:
+            paradas_qs = paradas_qs.filter(empresa=self.itinerario.empresa)
+            
+        self.fields['parada'].queryset = paradas_qs
         self.fields['parada'].label_from_instance = lambda obj: f"{obj.localidad.nombre}: {obj.nombre}"
         
         self.helper = FormHelper()
@@ -123,7 +159,10 @@ class HorarioForm(forms.ModelForm):
     
     class Meta:
         model = Horario
-        fields = ['itinerario', 'hora_salida', 'activo']
+        fields = [
+            'itinerario', 'hora_salida', 'activo', 
+            'bus_predeterminado', 'chofer_predeterminado', 'ayudante_predeterminado'
+        ]
         widgets = {
             'hora_salida': forms.TimeInput(attrs={'type': 'time'}),
         }
@@ -157,7 +196,43 @@ class HorarioForm(forms.ModelForm):
                 ),
             )
         )
+        layout_elements.append(
+            Fieldset(
+                'Recursos Predeterminados (Opcional)',
+                Row(
+                    Column('bus_predeterminado', css_class='col-md-4'),
+                    Column('chofer_predeterminado', css_class='col-md-4'),
+                    Column('ayudante_predeterminado', css_class='col-md-4'),
+                ),
+                HTML('''
+                    <div class="form-text mt-n2 mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Si se definen, estos recursos prevalecen sobre los del itinerario para este horario específico.
+                    </div>
+                '''),
+            )
+        )
         self.helper.layout = Layout(*layout_elements)
+        
+        # Filtrar recursos por empresa del itinerario
+        it = self.itinerario_fijo
+        if not it and self.instance.pk:
+            it = self.instance.itinerario
+        
+        # Si no lo encontramos pero hay un valor inicial en el campo, lo recuperamos
+        if not it and self.fields['itinerario'].initial:
+            val = self.fields['itinerario'].initial
+            if isinstance(val, Itinerario):
+                it = val
+            else:
+                it = Itinerario.objects.filter(pk=val).first()
+            
+        if it and it.empresa:
+            from users.models import Persona
+            from fleet.models import Bus
+            self.fields['bus_predeterminado'].queryset = Bus.objects.filter(empresa=it.empresa)
+            self.fields['chofer_predeterminado'].queryset = Persona.objects.filter(empresa=it.empresa, es_chofer=True)
+            self.fields['ayudante_predeterminado'].queryset = Persona.objects.filter(empresa=it.empresa, es_ayudante=True)
     
     def clean(self):
         cleaned_data = super().clean()
@@ -170,6 +245,32 @@ class HorarioForm(forms.ModelForm):
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
                 raise forms.ValidationError(f"Ya existe un horario a las {hora.strftime('%H:%M')} en {itinerario.nombre}.")
+        
+        # Validar exclusividad de chofer predeterminado
+        chofer = cleaned_data.get('chofer_predeterminado')
+        if chofer:
+            exists_chofer = Horario.objects.filter(chofer_predeterminado=chofer)
+            if self.instance.pk:
+                exists_chofer = exists_chofer.exclude(pk=self.instance.pk)
+            if exists_chofer.exists():
+                h = exists_chofer.first()
+                raise forms.ValidationError(
+                    f"El chofer {chofer.nombre_completo} ya está asignado como predeterminado "
+                    f"en el horario {h.hora_salida.strftime('%H:%M')} de {h.itinerario.nombre}."
+                )
+        
+        # Validar exclusividad de ayudante predeterminado
+        ayudante = cleaned_data.get('ayudante_predeterminado')
+        if ayudante:
+            exists_ayudante = Horario.objects.filter(ayudante_predeterminado=ayudante)
+            if self.instance.pk:
+                exists_ayudante = exists_ayudante.exclude(pk=self.instance.pk)
+            if exists_ayudante.exists():
+                h = exists_ayudante.first()
+                raise forms.ValidationError(
+                    f"El ayudante {ayudante.nombre_completo} ya está asignado como predeterminado "
+                    f"en el horario {h.hora_salida.strftime('%H:%M')} de {h.itinerario.nombre}."
+                )
         
         # Si se pasó itinerario fijo, forzar que los datos limpios lo tengan
         if self.itinerario_fijo:

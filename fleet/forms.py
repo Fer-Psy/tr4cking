@@ -69,7 +69,7 @@ class ParadaForm(forms.ModelForm):
                     Column(
                         Div(
                             Field('localidad', wrapper_class='flex-grow-1 mb-0'),
-                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalLocalidad" title="Nueva Localidad"><i class="bi bi-plus-lg"></i></button>'),
+                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2 btn-open-localidad-modal" style="margin-top: 28px;" title="Nueva Localidad"><i class="bi bi-plus-lg"></i></button>'),
                             css_class='d-flex align-items-start'
                         ),
                         css_class='col-md-6'
@@ -199,6 +199,31 @@ class BusForm(forms.ModelForm):
                 '''),
             ),
         )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        regenerar = cleaned_data.get('regenerar_asientos')
+        
+        # Validar si se puede regenerar (solo edición)
+        if regenerar and self.instance.pk:
+            from django.apps import apps
+            try:
+                Pasaje = apps.get_model('operations', 'Pasaje')
+                # Verificar si existen pasajes activos para este bus
+                # Excluimos cancelados porque esos sí permiten reconfiguración
+                tiene_pasajes = Pasaje.objects.filter(
+                    asiento__bus=self.instance
+                ).exclude(estado='cancelado').exists()
+                
+                if tiene_pasajes:
+                    self.add_error('regenerar_asientos', 
+                        "No es posible regenerar los asientos porque este bus tiene pasajes activos "
+                        "(vendidos o reservados). Debe cancelar o reubicar estos pasajes primero.")
+            except (LookupError, ValueError):
+                # Si el app operations no está cargado, ignoramos (ej: tests aislados)
+                pass
+                
+        return cleaned_data
 
 
 class AsientoForm(forms.ModelForm):

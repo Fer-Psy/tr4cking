@@ -85,6 +85,10 @@ Viaje: {{ viaje.itinerario.nombre }}
             <a href="{% url 'operations:incidencia_viaje_create' viaje.pk %}" class="btn btn-outline-danger">
                 <i class="bi bi-exclamation-triangle me-1"></i> Reportar Incidencia
             </a>
+            
+            <a href="{% url 'operations:viaje_create' %}?itinerario={{ viaje.itinerario_id }}&horario={{ viaje.horario_id }}&fecha={{ proxima_fecha_sugerida }}" class="btn btn-outline-info">
+                <i class="bi bi-calendar-plus me-1"></i> Programar Siguiente
+            </a>
         </div>
     </div>
 </div>

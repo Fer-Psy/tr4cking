@@ -182,73 +182,278 @@
 </div>
 
 <!-- Recent Activity -->
-<div class="col-12">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Últimas Personas Registradas</h3>
-            <div class="card-actions">
-                <a href="{% url 'users:persona_list' %}" class="btn btn-sm btn-outline-primary">Ver Todas</a>
+<div class="row row-deck row-cards">
+    <!-- Últimas Personas -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-people-fill me-2 text-primary"></i>Últimas Personas
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'users:persona_list' %}" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
             </div>
-        </div>
-        
-        {% if ultimas_personas %}
-        <div class="table-responsive">
-            <table class="table card-table table-vcenter text-nowrap datatable">
-                <thead>
-                    <tr>
-                        <th class="w-1">Cédula</th>
-                        <th>Nombre Completo</th>
-                        <th>Teléfono</th>
-                        <th>Email</th>
-                        <th>Rol</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for persona in ultimas_personas %}
-                    <tr>
-                        <td><span class="text-muted">{{ persona.cedula }}</span></td>
-                        <td>
-                            <a href="#" class="text-reset" tabindex="-1">{{ persona.nombre_completo }}</a>
-                        </td>
-                        <td>
-                            {{ persona.telefono }}
-                        </td>
-                        <td>
-                            {{ persona.email|default:"-" }}
-                        </td>
-                        <td>
-                            {% if persona.es_empleado %}
-                            <span class="badge bg-blue text-blue-fg">Empleado</span>
-                            {% endif %}
-                            {% if persona.es_cliente %}
-                            <span class="badge bg-green text-green-fg">Cliente</span>
-                            {% endif %}
-                            {% if persona.es_pasajero %}
-                            <span class="badge bg-secondary text-secondary-fg">Pasajero</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty">
-            <div class="empty-icon">
-                <i class="bi bi-people h1"></i>
+            {% if ultimas_personas %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th class="w-1">Cédula</th>
+                            <th>Nombre</th>
+                            <th>Teléfono</th>
+                            <th>Rol</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for persona in ultimas_personas %}
+                        <tr>
+                            <td><span class="text-muted">{{ persona.cedula }}</span></td>
+                            <td>
+                                <a href="{{ persona.get_absolute_url }}" class="text-reset">{{ persona.nombre_completo }}</a>
+                            </td>
+                            <td>{{ persona.telefono }}</td>
+                            <td>
+                                {% if persona.es_empleado %}<span class="badge bg-blue text-blue-fg me-1">Empleado</span>{% endif %}
+                                {% if persona.es_cliente %}<span class="badge bg-green text-green-fg me-1">Cliente</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <p class="empty-title">No hay personas registradas</p>
-            <p class="empty-subtitle text-secondary">
-                Comienza agregando la primera persona al sistema.
-            </p>
-            <div class="empty-action">
-                <a href="{% url 'users:persona_create' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-lg me-2"></i>
-                    Agregar Persona
-                </a>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-people h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay personas registradas</p>
+                </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
+    </div>
+
+    <!-- Últimos Buses -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-bus-front-fill me-2 text-green"></i>Últimos Buses
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'fleet:bus_list' %}" class="btn btn-sm btn-outline-success">Ver Todos</a>
+                </div>
+            </div>
+            {% if ultimos_buses %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Marca / Modelo</th>
+                            <th>Empresa</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bus in ultimos_buses %}
+                        <tr>
+                            <td>
+                                <a href="{{ bus.get_absolute_url }}" class="text-reset fw-bold">{{ bus.placa }}</a>
+                            </td>
+                            <td>{{ bus.marca|default:"-" }} {{ bus.modelo|default:"" }}</td>
+                            <td><span class="text-muted">{{ bus.empresa.nombre }}</span></td>
+                            <td>
+                                {% if bus.estado == 'activo' %}
+                                <span class="badge bg-green text-green-fg">Activo</span>
+                                {% elif bus.estado == 'mantenimiento' %}
+                                <span class="badge bg-yellow text-yellow-fg">Mantenimiento</span>
+                                {% else %}
+                                <span class="badge bg-red text-red-fg">Inactivo</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-bus-front h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay buses registrados</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimas Empresas -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-building me-2 text-yellow"></i>Últimas Empresas
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'fleet:empresa_list' %}" class="btn btn-sm btn-outline-warning">Ver Todas</a>
+                </div>
+            </div>
+            {% if ultimas_empresas %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>RUC</th>
+                            <th>Teléfono</th>
+                            <th>Email</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for empresa in ultimas_empresas %}
+                        <tr>
+                            <td>
+                                <a href="{{ empresa.get_absolute_url }}" class="text-reset fw-bold">{{ empresa.nombre }}</a>
+                            </td>
+                            <td><span class="text-muted">{{ empresa.ruc }}</span></td>
+                            <td>{{ empresa.telefono|default:"-" }}</td>
+                            <td>{{ empresa.email|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-building h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay empresas registradas</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimos Itinerarios -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-map-fill me-2 text-red"></i>Últimos Itinerarios
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'itineraries:itinerario_list' %}" class="btn btn-sm btn-outline-danger">Ver Todos</a>
+                </div>
+            </div>
+            {% if ultimos_itinerarios %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Empresa</th>
+                            <th>Días</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for itinerario in ultimos_itinerarios %}
+                        <tr>
+                            <td>
+                                <a href="{{ itinerario.get_absolute_url }}" class="text-reset fw-bold">{{ itinerario.nombre }}</a>
+                            </td>
+                            <td><span class="text-muted">{{ itinerario.empresa.nombre|default:"-" }}</span></td>
+                            <td><span class="text-muted small">{{ itinerario.dias_operacion_texto }}</span></td>
+                            <td>
+                                {% if itinerario.activo %}
+                                <span class="badge bg-green text-green-fg">Activo</span>
+                                {% else %}
+                                <span class="badge bg-red text-red-fg">Inactivo</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-map h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay itinerarios registrados</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimos Viajes -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-geo-alt-fill me-2 text-purple"></i>Últimos Viajes Programados
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:viaje_list' %}" class="btn btn-sm btn-outline-purple">Ver Todos</a>
+                </div>
+            </div>
+            {% if ultimos_viajes %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Itinerario</th>
+                            <th>Fecha</th>
+                            <th>Horario</th>
+                            <th>Bus</th>
+                            <th>Chofer</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for viaje in ultimos_viajes %}
+                        <tr>
+                            <td>
+                                <a href="{{ viaje.get_absolute_url }}" class="text-reset fw-bold">{{ viaje.itinerario.nombre }}</a>
+                            </td>
+                            <td>{{ viaje.fecha_viaje|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if viaje.horario %}
+                                <span class="text-muted">{{ viaje.horario.hora_salida|time:"H:i" }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="text-muted">{{ viaje.bus.placa }}</span></td>
+                            <td>{{ viaje.chofer.nombre_completo }}</td>
+                            <td>
+                                {% if viaje.estado == 'programado' %}
+                                <span class="badge bg-blue text-blue-fg">Programado</span>
+                                {% elif viaje.estado == 'en_curso' %}
+                                <span class="badge bg-yellow text-yellow-fg">En Curso</span>
+                                {% elif viaje.estado == 'completado' %}
+                                <span class="badge bg-green text-green-fg">Completado</span>
+                                {% elif viaje.estado == 'cancelado' %}
+                                <span class="badge bg-red text-red-fg">Cancelado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-geo-alt h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay viajes registrados</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}
+

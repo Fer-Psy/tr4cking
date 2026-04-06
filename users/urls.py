@@ -22,4 +22,9 @@ urlpatterns = [
     path('localidades/<int:pk>/', views.LocalidadDetailView.as_view(), name='localidad_detail'),
     path('localidades/<int:pk>/editar/', views.LocalidadUpdateView.as_view(), name='localidad_update'),
     path('localidades/<int:pk>/eliminar/', views.LocalidadDeleteView.as_view(), name='localidad_delete'),
+    
+    # Registro y Dashboard público
+    path('registro/', views.ClienteRegistroView.as_view(), name='cliente_registro'),
+    path('perfil/', views.ClientePerfilUpdateView.as_view(), name='perfil'),
+    path('dashboard/', views.DashboardClienteView.as_view(), name='dashboard_cliente'),
 ]

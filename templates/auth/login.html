@@ -59,7 +59,26 @@
 {% endblock %}
 
 {% block auth_footer %}
-<div class="auth-footer">
-    ¿No tienes una cuenta? <a href="#">Contacta al administrador</a>
+<div class="auth-footer text-center mt-3">
+    ¿No tienes una cuenta? <a href="{% url 'users:cliente_registro' %}" 
+       hx-get="{% url 'users:cliente_registro' %}" 
+       hx-target="#modal-register-content" 
+       data-bs-toggle="modal" 
+       data-bs-target="#modal-register">Regístrate como cliente</a>
+</div>
+
+<!-- Modal de Registro -->
+<div class="modal fade" id="modal-register" tabindex="-1" aria-labelledby="modalRegisterLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div id="modal-register-content">
+                <div class="modal-body text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

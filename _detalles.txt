@@ -1,0 +1,9 @@
+it_id=1 it=Asunción - Coronel Oviedo | ord=1 parada_id=11 parada=San Lorenzo
+it_id=1 it=Asunción - Coronel Oviedo | ord=2 parada_id=12 parada=Itacurubi
+it_id=1 it=Asunción - Coronel Oviedo | ord=3 parada_id=4 parada=Terminal Coronel Oviedo
+it_id=3 it=Coronel Oviedo-Encarnación | ord=1 parada_id=6 parada=Aguapety
+it_id=3 it=Coronel Oviedo-Encarnación | ord=2 parada_id=7 parada=Mbocajaty
+it_id=3 it=Coronel Oviedo-Encarnación | ord=3 parada_id=8 parada=Terminal de Caazapá
+it_id=13 it=Coronel Oviedo-Caaguazu | ord=1 parada_id=3 parada=Terminal Coronel Oviedo
+it_id=13 it=Coronel Oviedo-Caaguazu | ord=2 parada_id=10 parada=Blas Garay (Desvio Troche)
+it_id=13 it=Coronel Oviedo-Caaguazu | ord=3 parada_id=13 parada=Terminal Caaguazu

@@ -1,3 +1,4 @@
+{% load static %}
 <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
@@ -14,6 +15,64 @@
 
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
+                {% if request.user.persona.es_cliente and not request.user.is_staff and not request.user.is_superuser %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.view_name == 'users:dashboard_cliente' %}active{% endif %}"
+                        href="{% url 'users:dashboard_cliente' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-house-door"></i>
+                        </span>
+                        <span class="nav-link-title">Mi Panel</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.view_name == 'users:perfil' %}active{% endif %}"
+                        href="{% url 'users:perfil' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-person-circle"></i>
+                        </span>
+                        <span class="nav-link-title">Mi Perfil</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'buscar_viajes' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:buscar_viajes' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <span class="nav-link-title">Buscar Viajes</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'reservar' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:buscar_viajes' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-ticket-perforated"></i>
+                        </span>
+                        <span class="nav-link-title">Mis Pasajes</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.view_name == 'operations:rastreo_publico' %}active{% endif %}" 
+                       href="{% url 'operations:rastreo_publico' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-geo-alt-fill" style="color: #4dabf7;"></i>
+                        </span>
+                        <span class="nav-link-title">Rastrear Mi Bus</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-box-seam"></i>
+                        </span>
+                        <span class="nav-link-title">Mis Encomiendas</span>
+                    </a>
+                </li>
+
+                {% elif request.user.is_superuser or not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
+                <!-- ==========================================================================
+                     MENÚ PARA ADMIN / STAFF / SUPERUSER
+                     ========================================================================== -->
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
                         href="{% url 'dashboard' %}">
@@ -106,6 +165,7 @@
                 <li class="nav-item">
                     <a class="nav-link {% if 'operations:dashboard' == request.resolver_match.view_name %}active{% endif %}"
                         href="{% url 'operations:dashboard' %}">
+
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="bi bi-clipboard2-data"></i>
                         </span>
@@ -137,6 +197,15 @@
                             <i class="bi bi-box-seam"></i>
                         </span>
                         <span class="nav-link-title">Encomiendas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'rastreo' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:rastreo_mapa' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-broadcast" style="color: #4dabf7;"></i>
+                        </span>
+                        <span class="nav-link-title">Rastreo en Vivo</span>
                     </a>
                 </li>
 
@@ -197,6 +266,69 @@
                         <span class="nav-link-title">Reportes</span>
                     </a>
                 </li>
+
+                {% else %}
+                <!-- ==========================================================================
+                     MENÚ PARA AYUDANTES / CHOFERES (RESTRINGIDO)
+                     ========================================================================== -->
+                <li class="nav-item">
+                    <a class="nav-link {% if 'dashboard_ayudante' in request.resolver_match.view_name %}active{% endif %}"
+                        href="{% url 'operations:dashboard_ayudante' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-person-badge" style="color: #63d471;"></i>
+                        </span>
+                        <span class="nav-link-title">Mi Panel</span>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link {% if 'persona' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'users:persona_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-people"></i>
+                        </span>
+                        <span class="nav-link-title">Personas / Crear Cliente</span>
+                    </a>
+                </li>
+
+                <li class="nav-item header">Operaciones</li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'caja' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:caja_dashboard' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-cash-stack"></i>
+                        </span>
+                        <span class="nav-link-title">Caja</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'factura' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:factura_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-receipt"></i>
+                        </span>
+                        <span class="nav-link-title">Facturas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'pendientes' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:clientes_pendientes_factura' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-person-lines-fill"></i>
+                        </span>
+                        <span class="nav-link-title">Pendientes Factura</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'encomienda' in request.resolver_match.url_name %}active{% endif %}"
+                        href="{% url 'operations:encomienda_list' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="bi bi-box-seam"></i>
+                        </span>
+                        <span class="nav-link-title">Entregas Encomiendas</span>
+                    </a>
+                </li>
+                {% endif %}
             </ul>
         </div>
     </div>

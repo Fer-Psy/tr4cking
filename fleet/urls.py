@@ -20,6 +20,7 @@ urlpatterns = [
     path('paradas/nuevo/ajax/', views.ParadaCreateAjaxView.as_view(), name='parada_create_ajax'),
     path('paradas/<int:pk>/', views.ParadaDetailView.as_view(), name='parada_detail'),
     path('paradas/<int:pk>/editar/', views.ParadaUpdateView.as_view(), name='parada_update'),
+    path('paradas/autocomplete/', views.paradas_autocomplete_ajax, name='parada_autocomplete'),
     path('paradas/<int:pk>/eliminar/', views.ParadaDeleteView.as_view(), name='parada_delete'),
     
     # Buses

@@ -1,0 +1,311 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Buscar Viajes - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-hero {
+        background: linear-gradient(135deg, #1a2035 0%, #206bc4 100%);
+        border-radius: 16px;
+        padding: 2.5rem;
+        color: white;
+        margin-bottom: 2rem;
+    }
+    .search-hero h2 {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    .viaje-resultado {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    .viaje-resultado:hover {
+        border-color: var(--tblr-primary);
+        box-shadow: 0 4px 20px rgba(32,107,196,0.15);
+        transform: translateY(-2px);
+    }
+    .ruta-visual {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0.5rem 0;
+    }
+    .ruta-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--tblr-primary);
+        flex-shrink: 0;
+    }
+    .ruta-line {
+        flex-grow: 1;
+        height: 2px;
+        background: linear-gradient(90deg, var(--tblr-primary), #4dabf7);
+    }
+    .disponibilidad-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .disponibilidad-alta { background: #d3f9d8; color: #2b8a3e; }
+    .disponibilidad-media { background: #fff3cd; color: #856404; }
+    .disponibilidad-baja { background: #f8d7da; color: #721c24; }
+    .filter-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .input-group-flat { position: relative; }
+    .autocomplete-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e6e7e9;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        display: none;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .autocomplete-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 0.9rem;
+    }
+    .autocomplete-item:hover {
+        background: #f1f3f5;
+    }
+    .autocomplete-item strong { color: var(--tblr-primary); }
+</style>
+{% endblock %}
+
+{% block title_content %}Buscar Viajes Disponibles{% endblock %}
+
+{% block content %}
+<!-- Hero de búsqueda -->
+<div class="search-hero">
+    <div class="row align-items-center">
+        <div class="col-md-7">
+            <h2><i class="bi bi-search me-2"></i>Encuentra tu próximo viaje</h2>
+            <p class="mb-0 opacity-75">Busca por ruta, fecha y reserva tu asiento online</p>
+        </div>
+        <div class="col-md-5 text-end d-none d-md-block">
+            <i class="bi bi-bus-front" style="font-size: 5rem; opacity: 0.15;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card filter-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">
+                    <i class="bi bi-geo-alt me-1 text-primary"></i>Origen
+                </label>
+                <div class="input-group input-group-flat">
+                    <input type="text" id="origen_input" class="form-control" autocomplete="off" placeholder="Escriba origen..." value="{{ origen_nombre|default:'' }}">
+                    <span class="input-group-text">
+                        <a href="javascript:void(0)" id="clear_origen" class="link-secondary" title="Limpiar" data-bs-toggle="tooltip">
+                            <i class="bi bi-x-circle"></i>
+                        </a>
+                    </span>
+                    <input type="hidden" name="origen_id" id="origen_id" value="{{ origen_id|default:'' }}">
+                    <div id="origen_results" class="autocomplete-results"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">
+                    <i class="bi bi-geo-alt-fill me-1 text-danger"></i>Destino
+                </label>
+                <div class="input-group input-group-flat">
+                    <input type="text" id="destino_input" class="form-control" autocomplete="off" placeholder="Escriba destino..." value="{{ destino_nombre|default:'' }}">
+                    <span class="input-group-text">
+                        <a href="javascript:void(0)" id="clear_destino" class="link-secondary" title="Limpiar" data-bs-toggle="tooltip">
+                            <i class="bi bi-x-circle"></i>
+                        </a>
+                    </span>
+                    <input type="hidden" name="destino_id" id="destino_id" value="{{ destino_id|default:'' }}">
+                    <div id="destino_results" class="autocomplete-results"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">
+                    <i class="bi bi-calendar-event me-1 text-primary"></i>¿Cuándo viajas?
+                </label>
+                <input type="date" name="fecha" class="form-control" value="{{ fecha_seleccionada|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100" style="margin-top: auto;">
+                    <i class="bi bi-search me-1"></i>Buscar Viajes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resultados -->
+<div id="resultados">
+    {% if viajes %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">
+            <i class="bi bi-list-task me-2 text-primary"></i>
+            {{ viajes|length }} viaje{{ viajes|length|pluralize:"s" }} disponible{{ viajes|length|pluralize:"s" }}
+        </h3>
+    </div>
+
+    {% for info in viajes %}
+    <div class="viaje-resultado">
+        <div class="row align-items-center">
+            <div class="col-md-5">
+                <h4 class="fw-bold mb-1">{{ info.viaje.itinerario.nombre }}</h4>
+                <div class="text-muted small mb-1">
+                    <i class="bi bi-building me-1"></i>{{ info.viaje.empresa.nombre }}
+                </div>
+                <div class="ruta-visual">
+                    <div class="ruta-dot"></div>
+                    <div class="ruta-line"></div>
+                    <div class="ruta-dot" style="background: #e74c3c;"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-1">
+                    <i class="bi bi-calendar3 me-1 text-primary"></i>
+                    <strong>{{ info.viaje.fecha_viaje|date:"d/m/Y" }}</strong>
+                </div>
+                <div class="mb-1">
+                    <i class="bi bi-clock me-1 text-primary"></i>
+                    {{ info.viaje.horario.hora_salida|time:"H:i" }} hs
+                </div>
+                <div>
+                    <i class="bi bi-bus-front me-1 text-muted"></i>
+                    <small class="text-muted">{{ info.viaje.bus.placa }}</small>
+                </div>
+            </div>
+            <div class="col-md-2 text-center">
+                {% if info.porcentaje_ocupacion < 50 %}
+                <span class="disponibilidad-badge disponibilidad-alta">
+                    <i class="bi bi-check-circle-fill"></i>
+                    {{ info.asientos_libres }} libres
+                </span>
+                {% elif info.porcentaje_ocupacion < 80 %}
+                <span class="disponibilidad-badge disponibilidad-media">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    {{ info.asientos_libres }} libres
+                </span>
+                {% else %}
+                <span class="disponibilidad-badge disponibilidad-baja">
+                    <i class="bi bi-x-circle-fill"></i>
+                    {{ info.asientos_libres }} libres
+                </span>
+                {% endif %}
+                <div class="text-muted small mt-1">de {{ info.asientos_total }}</div>
+            </div>
+            <div class="col-md-2 text-end">
+                {% if info.asientos_libres > 0 %}
+                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}" 
+                   class="btn btn-primary btn-sm px-4 rounded-pill">
+                    <i class="bi bi-ticket-perforated me-1"></i>Reservar
+                </a>
+                {% else %}
+                <button class="btn btn-outline-secondary btn-sm px-4 rounded-pill" disabled>
+                    Agotado
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="text-center py-5">
+        {% if not ha_buscado %}
+            <i class="bi bi-geo-alt" style="font-size: 4rem; color: var(--tblr-primary); opacity: 0.2;"></i>
+            <h3 class="mt-3 text-muted">Ingresa tu origen y destino</h3>
+            <p class="text-muted">Utiliza el buscador de arriba para encontrar los viajes disponibles para tu próxima ruta.</p>
+        {% else %}
+            <i class="bi bi-bus-front" style="font-size: 4rem; color: var(--tblr-primary); opacity: 0.2;"></i>
+            <h3 class="mt-3 text-muted">No se encontraron viajes</h3>
+            <p class="text-muted">Intenta ajustar los filtros de búsqueda o seleccionar otro rango de fechas.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function setupAutocomplete(inputId, hiddenId, resultsId, clearId) {
+        const input = document.getElementById(inputId);
+        const hidden = document.getElementById(hiddenId);
+        const results = document.getElementById(resultsId);
+        const clear = document.getElementById(clearId);
+        let timeout = null;
+
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                results.style.display = 'none';
+                return;
+            }
+
+            timeout = setTimeout(() => {
+                fetch(`{% url 'fleet:parada_autocomplete' %}?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        results.innerHTML = '';
+                        if (data.length > 0) {
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'autocomplete-item';
+                                div.innerHTML = `<strong>${item.text}</strong>`;
+                                div.addEventListener('click', function() {
+                                    input.value = item.text;
+                                    hidden.value = item.id;
+                                    results.style.display = 'none';
+                                });
+                                results.appendChild(div);
+                            });
+                            results.style.display = 'block';
+                        } else {
+                            results.style.display = 'none';
+                        }
+                    });
+            }, 300);
+        });
+
+        clear.addEventListener('click', function() {
+            input.value = '';
+            hidden.value = '';
+            results.style.display = 'none';
+        });
+
+        // Cerrar resultados al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (e.target !== input && e.target !== results) {
+                results.style.display = 'none';
+            }
+        });
+    }
+
+    setupAutocomplete('origen_input', 'origen_id', 'origen_results', 'clear_origen');
+    setupAutocomplete('destino_input', 'destino_id', 'destino_results', 'clear_destino');
+});
+</script>
+{% endblock %}

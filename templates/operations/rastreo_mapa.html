@@ -1,0 +1,363 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Rastreo en Vivo - TR4CKING{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #mapa-rastreo {
+        height: calc(100vh - 220px);
+        min-height: 500px;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+        z-index: 1;
+    }
+    .panel-viajes {
+        max-height: calc(100vh - 220px);
+        overflow-y: auto;
+    }
+    .viaje-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        border-radius: 10px;
+    }
+    .viaje-card:hover, .viaje-card.active {
+        border-color: var(--tblr-primary);
+        box-shadow: 0 4px 15px rgba(32, 107, 196, 0.2);
+        transform: translateY(-2px);
+    }
+    .bus-icon-marker {
+        background: transparent;
+        border: none;
+    }
+    .bus-marker-inner {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #206bc4, #4dabf7);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(32,107,196,0.4);
+        border: 3px solid white;
+        animation: pulse-ring 2s infinite;
+        position: relative;
+    }
+    .bus-marker-inner i {
+        color: white;
+        font-size: 1.3rem;
+    }
+    @keyframes pulse-ring {
+        0% { box-shadow: 0 0 0 0 rgba(32,107,196,0.4); }
+        70% { box-shadow: 0 0 0 15px rgba(32,107,196,0); }
+        100% { box-shadow: 0 0 0 0 rgba(32,107,196,0); }
+    }
+    .stat-pulse {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #2fb344;
+        animation: blink 1.5s infinite;
+        margin-right: 6px;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .ocupacion-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: #e9ecef;
+        overflow: hidden;
+    }
+    .ocupacion-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+    .no-viajes-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        text-align: center;
+        background: rgba(255,255,255,0.95);
+        padding: 2rem 3rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 12px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+    }
+    .popup-header {
+        background: linear-gradient(135deg, #206bc4, #4dabf7);
+        color: white;
+        padding: 10px 14px;
+        border-radius: 8px 8px 0 0;
+        margin: -14px -14px 10px -14px;
+    }
+</style>
+{% endblock %}
+
+{% block title_content %}
+<div class="d-flex align-items-center gap-2">
+    <span class="stat-pulse"></span>
+    Rastreo en Vivo
+    <span class="badge bg-primary ms-2" id="badge-total">{{ total_en_curso }} en curso</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Panel lateral de viajes -->
+    <div class="col-lg-4 col-xl-3">
+        <div class="panel-viajes">
+            <div class="card border-0 shadow-sm mb-3" style="background: linear-gradient(135deg, #1a2035 0%, #2d3748 100%);">
+                <div class="card-body text-white py-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-broadcast" style="font-size: 1.5rem; color: #4dabf7;"></i>
+                        <div>
+                            <div class="text-uppercase small opacity-75" style="letter-spacing: 1px;">Buses Activos</div>
+                            <div class="fs-2 fw-bold" id="total-buses">{{ total_en_curso }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="lista-viajes">
+                {% for viaje in viajes_en_curso %}
+                <div class="card viaje-card mb-2 border-0 shadow-sm" data-viaje-id="{{ viaje.pk }}" onclick="centrarViaje({{ viaje.pk }})">
+                    <div class="card-body py-3 px-3">
+                        <div class="d-flex align-items-start justify-content-between mb-2">
+                            <div>
+                                <h4 class="card-title mb-0 fs-6 fw-bold">{{ viaje.itinerario.nombre }}</h4>
+                                <small class="text-muted">{{ viaje.empresa.nombre }}</small>
+                            </div>
+                            <span class="badge bg-green-lt">En curso</span>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <div class="text-muted small">
+                                    <i class="bi bi-bus-front me-1"></i>{{ viaje.bus.placa }}
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">
+                                    <i class="bi bi-clock me-1"></i>{{ viaje.horario.hora_salida|time:"H:i" }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span><i class="bi bi-person-fill text-primary me-1"></i>Ocupación</span>
+                                <span class="fw-bold ocupacion-pct" data-viaje="{{ viaje.pk }}">--</span>
+                            </div>
+                            <div class="ocupacion-bar">
+                                <div class="ocupacion-fill bg-primary" style="width: 0%" data-viaje-bar="{{ viaje.pk }}"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-geo-alt" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-2">No hay viajes en curso en este momento.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapa -->
+    <div class="col-lg-8 col-xl-9 position-relative">
+        <div id="mapa-rastreo"></div>
+        {% if not viajes_en_curso %}
+        <div class="no-viajes-overlay">
+            <i class="bi bi-bus-front" style="font-size: 4rem; color: #206bc4; opacity: 0.4;"></i>
+            <h3 class="mt-3">Sin viajes en curso</h3>
+            <p class="text-muted">Cuando un viaje cambie a estado "En Curso", aparecerá aquí.<br>
+            El mapa se actualiza automáticamente cada 30 segundos.</p>
+
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+    // Centro de Paraguay
+    const MAP_CENTER = [-23.5, -57.5];
+    const MAP_ZOOM = 7;
+
+    const map = L.map('mapa-rastreo', {
+        zoomControl: true,
+        attributionControl: false,
+    }).setView(MAP_CENTER, MAP_ZOOM);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+    }).addTo(map);
+
+    // Marcadores de buses
+    let busMarkers = {};
+    let paradaMarkers = {};
+
+    function crearIconoBus() {
+        return L.divIcon({
+            className: 'bus-icon-marker',
+            html: '<div class="bus-marker-inner"><i class="bi bi-bus-front-fill"></i></div>',
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
+            popupAnchor: [0, -28],
+        });
+    }
+
+    function crearIconoParada() {
+        return L.divIcon({
+            className: 'bus-icon-marker',
+            html: '<div style="width:14px;height:14px;background:#e74c3c;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+        });
+    }
+
+    function getOcupacionColor(pct) {
+        if (pct < 40) return '#2fb344';
+        if (pct < 70) return '#f59f00';
+        return '#d63939';
+    }
+
+    function crearPopupContent(v) {
+        const pct = v.porcentaje_ocupacion;
+        const color = getOcupacionColor(pct);
+        return `
+            <div style="min-width: 240px;">
+                <div class="popup-header">
+                    <div class="fw-bold"><i class="bi bi-bus-front-fill me-2"></i>${v.itinerario}</div>
+                    <small>${v.empresa}</small>
+                </div>
+                <div class="px-1">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span><i class="bi bi-truck me-1"></i>${v.bus_placa}</span>
+                        <span class="text-muted">${v.bus_marca}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span><i class="bi bi-person me-1"></i>${v.chofer}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span><i class="bi bi-clock me-1"></i>Salida: ${v.hora_salida_real || v.hora_salida}</span>
+                    </div>
+                    ${v.ubicacion ? `<div class="mb-1"><i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>` : ''}
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold">Asientos</span>
+                        <span style="color:${color};" class="fw-bold">${pct}% ocupado</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="badge bg-danger-lt"><i class="bi bi-person-fill me-1"></i>${v.asientos_ocupados} ocupados</span>
+                        <span class="badge bg-success-lt"><i class="bi bi-check-circle me-1"></i>${v.asientos_libres} libres</span>
+                    </div>
+                    <div class="ocupacion-bar mt-2">
+                        <div class="ocupacion-fill" style="width:${pct}%;background:${color};"></div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function actualizarMapa() {
+        fetch("{% url 'operations:api_viajes_en_curso' %}")
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('badge-total').textContent = data.total + ' en curso';
+                document.getElementById('total-buses').textContent = data.total;
+
+                // Limpiar marcadores viejos que ya no existen
+                Object.keys(busMarkers).forEach(id => {
+                    if (!data.viajes.find(v => v.id == id)) {
+                        map.removeLayer(busMarkers[id]);
+                        delete busMarkers[id];
+                    }
+                });
+
+                        data.viajes.forEach((v, index) => {
+                            // Actualizar panel lateral
+                            const pctEl = document.querySelector(`[data-viaje="${v.id}"]`);
+                            if (pctEl) pctEl.textContent = v.porcentaje_ocupacion + '%';
+                            const barEl = document.querySelector(`[data-viaje-bar="${v.id}"]`);
+                            if (barEl) {
+                                barEl.style.width = v.porcentaje_ocupacion + '%';
+                                barEl.style.background = getOcupacionColor(v.porcentaje_ocupacion);
+                            }
+
+                            if (v.ubicacion) {
+                                const latlng = [v.ubicacion.lat, v.ubicacion.lng];
+
+                                if (busMarkers[v.id]) {
+                                    // Mover marcador existente con animación suave
+                                    if (busMarkers[v.id].getLatLng().lat !== latlng[0] || busMarkers[v.id].getLatLng().lng !== latlng[1]) {
+                                        busMarkers[v.id].setLatLng(latlng);
+                                    }
+                                    busMarkers[v.id].setPopupContent(crearPopupContent(v));
+                                } else {
+                                    // Crear nuevo marcador
+                                    const marker = L.marker(latlng, {
+                                        icon: crearIconoBus(),
+                                        zIndexOffset: 1000,
+                                    }).addTo(map).bindPopup(crearPopupContent(v));
+                                    busMarkers[v.id] = marker;
+
+                                    // Auto-centrar en el primero si no hay interacción del usuario aún
+                                    if (Object.keys(busMarkers).length === 1) {
+                                        centrarViaje(v.id);
+                                    }
+                                }
+
+
+                        // Agregar paradas si no existen
+                        v.paradas.forEach(p => {
+                            if (p.lat && p.lng) {
+                                const key = `${v.id}-${p.orden}`;
+                                if (!paradaMarkers[key]) {
+                                    const pm = L.marker([p.lat, p.lng], {
+                                        icon: crearIconoParada(),
+                                    }).addTo(map).bindTooltip(p.nombre, {
+                                        permanent: false,
+                                        direction: 'top',
+                                        offset: [0, -10],
+                                    });
+                                    paradaMarkers[key] = pm;
+                                }
+                            }
+                        });
+                    }
+                });
+            })
+            .catch(err => console.error('Error al actualizar mapa:', err));
+    }
+
+    // Centrar mapa en un viaje específico
+    window.centrarViaje = function(viajeId) {
+        if (busMarkers[viajeId]) {
+            map.setView(busMarkers[viajeId].getLatLng(), 13, { animate: true });
+            busMarkers[viajeId].openPopup();
+        }
+        // Marcar como activo en el panel
+        document.querySelectorAll('.viaje-card').forEach(c => c.classList.remove('active'));
+        const card = document.querySelector(`[data-viaje-id="${viajeId}"]`);
+        if (card) card.classList.add('active');
+    };
+
+    // Actualizar cada 30 segundos
+    actualizarMapa();
+    setInterval(actualizarMapa, 30000);
+
+})();
+</script>
+{% endblock %}

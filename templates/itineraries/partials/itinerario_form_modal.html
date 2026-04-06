@@ -8,7 +8,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 
-<form hx-post="{% if object %}{% url 'itineraries:itinerario_update' object.pk %}{% else %}{% url 'itineraries:itinerario_create' %}{% endif %}"
+<form hx-post="{% if object %}{% url 'itineraries:itinerario_update' object.pk %}{% else %}{% url 'itineraries:itinerario_create' %}{% endif %}{% if request.GET.refresh %}?refresh={{ request.GET.refresh }}{% endif %}"
       hx-target="#modal-itinerario .modal-content"
       novalidate>
     {% csrf_token %}

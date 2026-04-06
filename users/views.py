@@ -1,16 +1,19 @@
 """
 Views for users app.
 """
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.contrib import messages
+from django.utils import timezone
 from django.db.models import Q
 from django.db.models.deletion import ProtectedError
-from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth import login
+from django.http import HttpResponse, JsonResponse
 from .models import Persona, Localidad
-from .forms import PersonaForm, LocalidadForm
+from .forms import PersonaForm, LocalidadForm, ClienteRegistroForm, ClientePerfilForm
 
 
 # =============================================================================
@@ -43,8 +46,6 @@ class PersonaListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(es_empleado=True)
         elif rol == 'cliente':
             queryset = queryset.filter(es_cliente=True)
-        elif rol == 'pasajero':
-            queryset = queryset.filter(es_pasajero=True)
         elif rol == 'chofer':
             queryset = queryset.filter(es_chofer=True)
         elif rol == 'ayudante':
@@ -73,6 +74,11 @@ class PersonaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     template_name = 'users/persona_form.html'
     success_url = reverse_lazy('users:persona_list')
     success_message = "Persona %(nombre)s %(apellido)s creada exitosamente."
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user_is_admin'] = self.request.user.is_superuser or self.request.user.is_staff
+        return kwargs
 
 
 class PersonaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
@@ -82,6 +88,18 @@ class PersonaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'users/persona_form.html'
     success_url = reverse_lazy('users:persona_list')
     success_message = "Persona %(nombre)s %(apellido)s actualizada exitosamente."
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user_is_admin'] = self.request.user.is_superuser or self.request.user.is_staff
+        return kwargs
+    
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.object.user:
+            initial['username'] = self.object.user.username
+        return initial
+
 
 
 class PersonaDeleteView(LoginRequiredMixin, DeleteView):
@@ -212,3 +230,91 @@ def get_localidad_coords_ajax(request, pk):
         })
     except Localidad.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Localidad no encontrada'}, status=404)
+
+
+class ClienteRegistroView(SuccessMessageMixin, CreateView):
+    """Vista pública para que nuevos clientes se registren."""
+    model = Persona
+    form_class = ClienteRegistroForm
+    template_name = 'auth/register.html'
+    success_url = reverse_lazy('users:dashboard_cliente')
+    success_message = "¡Registro exitoso! Ya puedes utilizar el sistema como cliente."
+    
+    def get_template_names(self):
+        if 'HX-Request' in self.request.headers:
+            return ['auth/partials/register_modal.html']
+        return [self.template_name]
+        
+    def form_valid(self, form):
+        self.object = form.save()
+        # Loguear automáticamente al nuevo usuario
+        login(self.request, self.object.user)
+        
+        if 'HX-Request' in self.request.headers:
+            response = HttpResponse()
+            response['HX-Redirect'] = self.get_success_url()
+            return response
+            
+        return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        # Si falla en modo HTMX, debe regresar el parcial para mostrar errores en el modal
+        if 'HX-Request' in self.request.headers:
+            return self.render_to_response(self.get_context_data(form=form))
+        return super().form_invalid(form)
+
+
+class DashboardClienteView(LoginRequiredMixin, TemplateView):
+    """Panel de control principal para el cliente final."""
+    template_name = 'users/dashboard_cliente.html'
+    
+    def get_context_data(self, **kwargs):
+        from operations.utils import limpiar_reservas_expiradas
+        limpiar_reservas_expiradas()
+        
+        context = super().get_context_data(**kwargs)
+        persona = getattr(self.request.user, 'persona', None)
+        
+        # En caso de que no tenga objeto Persona vinculado (ej: admin nuevo)
+        if not persona:
+            messages.warning(self.request, "Tu cuenta no tiene un perfil de cliente vinculado.")
+            return context
+            
+        # Estadísticas del cliente
+        from operations.models import Pasaje, Encomienda, Viaje
+        
+        context['pasajes_recientes'] = Pasaje.objects.filter(pasajero=persona).order_by('-fecha_venta')[:5]
+        context['encomiendas_recientes'] = Encomienda.objects.filter(remitente=persona).order_by('-fecha_registro')[:5]
+        
+        ahora = timezone.now()
+        hoy = ahora.date()
+        hora_actual = ahora.time()
+        
+        # Viajes sugeridos (disponibles para compra)
+        context['proximos_viajes'] = Viaje.objects.filter(
+            Q(fecha_viaje__gt=hoy) | Q(fecha_viaje=hoy, horario__hora_salida__gt=hora_actual),
+            estado='programado'
+        ).order_by('fecha_viaje', 'horario__hora_salida')[:6]
+        
+        return context
+
+class ClientePerfilUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    """Vista para que el cliente actualice sus propios datos."""
+    model = Persona
+    form_class = ClientePerfilForm
+    template_name = 'users/perfil_form.html'
+    success_url = reverse_lazy('users:dashboard_cliente')
+    success_message = "Tu perfil ha sido actualizado correctamente."
+    
+    def get_object(self, queryset=None):
+        return get_object_or_404(Persona, user=self.request.user)
+    
+    def form_valid(self, form):
+        # Si cambió la contraseña, necesitamos re-loguear (opcional pero recomendado en algunos sistemas)
+        # para evitar que la sesión expire inmediatamente, pero Django 
+        # generalmente mantiene la sesión si usamos UpdateView estándar.
+        from django.contrib.auth import update_session_auth_hash
+        response = super().form_valid(form)
+        if form.cleaned_data.get('password'):
+            update_session_auth_hash(self.request, self.request.user)
+        return response

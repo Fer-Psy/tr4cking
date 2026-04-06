@@ -194,6 +194,68 @@ class TrackingViaje(models.Model):
         return f"Tracking {self.viaje} - {self.timestamp}"
 
 
+class UbicacionAyudante(models.Model):
+    """
+    Registra la ubicación GPS en tiempo real de un ayudante/chofer.
+    Se actualiza periódicamente desde el navegador del usuario logueado.
+    """
+    persona = models.ForeignKey(
+        'users.Persona',
+        on_delete=models.CASCADE,
+        related_name='ubicaciones',
+        verbose_name="Persona"
+    )
+    viaje = models.ForeignKey(
+        Viaje,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ubicaciones_personal',
+        verbose_name="Viaje en curso"
+    )
+    latitud = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        verbose_name="Latitud"
+    )
+    longitud = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        verbose_name="Longitud"
+    )
+    velocidad_kmh = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        verbose_name="Velocidad (km/h)"
+    )
+    heading = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        verbose_name="Dirección (grados)"
+    )
+    timestamp = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Última actualización"
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Sesión activa"
+    )
+
+    class Meta:
+        verbose_name = "Ubicación de ayudante"
+        verbose_name_plural = "Ubicaciones de ayudantes"
+        ordering = ['-timestamp']
+        # Solo una ubicación activa por persona
+        constraints = [
+            models.UniqueConstraint(
+                fields=['persona'],
+                condition=models.Q(activo=True),
+                name='unique_ubicacion_activa_por_persona'
+            )
+        ]
+
+    def __str__(self):
+        return f"Ubicación {self.persona.nombre_completo} - {self.timestamp}"
+
+
 # =============================================================================
 # PASAJES Y RESERVAS
 # =============================================================================
@@ -286,6 +348,11 @@ class Pasaje(models.Model):
     fecha_venta = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Fecha de venta"
+    )
+    fecha_limite_pago = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Fecha límite de pago",
+        help_text="Para reservas: fecha/hora límite para abonar el pasaje"
     )
     fecha_cancelacion = models.DateTimeField(
         null=True, blank=True,

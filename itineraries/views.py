@@ -119,10 +119,18 @@ class ItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
 
     def form_valid(self, form):
         if self.request.headers.get('HX-Request'):
+            import json
             self.object = form.save()
             messages.success(self.request, self.get_success_message(form.cleaned_data))
             response = HttpResponse(status=204)
-            response['HX-Refresh'] = 'true'
+            
+            # Send the updated data for potential selection/updating
+            data = {'id': self.object.id, 'nombre': self.object.nombre}
+            response['HX-Trigger'] = json.dumps({'itinerarioUpdated': data})
+            
+            # Check for explicit refresh or default to refresh for list view consistency
+            if self.request.GET.get('refresh') == 'true' or not self.request.GET.get('refresh'):
+                response['HX-Refresh'] = 'true'
             return response
         return super().form_valid(form)
 
@@ -179,13 +187,21 @@ class DetalleItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, Creat
         
         # Para el modal de nueva parada
         from fleet.forms import ParadaForm
+        from users.models import Localidad
         from users.forms import LocalidadForm
-        context['parada_form'] = ParadaForm()
+        context['parada_form'] = ParadaForm(initial={'empresa': self.itinerario.empresa})
         context['localidad_form'] = LocalidadForm()
         
-        # Para el selector rápido de localidades
+        # Para el selector rápido de localidades (filtrado por empresa)
         from users.models import Localidad
-        context['localidades'] = Localidad.objects.all().order_by('nombre').prefetch_related('paradas')
+        from fleet.models import Parada
+        from django.db.models import Prefetch
+        
+        pref_paradas = Prefetch(
+            'paradas', 
+            queryset=Parada.objects.filter(empresa=self.itinerario.empresa).order_by('nombre')
+        )
+        context['localidades'] = Localidad.objects.prefetch_related(pref_paradas).order_by('nombre')
         
         return context
 
@@ -211,13 +227,21 @@ class DetalleItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, Updat
         
         # Para el modal de nueva parada
         from fleet.forms import ParadaForm
+        from users.models import Localidad
         from users.forms import LocalidadForm
-        context['parada_form'] = ParadaForm()
+        context['parada_form'] = ParadaForm(initial={'empresa': self.itinerario.empresa})
         context['localidad_form'] = LocalidadForm()
         
-        # Para el selector rápido de localidades
+        # Para el selector rápido de localidades (filtrado por empresa)
         from users.models import Localidad
-        context['localidades'] = Localidad.objects.all().order_by('nombre').prefetch_related('paradas')
+        from fleet.models import Parada
+        from django.db.models import Prefetch
+        
+        pref_paradas = Prefetch(
+            'paradas', 
+            queryset=Parada.objects.filter(empresa=self.itinerario.empresa).order_by('nombre')
+        )
+        context['localidades'] = Localidad.objects.prefetch_related(pref_paradas).order_by('nombre')
         
         return context
 
@@ -378,6 +402,27 @@ class HorarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['itinerario'] = self.itinerario
+        return context
+
+
+class HorarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    """Editar un horario existente."""
+    model = Horario
+    form_class = HorarioForm
+    template_name = 'itineraries/horario_form.html'
+    success_message = "Horario actualizado exitosamente."
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['itinerario'] = self.object.itinerario
+        return kwargs
+    
+    def get_success_url(self):
+        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.object.itinerario.pk})
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['itinerario'] = self.object.itinerario
         return context
 
 

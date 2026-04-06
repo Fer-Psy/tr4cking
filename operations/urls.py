@@ -11,6 +11,8 @@ urlpatterns = [
     # DASHBOARD
     # ==========================================================================
     path('', views.OperationsDashboardView.as_view(), name='dashboard'),
+    path('ayudante/', views.DashboardAyudanteView.as_view(), name='dashboard_ayudante'),
+
     
     # ==========================================================================
     # VIAJES
@@ -20,12 +22,15 @@ urlpatterns = [
     path('viajes/<int:pk>/', views.ViajeDetailView.as_view(), name='viaje_detail'),
     path('viajes/<int:pk>/editar/', views.ViajeUpdateView.as_view(), name='viaje_update'),
     path('viajes/<int:pk>/estado/', views.ViajeEstadoUpdateView.as_view(), name='viaje_estado'),
+    path('viajes/<int:pk>/iniciar/', views.ViajeIniciarView.as_view(), name='viaje_iniciar'),
+    path('viajes/generar-automaticos/', views.GenerarViajesAutomaticosView.as_view(), name='generar_viajes_automaticos'),
     
     # ==========================================================================
     # PASAJES
     # ==========================================================================
     path('pasajes/', views.PasajeListView.as_view(), name='pasaje_list'),
     path('pasajes/<int:pk>/', views.PasajeDetailView.as_view(), name='pasaje_detail'),
+    path('pasajes/<int:pk>/comprobante/', views.PasajeComprobanteView.as_view(), name='pasaje_comprobante'),
     path('pasajes/<int:pk>/cancelar/', views.PasajeCancelacionView.as_view(), name='pasaje_cancelar'),
     
     # Venta de pasajes (desde un viaje)
@@ -99,10 +104,31 @@ urlpatterns = [
     # APIs para facturación
     path('api/buscar-clientes/', views.BuscarClientesFacturaView.as_view(), name='api_buscar_clientes'),
     path('api/items-pendientes/', views.ObtenerItemsPendientesClienteView.as_view(), name='api_items_pendientes'),
+    path('api/crear-encomienda-quick/', views.APICrearEncomiendaFacturacionView.as_view(), name='api_crear_encomienda_quick'),
     path('api/buscar-clientes-registrados/', views.BuscarClientesRegistradosView.as_view(), name='api_buscar_clientes_registrados'),
     
     # API para obtener paradas de un viaje
     path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
     path('obtener-horarios/', views.ObtenerHorariosItinerarioView.as_view(), name='obtener_horarios'),
+    
+    # ==========================================================================
+    # RASTREO EN TIEMPO REAL
+    # ==========================================================================
+    path('rastreo/', views.RastreoMapaView.as_view(), name='rastreo_mapa'),
+    path('api/viajes-en-curso/', views.APIViajosEnCursoView.as_view(), name='api_viajes_en_curso'),
+    path('api/viajes-publico/', views.APIViajesPublicosView.as_view(), name='api_viajes_publico'),
+    path('rastreo-publico/', views.RastreoPublicoView.as_view(), name='rastreo_publico'),
+
+    path('api/actualizar-ubicacion/', views.APIActualizarUbicacionView.as_view(), name='api_actualizar_ubicacion'),
+    path('api/desactivar-ubicacion/', views.APIDesactivarUbicacionView.as_view(), name='api_desactivar_ubicacion'),
+    
+    # ==========================================================================
+    # RESERVAS CLIENTES
+    # ==========================================================================
+    path('buscar-viajes/', views.BuscarViajesClienteView.as_view(), name='buscar_viajes'),
+    path('reservar/<int:viaje_pk>/', views.ReservarPasajeView.as_view(), name='reservar_pasaje'),
+    path('api/asientos-segmento/<int:viaje_pk>/', views.APIAsientosSegmentoView.as_view(), name='api_asientos_segmento'),
+    path('api/enviar-comprobante/<int:pk>/', views.PasajeEnviarCorreoView.as_view(), name='api_enviar_comprobante'),
+    path('api/crear-reserva/<int:viaje_pk>/', views.CrearReservaClienteView.as_view(), name='api_crear_reserva'),
 ]
 

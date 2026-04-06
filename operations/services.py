@@ -119,6 +119,12 @@ class FacturacionService:
         # Agregar detalles de pasajes
         if pasajes:
             for pasaje in pasajes:
+                # Cambiar estado de reservado a vendido al facturar
+                if pasaje.estado == 'reservado':
+                    pasaje.estado = 'vendido'
+                    pasaje.fecha_venta = timezone.now()
+                    pasaje.save()
+                    
                 DetalleFactura.objects.create(
                     factura=factura,
                     cantidad=Decimal('1'),

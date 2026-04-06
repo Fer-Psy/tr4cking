@@ -93,11 +93,14 @@
 
             <!-- Selección de Encomiendas (carga dinámica) -->
             <div class="card mb-4" id="card-encomiendas" style="display: none;">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="card-title mb-0">
                         <i class="bi bi-box-seam me-2"></i>
                         Encomiendas Disponibles
                     </h4>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-nueva-encomienda">
+                        <i class="bi bi-plus-circle me-1"></i> Nueva Encomienda
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -186,6 +189,91 @@
             </div>
             <div class="card-body" id="cliente-info">
                 <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nueva encomienda rápida -->
+<div class="modal fade" id="modalNuevaEncomienda" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-box-seam me-2"></i>
+                    Registrar Nueva Encomienda
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-nueva-encomienda-quick">
+                    {% csrf_token %}
+                    <input type="hidden" name="remitente_id" id="quick-remitente-id">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Viaje *</label>
+                            {{ encomienda_form.viaje }}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Origen *</label>
+                            {{ encomienda_form.parada_origen }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Destino *</label>
+                            {{ encomienda_form.parada_destino }}
+                        </div>
+
+                        <div class="col-12 py-2 border-bottom">
+                            <h6 class="mb-0">Datos del Destinatario</h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Cédula Destinatario *</label>
+                            {{ encomienda_form.cedula_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre *</label>
+                            {{ encomienda_form.nombre_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido *</label>
+                            {{ encomienda_form.apellido_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Teléfono *</label>
+                            {{ encomienda_form.telefono_destinatario }}
+                        </div>
+
+                        <div class="col-12 py-2 border-bottom">
+                            <h6 class="mb-0">Detalles de Encomienda</h6>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo *</label>
+                            {{ encomienda_form.tipo }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Peso (kg)</label>
+                            {{ encomienda_form.peso_kg }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Precio (Gs.) *</label>
+                            {{ encomienda_form.precio }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descripción</label>
+                            {{ encomienda_form.descripcion }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary ms-auto" id="btn-save-encomienda-quick">
+                    <i class="bi bi-save me-2"></i> Guardar y Agregar a Factura
+                </button>
             </div>
         </div>
     </div>
@@ -567,6 +655,80 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ===== NUEVA ENCOMIENDA RÁPIDA =====
+    const btnNuevaEncomienda = document.getElementById('btn-nueva-encomienda');
+    const modalNuevaEncomienda = new bootstrap.Modal(document.getElementById('modalNuevaEncomienda'));
+    const btnSaveEncomienda = document.getElementById('btn-save-encomienda-quick');
+    const formQuick = document.getElementById('form-nueva-encomienda-quick');
+
+    btnNuevaEncomienda.addEventListener('click', function() {
+        if (!cedulaHidden.value) {
+            alert('Debe seleccionar un cliente primero');
+            return;
+        }
+        document.getElementById('quick-remitente-id').value = cedulaHidden.value;
+        modalNuevaEncomienda.show();
+    });
+
+    btnSaveEncomienda.addEventListener('click', function() {
+        const formData = new FormData(formQuick);
+        
+        btnSaveEncomienda.disabled = true;
+        btnSaveEncomienda.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+        fetch('/operations/api/crear-encomienda-quick/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            btnSaveEncomienda.disabled = false;
+            btnSaveEncomienda.innerHTML = '<i class="bi bi-save me-2"></i> Guardar y Agregar a Factura';
+
+            if (data.ok) {
+                // Agregar a la tabla de encomiendas
+                noEncomiendas.style.display = 'none';
+                const e = data.encomienda;
+                const newRow = `
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="encomiendas" value="${e.pk}" 
+                                   class="form-check-input item-check"
+                                   data-precio="${e.precio}" checked>
+                        </td>
+                        <td>${e.codigo}</td>
+                        <td>${e.tipo}</td>
+                        <td>${e.descripcion}</td>
+                        <td>${e.destino}</td>
+                        <td class="text-end">Gs. ${e.precio.toLocaleString('es-PY')}</td>
+                    </tr>
+                `;
+                tbodyEncomiendas.insertAdjacentHTML('beforeend', newRow);
+                
+                // Reconectar eventos de checkboxes
+                document.querySelectorAll('.item-check').forEach(cb => {
+                    cb.removeEventListener('change', calcularTotales);
+                    cb.addEventListener('change', calcularTotales);
+                });
+
+                calcularTotales();
+                modalNuevaEncomienda.hide();
+                formQuick.reset();
+            } else {
+                alert(data.error + (data.details ? ': ' + JSON.stringify(data.details) : ''));
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            btnSaveEncomienda.disabled = false;
+            btnSaveEncomienda.innerHTML = '<i class="bi bi-save me-2"></i> Guardar y Agregar a Factura';
+            alert('Error de conexión');
+        });
+    });
+
     // ===== SI VIENE CON CLIENTE PRESELECCIONADO =====
     {% if cliente_cedula %}
     seleccionarCliente('{{ cliente_cedula }}');

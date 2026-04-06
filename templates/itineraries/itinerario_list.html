@@ -228,14 +228,30 @@
 </div>
 
 <script>
-    // Reset modal content when closed
-    document.getElementById('modal-itinerario').addEventListener('hidden.bs.modal', function () {
-        this.querySelector('.modal-content').innerHTML = `
-            <div class="modal-body text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <div class="mt-3">Cargando formulario...</div>
-            </div>
-        `;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle itinerary creation/update (close modal and refresh page)
+        const closeAndRefresh = function(evt) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modal-itinerario'));
+            if (modal) modal.hide();
+            
+            // If it was already set to refresh via view, this might be redundant but safe.
+            // If not, we force a refresh here to see the new/updated item in the list.
+            window.location.reload();
+        };
+
+        document.body.addEventListener('itinerarioCreated', closeAndRefresh);
+        document.body.addEventListener('itinerarioUpdated', closeAndRefresh);
+
+        // Reset modal content when closed
+        document.getElementById('modal-itinerario').addEventListener('hidden.bs.modal', function () {
+            this.querySelector('.modal-content').innerHTML = `
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <div class="mt-3">Cargando formulario...</div>
+                </div>
+            `;
+        });
     });
 </script>
 {% endblock %}

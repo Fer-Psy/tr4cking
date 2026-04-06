@@ -151,6 +151,13 @@ class ViajeForm(forms.ModelForm):
             'hx-vals': 'js:{itinerario: document.getElementById("id_itinerario").value, fecha: this.value, empresa: document.getElementById("id_empresa").value}'
         })
         
+        self.fields['horario'].widget.attrs.update({
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_horario',
+            'hx-trigger': 'change',
+            'hx-vals': 'js:{itinerario: document.getElementById("id_itinerario").value, fecha: document.getElementById("id_fecha_viaje").value, empresa: document.getElementById("id_empresa").value, horario: this.value}'
+        })
+        
         self.fields['empresa'].widget.attrs.update({
             'hx-get': '/operations/obtener-horarios/',
             'hx-target': '#id_itinerario',
@@ -711,7 +718,7 @@ class FacturaForm(forms.ModelForm):
             # Pasajes del cliente sin facturar
             self.fields['pasajes'].queryset = Pasaje.objects.filter(
                 pasajero__cedula=cliente_cedula,
-                estado='vendido'
+                estado__in=['vendido', 'reservado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
             ).select_related('viaje', 'asiento')
