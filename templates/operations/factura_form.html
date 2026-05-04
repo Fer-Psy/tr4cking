@@ -20,7 +20,15 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Timbrado *</label>
-                            {{ form.timbrado }}
+                            <select name="timbrado" id="id_timbrado" class="form-select" required>
+                                <option value="">-- Seleccione Timbrado --</option>
+                                {% for t in form.fields.timbrado.queryset %}
+                                    <option value="{{ t.pk }}" data-empresa="{{ t.empresa_id }}"
+                                            {% if form.timbrado.value|stringformat:"s" == t.pk|stringformat:"s" %}selected{% endif %}>
+                                        {{ t.empresa.nombre }} - {{ t.numero }} ({{ t.punto_expedicion }})
+                                    </option>
+                                {% endfor %}
+                            </select>
                             {% if form.timbrado.errors %}
                             <div class="invalid-feedback d-block">{{ form.timbrado.errors.0 }}</div>
                             {% endif %}
@@ -37,12 +45,13 @@
                             <div class="input-group">
                                 <input type="text" class="form-control" id="cedula-busqueda" 
                                        placeholder="Ingrese cédula o RUC para buscar"
+                                       value="{{ cliente_cedula|default:'' }}"
                                        autocomplete="off">
                                 <button type="button" class="btn btn-primary" id="btn-buscar-cliente">
                                     <i class="bi bi-search me-1"></i> Buscar
                                 </button>
                             </div>
-                            <input type="hidden" name="cedula_cliente" id="cedula-cliente-hidden">
+                            <input type="hidden" name="cedula_cliente" id="cedula-cliente-hidden" value="{{ cliente_cedula|default:'' }}">
                             <div id="info-cliente-factura" class="mt-2"></div>
                             
                             <!-- Dropdown de resultados de búsqueda -->
@@ -537,7 +546,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td>
                                     <input type="checkbox" name="pasajes" value="${p.pk}" 
                                            class="form-check-input item-check"
-                                           data-precio="${p.precio}" checked>
+                                           data-precio="${p.precio}"
+                                           data-empresa="${p.empresa_id}" checked>
                                 </td>
                                 <td>${p.codigo}</td>
                                 <td>${p.viaje}</td>
@@ -565,7 +575,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td>
                                     <input type="checkbox" name="encomiendas" value="${e.pk}" 
                                            class="form-check-input item-check"
-                                           data-precio="${e.precio}" checked>
+                                           data-precio="${e.precio}"
+                                           data-empresa="${e.empresa_id}" checked>
                                 </td>
                                 <td>${e.codigo}</td>
                                 <td>${e.tipo}</td>
@@ -626,6 +637,39 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Habilitar/deshabilitar botón de generar
         btnGenerar.disabled = count === 0;
+
+        // ===== AUTO-SELECCIÓN DE TIMBRADO POR EMPRESA =====
+        const empresasSeleccionadas = new Set();
+        checkboxes.forEach(cb => {
+            if (cb.checked && cb.dataset.empresa && cb.dataset.empresa !== 'null') {
+                empresasSeleccionadas.add(cb.dataset.empresa);
+            }
+        });
+
+        const timbradoSelect = document.getElementById('id_timbrado');
+        if (empresasSeleccionadas.size === 1) {
+            const empresaId = Array.from(empresasSeleccionadas)[0];
+            // Filtrar opciones de timbrado
+            Array.from(timbradoSelect.options).forEach(opt => {
+                if (!opt.value) return; // Saltar placeholder
+                
+                if (opt.dataset.empresa === empresaId) {
+                    opt.classList.add('bg-success-lt', 'fw-bold');
+                    // Auto-seleccionar si no hay uno seleccionado
+                    if (!timbradoSelect.value) {
+                        timbradoSelect.value = opt.value;
+                        timbradoSelect.dispatchEvent(new Event('change'));
+                    }
+                } else {
+                    opt.classList.remove('bg-success-lt', 'fw-bold');
+                }
+            });
+        } else {
+            // Limpiar estilos si hay múltiples empresas
+            Array.from(timbradoSelect.options).forEach(opt => {
+                opt.classList.remove('bg-success-lt', 'fw-bold');
+            });
+        }
     }
     
     // ===== TIMBRADO - SIGUIENTE NÚMERO =====

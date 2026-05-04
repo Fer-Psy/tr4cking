@@ -474,13 +474,6 @@
             <div class="uppercase">{{ factura.cliente.nombre_completo }}</div>
         </div>
 
-        <!-- Pasajero si es diferente al cliente -->
-        {% if primer_detalle_pasaje and primer_detalle_pasaje.pasajero != factura.cliente %}
-        <div class="cliente-section">
-            <div class="cliente-titulo">PASAJERO: C.I. {{ primer_detalle_pasaje.pasajero.cedula }}</div>
-            <div class="uppercase">{{ primer_detalle_pasaje.pasajero.nombre_completo }}</div>
-        </div>
-        {% endif %}
 
         <div class="divider-solid"></div>
 

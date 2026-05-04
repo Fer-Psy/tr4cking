@@ -79,9 +79,10 @@
                     <thead>
                         <tr>
                             <th>Hora</th>
+                            <th>Empresa</th>
                             <th>Tipo</th>
                             <th>Concepto</th>
-                            <th>Descripción</th>
+                            <th>Detalle de Operación</th>
                             <th class="text-end">Monto</th>
                         </tr>
                     </thead>
@@ -90,6 +91,13 @@
                         <tr>
                             <td>{{ mov.fecha|time:"H:i" }}</td>
                             <td>
+                                {% if mov.empresa %}
+                                <span class="text-uppercase small font-weight-bold">{{ mov.empresa.nombre }}</span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 {% if mov.tipo == 'ingreso' %}
                                 <span class="badge bg-green"><i class="bi bi-arrow-down"></i> Ingreso</span>
                                 {% else %}
@@ -97,14 +105,42 @@
                                 {% endif %}
                             </td>
                             <td>{{ mov.get_concepto_display }}</td>
-                            <td>{{ mov.descripcion|truncatechars:30 }}</td>
+                            <td>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div><strong>{{ mov.descripcion }}</strong></div>
+                                    {% if mov.items_detalle %}
+                                    <button class="btn btn-sm btn-ghost-secondary p-0" type="button" 
+                                            data-bs-toggle="collapse" data-bs-target="#mov-{{ mov.id }}" 
+                                            aria-expanded="false" title="Ver detalles">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {% if mov.items_detalle %}
+                                <div class="collapse mt-2" id="mov-{{ mov.id }}">
+                                    {% for item in mov.items_detalle %}
+                                    <div class="small text-muted border-start ps-2 mb-1 py-1 bg-light-lt">
+                                        {% if item.tipo == 'Pasaje' %}
+                                            <i class="bi bi-ticket-perforated me-1"></i>
+                                            <strong>{{ item.info }}</strong> - As: {{ item.asiento }} 
+                                            <br><span class="ps-3">Pax: {{ item.pasajero }}</span>
+                                        {% else %}
+                                            <i class="bi bi-box-seam me-1"></i>
+                                            <strong>{{ item.info }}</strong>
+                                            <br><span class="ps-3">Rem: {{ item.remitente }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
                             <td class="text-end {% if mov.tipo == 'ingreso' %}text-green{% else %}text-red{% endif %}">
-                                {% if mov.tipo == 'egreso' %}-{% endif %}Gs. {{ mov.monto|floatformat:0 }}
+                                <strong>{% if mov.tipo == 'egreso' %}-{% endif %}Gs. {{ mov.monto|floatformat:0 }}</strong>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
+                            <td colspan="6" class="text-center py-4 text-muted">
                                 No hay movimientos registrados
                             </td>
                         </tr>

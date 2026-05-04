@@ -181,14 +181,32 @@
                             </h5>
                         </div>
                         <div class="card-body">
-                            <div class="form-check form-switch">
-                                {{ form.activo }}
-                                <label class="form-check-label" for="id_activo">
-                                    <strong>Timbrado Activo</strong>
-                                </label>
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <div class="form-check form-switch m-0">
+                                        {{ form.activo }}
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <label class="form-check-label h4 mb-0" for="id_activo">
+                                        Estado de Uso
+                                    </label>
+                                    <div id="estado-status-text" class="mt-1">
+                                        {% if form.activo.value %}
+                                        <span class="badge bg-success-lt">
+                                            <i class="bi bi-check-circle me-1"></i> Activo y Habilitado
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger-lt">
+                                            <i class="bi bi-x-circle me-1"></i> Inactivo / Deshabilitado
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-text">
-                                Desmarque esta opción si el timbrado ya no debe usarse aunque esté vigente
+                            <div class="form-text mt-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Desmarque esta opción si el timbrado ya no debe usarse (ej: por extravío o cancelación) aunque la fecha de vencimiento no haya llegado.
                             </div>
                         </div>
                     </div>
@@ -273,6 +291,28 @@ document.addEventListener('DOMContentLoaded', function() {
         numeroDesde.addEventListener('input', actualizarRango);
         numeroHasta.addEventListener('input', actualizarRango);
         actualizarRango();
+    }
+
+    // Actualizar badge de estado en tiempo real
+    const switchActivo = document.getElementById('id_activo');
+    const statusTextDiv = document.getElementById('estado-status-text');
+    
+    if (switchActivo && statusTextDiv) {
+        switchActivo.addEventListener('change', function() {
+            if (this.checked) {
+                statusTextDiv.innerHTML = `
+                    <span class="badge bg-success-lt">
+                        <i class="bi bi-check-circle me-1"></i> Activo y Habilitado
+                    </span>
+                `;
+            } else {
+                statusTextDiv.innerHTML = `
+                    <span class="badge bg-danger-lt">
+                        <i class="bi bi-x-circle me-1"></i> Inactivo / Deshabilitado
+                    </span>
+                `;
+            }
+        });
     }
 });
 </script>

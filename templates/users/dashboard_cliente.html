@@ -108,75 +108,8 @@
 </div>
 
 <div class="row row-cards">
-    <!-- Próximos Viajes Disponibles -->
-    <div class="col-lg-8">
-        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
-            <div class="card-header border-0 bg-transparent py-3">
-                <h3 class="card-title fw-bold">
-                    <i class="bi bi-calendar-check me-2 text-primary"></i>Próximos Viajes Disponibles
-                </h3>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table table-hover">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Ruta / Itinerario</th>
-                                <th>Fecha y Hora</th>
-                                <th>Bus</th>
-                                <th class="w-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for viaje in proximos_viajes %}
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar avatar-sm bg-primary-lt me-3">
-                                            <i class="bi bi-geo-alt"></i>
-                                        </div>
-                                        <div class="flex-fill">
-                                            <div class="font-weight-medium">{{ viaje.itinerario.nombre }}</div>
-                                            <div class="text-muted small">{{ viaje.empresa.nombre }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div>{{ viaje.fecha_viaje|date:"d/m/Y" }}</div>
-                                    <div class="text-muted small">{{ viaje.horario.hora_salida|time:"H:i" }} hs</div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-purple-lt">{{ viaje.bus.placa }}</span>
-                                </td>
-                                <td>
-                                    <a href="{% url 'operations:reservar_pasaje' viaje.pk %}"
-                                       class="btn btn-outline-primary btn-sm px-3 rounded-pill">
-                                        Reservar
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center py-4">
-                                    <div class="text-muted">No hay viajes programados próximamente.</div>
-                                    <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-primary btn-sm mt-2">
-                                        <i class="bi bi-search me-1"></i>Buscar viajes
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-footer bg-transparent border-top-0 text-center py-3">
-                <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-ghost-primary btn-sm px-4">Ver Todos los Viajes</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Actividad Reciente -->
-    <div class="col-lg-4">
+    <!-- Mis Reservas -->
+    <div class="col-lg-6">
         <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Reservas</h3>
@@ -187,10 +120,11 @@
                 <div class="list-group-item px-3 py-3 border-0 border-bottom">
                     <div class="row align-items-center">
                         <div class="col">
-                            <div class="font-weight-medium">{{ pasaje.viaje.itinerario.nombre }}</div>
+                            <div class="font-weight-medium">{{ pasaje.descripcion }}</div>
                             <div class="text-muted small">
                                 Asiento #{{ pasaje.asiento.numero_asiento }} - {{ pasaje.viaje.fecha_viaje|date:"d M" }}
                             </div>
+                            <div class="text-muted small">Ref: {{ pasaje.codigo }}</div>
                             {% if pasaje.estado == 'reservado' and pasaje.fecha_limite_pago %}
                             <div class="text-warning small">
                                 <i class="bi bi-clock me-1"></i>Pagar antes de: {{ pasaje.fecha_limite_pago|time:"H:i" }}
@@ -219,8 +153,11 @@
                 {% endfor %}
             </div>
         </div>
+    </div>
 
-        <div class="card shadow-sm border-0" style="border-radius: 12px;">
+    <!-- Mis Envíos -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Envíos</h3>
                 <span class="badge bg-green-lt">Encomiendas</span>

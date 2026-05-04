@@ -10,7 +10,11 @@
 {% endfor %}
 
 {% if itinerarios %}
-<select id="id_itinerario" name="itinerario" class="form-select" hx-swap-oob="true">
+<select id="id_itinerario" name="itinerario" class="form-select select2" hx-swap-oob="true"
+    hx-get="/operations/obtener-horarios/"
+    hx-target="#id_horario"
+    hx-trigger="change"
+    hx-vals='js:{itinerario: this.value, fecha: document.getElementById("id_fecha_viaje")?.value || "", empresa: document.getElementById("id_empresa")?.value || "", viaje_id: "{{ viaje_id|default:'' }}"}'>
     <option value="">-- Seleccione un itinerario --</option>
     {% for it in itinerarios %}
         <option value="{{ it.id }}" {% if it.id|stringformat:"s" == itinerario_id %}selected{% endif %}>{{ it.nombre }}</option>
@@ -26,7 +30,7 @@
             {% if bus.id == bus_pred_id %}(Asignado){% endif %}
         </option>
     {% empty %}
-        {% if request.GET.itinerario or request.GET.empresa %}
+        {% if itinerario_id or empresa_id %}
             <option value="" disabled>No hay buses registrados para esta empresa</option>
         {% endif %}
     {% endfor %}
@@ -40,7 +44,7 @@
             {% if c.cedula == chofer_pred_cedula %}(Asignado){% endif %}
         </option>
     {% empty %}
-        {% if request.GET.empresa %}
+        {% if empresa_id %}
             <option value="" disabled>No hay choferes para esta empresa</option>
         {% endif %}
     {% endfor %}

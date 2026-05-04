@@ -12,14 +12,6 @@ class DetalleItinerarioInline(admin.TabularInline):
     autocomplete_fields = ('parada',)
 
 
-class HorarioInline(admin.TabularInline):
-    """Inline para ver/editar horarios de un itinerario."""
-    model = Horario
-    extra = 1
-    fields = ('hora_salida', 'activo')
-    ordering = ('hora_salida',)
-
-
 class PrecioInline(admin.TabularInline):
     """Inline para ver/editar precios de un itinerario."""
     model = Precio
@@ -35,7 +27,7 @@ class ItinerarioAdmin(admin.ModelAdmin):
     list_filter = ('empresa', 'activo', 'ruta')
     search_fields = ('nombre', 'ruta', 'empresa__nombre')
     ordering = ('nombre',)
-    inlines = [HorarioInline, DetalleItinerarioInline, PrecioInline]
+    inlines = [DetalleItinerarioInline, PrecioInline]
     fieldsets = (
         ('Información General', {
             'fields': ('empresa', 'nombre', 'ruta', 'activo')
@@ -44,10 +36,11 @@ class ItinerarioAdmin(admin.ModelAdmin):
             'fields': ('distancia_total_km', 'duracion_estimada_hs'),
         }),
         ('Días de Operación', {
-            'fields': ('dias_semana',),
+            'fields': ('dias_semana', 'horarios'),
             'description': 'Patrón binario: 1=opera, 0=no opera. Ej: 1111100 = Lun-Vie'
         }),
     )
+    filter_horizontal = ('horarios',)
 
     def dias_operacion_texto(self, obj):
         return obj.dias_operacion_texto
@@ -57,10 +50,9 @@ class ItinerarioAdmin(admin.ModelAdmin):
 @admin.register(Horario)
 class HorarioAdmin(admin.ModelAdmin):
     """Admin para gestionar horarios de salida."""
-    list_display = ('itinerario', 'hora_salida', 'activo')
-    list_filter = ('itinerario', 'activo')
-    search_fields = ('itinerario__nombre',)
-    ordering = ('itinerario', 'hora_salida')
+    list_display = ('hora_salida', 'activo')
+    list_filter = ('activo',)
+    ordering = ('hora_salida',)
 
 
 @admin.register(DetalleItinerario)

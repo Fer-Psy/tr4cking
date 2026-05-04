@@ -339,6 +339,12 @@ class Pasaje(models.Model):
         editable=False,
         verbose_name="Código de pasaje"
     )
+    descripcion = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Descripción del tramo"
+    )
     vendedor = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -377,12 +383,23 @@ class Pasaje(models.Model):
         return reverse('operations:pasaje_detail', kwargs={'pk': self.pk})
 
     def save(self, *args, **kwargs):
-        if not self.codigo:
-            # Generar código único: PAS-YYYYMMDD-XXXX
-            fecha = timezone.now().strftime('%Y%m%d')
-            random_part = str(uuid.uuid4().hex)[:4].upper()
-            self.codigo = f"PAS-{fecha}-{random_part}"
+        if not self.descripcion:
+            # Generar descripción detallada para el usuario
+            fecha = self.viaje.fecha_viaje.strftime('%d/%m/%Y')
+            origen = self.parada_origen.nombre.replace('Terminal ', '').replace('Terminal de ', '').strip()
+            destino = self.parada_destino.nombre.replace('Terminal ', '').replace('Terminal de ', '').strip()
+            num_asiento = self.asiento.numero_asiento
+            self.descripcion = f"Viaje {origen}-{destino} ({fecha} - As. {num_asiento})"
+            
+        # Salvar para obtener el ID si es nuevo
+        is_new = self.pk is None
         super().save(*args, **kwargs)
+        
+        if is_new and not self.codigo:
+            # Generar código simple basado en el ID correlativo: Pasaje 042, Pasaje 043...
+            self.codigo = f"Pasaje {self.id:03d}"
+            # Actualizamos solo el código para no disparar un save completo
+            type(self).objects.filter(pk=self.pk).update(codigo=self.codigo)
 
     @property
     def cliente_efectivo(self):
@@ -511,12 +528,15 @@ class Encomienda(models.Model):
         return reverse('operations:encomienda_detail', kwargs={'pk': self.pk})
 
     def save(self, *args, **kwargs):
-        if not self.codigo:
-            # Generar código único: ENC-YYYYMMDD-XXXX
-            fecha = timezone.now().strftime('%Y%m%d')
-            random_part = str(uuid.uuid4().hex)[:4].upper()
-            self.codigo = f"ENC-{fecha}-{random_part}"
+        # Salvar para obtener el ID si es nuevo
+        is_new = self.pk is None
         super().save(*args, **kwargs)
+        
+        if is_new and not self.codigo:
+            # Generar código simple basado en el ID correlativo: Enc 001, Enc 002...
+            self.codigo = f"Enc {self.id:03d}"
+            # Actualizamos solo el código
+            type(self).objects.filter(pk=self.pk).update(codigo=self.codigo)
 
 
 # =============================================================================
@@ -959,6 +979,37 @@ class MovimientoCaja(models.Model):
     def __str__(self):
         signo = '+' if self.tipo == 'ingreso' else '-'
         return f"{signo} Gs. {self.monto:,.0f} - {self.descripcion}"
+
+    @property
+    def empresa(self):
+        """Retorna la empresa asociada al movimiento (vía factura)."""
+        if self.factura and self.factura.timbrado:
+            return self.factura.timbrado.empresa
+        return None
+
+    @property
+    def items_detalle(self):
+        """Retorna detalles de los pasajes o encomiendas vinculados."""
+        if not self.factura:
+            return None
+        
+        detalles = []
+        for d in self.factura.detalles.all():
+            if d.pasaje:
+                viaje = d.pasaje.viaje
+                detalles.append({
+                    'tipo': 'Pasaje',
+                    'info': f"{viaje.itinerario.nombre} ({viaje.fecha_viaje.strftime('%d/%m')})",
+                    'asiento': d.pasaje.asiento.numero_asiento,
+                    'pasajero': d.pasaje.pasajero.nombre_completo
+                })
+            elif d.encomienda:
+                detalles.append({
+                    'tipo': 'Encomienda',
+                    'info': f"{d.encomienda.codigo} a {d.encomienda.parada_destino.nombre}",
+                    'remitente': d.encomienda.remitente.nombre_completo
+                })
+        return detalles
 
 
 # =============================================================================

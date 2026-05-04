@@ -276,7 +276,16 @@
                 <span><i class="bi bi-calendar3 me-1"></i>{{ viaje.fecha_viaje|date:"d/m/Y" }}</span>
                 <span><i class="bi bi-clock me-1"></i>{{ viaje.horario.hora_salida|time:"H:i" }} hs</span>
                 <span><i class="bi bi-bus-front me-1"></i>{{ viaje.bus.placa }} - {{ viaje.bus.marca }} {{ viaje.bus.modelo }}</span>
-                <span><i class="bi bi-building me-1"></i>{{ viaje.empresa.nombre }}</span>
+                <span>
+                    <i class="bi bi-building me-1"></i>
+                    {% if viaje.empresa %}
+                        {{ viaje.empresa.nombre }}
+                    {% elif viaje.bus.empresa %}
+                        {{ viaje.bus.empresa.nombre }}
+                    {% else %}
+                        Empresa no especificada
+                    {% endif %}
+                </span>
             </div>
         </div>
         <div class="col-md-4 text-end">
@@ -406,6 +415,18 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
+                    <div class="text-muted small">Empresa</div>
+                    <div class="fw-bold">
+                        {% if viaje.empresa %}
+                            {{ viaje.empresa.nombre }}
+                        {% elif viaje.bus.empresa %}
+                            {{ viaje.bus.empresa.nombre }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
                     <div class="text-muted small">Itinerario</div>
                     <div class="fw-bold">{{ viaje.itinerario.nombre }}</div>
                 </div>
@@ -431,12 +452,26 @@
                     <span class="precio-display" id="resumen-precio">--</span>
                 </div>
 
-                <div class="tolerancia-msg">
-                    <div class="d-flex gap-2 align-items-start">
-                        <i class="bi bi-clock-history"></i>
-                        <div>
-                            <strong>Tolerancia de reserva: hasta 30 min antes de la salida</strong>
-                            <p class="mb-0 small mt-1">Debe estar informado que tiene <strong>hasta 30 minutos antes de que el bus parta</strong> para poder abonar, de lo contrario la reserva se cancela automáticamente, por lo que dicho asiento quedará libre.</p>
+                    </div>
+                </div>
+
+                <div class="card mt-3 border-info-subtle bg-info-lt" style="border-radius: 12px; border: 1px dashed #206bc4;">
+                    <div class="card-body p-3">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check-facturacion" onchange="toggleFacturacion()">
+                            <label class="form-check-label fw-bold cursor-pointer" for="check-facturacion">
+                                ¿Desea factura con otros datos?
+                            </label>
+                        </div>
+                        <div id="panel-facturacion" style="display: none;">
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">RUC o CI</label>
+                                <input type="text" class="form-control form-control-sm" id="factura-ruc" placeholder="Ej: 80012345-6 o 1234567">
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label small mb-1">Razón Social / Nombre</label>
+                                <input type="text" class="form-control form-control-sm" id="factura-nombre" placeholder="Ej: Facultad Politecnica">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -462,9 +497,13 @@
                     <p class="text-muted" id="exito-mensaje">-</p>
                     <div class="card bg-light border-0 text-start p-3 mt-3" style="border-radius: 12px;">
                         <div class="row">
-                            <div class="col-6 mb-2">
-                                <small class="text-muted">Código</small>
-                                <div class="fw-bold" id="exito-codigo">-</div>
+                            <div class="col-12 mb-2">
+                                <small class="text-muted">Código de Reserva (para el personal)</small>
+                                <div class="fw-bold h4 text-primary mb-0" id="exito-codigo">-</div>
+                            </div>
+                            <div class="col-12 mb-2 border-top pt-2">
+                                <small class="text-muted">Detalle del Viaje</small>
+                                <div class="fw-bold" id="exito-descripcion">-</div>
                             </div>
                             <div class="col-6 mb-2">
                                 <small class="text-muted">Asiento</small>
@@ -477,6 +516,11 @@
                             <div class="col-6 mb-2">
                                 <small class="text-muted">Destino</small>
                                 <div class="fw-bold" id="exito-destino">-</div>
+                            </div>
+                            <div class="col-12 mb-2" id="exito-panel-facturacion" style="display: none;">
+                                <hr class="my-1">
+                                <small class="text-muted">Facturar a nombre de</small>
+                                <div class="fw-bold text-info" id="exito-factura-nombre">-</div>
                             </div>
                             <div class="col-6">
                                 <small class="text-muted">Precio</small>
@@ -513,6 +557,8 @@
 <script>
 (function() {
     const VIAJE_PK = "{{ viaje.pk }}";
+    const INITIAL_ORIGEN_ID = "{{ initial_origen_id|default:'' }}";
+    const INITIAL_DESTINO_ID = "{{ initial_destino_id|default:'' }}";
     let currentPasajeId = null;
     let origenId = null, destinoId = null;
     let origenNombre = '', destinoNombre = '';
@@ -570,11 +616,18 @@
                 document.getElementById('resumen-destino').textContent = nombre;
 
                 // Bloquear otros cambios para evitar errores de secuencia
+                // Ocultar las otras paradas como solicitó el usuario
                 document.querySelectorAll('.parada-item').forEach(p => {
                     const pOrden = parseInt(p.dataset.orden);
                     if (pOrden !== origenOrden && pOrden !== destinoOrden) {
                         p.classList.add('disabled');
+                        p.style.display = 'none'; // Ocultar
                     }
+                });
+                
+                // Ocultar todas las líneas conectores
+                document.querySelectorAll('.parada-line').forEach(line => {
+                    line.style.display = 'none';
                 });
 
                 // Avanzar al paso 2
@@ -584,6 +637,22 @@
         });
     });
 
+    // Auto-selección inicial
+    if (INITIAL_ORIGEN_ID && INITIAL_DESTINO_ID) {
+        const itemOrigen = document.querySelector(`.parada-item[data-parada-id="${INITIAL_ORIGEN_ID}"]`);
+        const itemDestino = document.querySelector(`.parada-item[data-parada-id="${INITIAL_DESTINO_ID}"]`);
+        
+        if (itemOrigen && itemDestino) {
+            // Primero origen
+            itemOrigen.click();
+            // Luego destino
+            itemDestino.click();
+        }
+    } else if (INITIAL_ORIGEN_ID) {
+        const itemOrigen = document.querySelector(`.parada-item[data-parada-id="${INITIAL_ORIGEN_ID}"]`);
+        if (itemOrigen) itemOrigen.click();
+    }
+
     window.resetSeleccion = function() {
         origenId = null; destinoId = null;
         origenOrden = null; destinoOrden = null;
@@ -592,6 +661,10 @@
 
         document.querySelectorAll('.parada-item').forEach(p => {
             p.classList.remove('selected-origen', 'selected-destino', 'disabled');
+            p.style.display = 'flex'; // Volver a mostrar
+        });
+        document.querySelectorAll('.parada-line').forEach(line => {
+            line.style.display = 'block'; // Volver a mostrar líneas
         });
         document.getElementById('origen-nombre').textContent = 'No seleccionado';
         document.getElementById('destino-nombre').textContent = 'No seleccionado';
@@ -603,8 +676,20 @@
         document.getElementById('panel-asientos').style.display = 'none';
         document.getElementById('btn-reiniciar-seleccion').style.display = 'none';
         
+        // Reset facturación
+        document.getElementById('check-facturacion').checked = false;
+        document.getElementById('panel-facturacion').style.display = 'none';
+        document.getElementById('factura-ruc').value = '';
+        document.getElementById('factura-nombre').value = '';
+        
         avanzarPaso(1);
     }
+
+    window.toggleFacturacion = function() {
+        const check = document.getElementById('check-facturacion');
+        const panel = document.getElementById('panel-facturacion');
+        panel.style.display = check.checked ? 'block' : 'none';
+    };
 
     function avanzarPaso(paso) {
         document.querySelectorAll('.step').forEach((s, i) => {
@@ -748,6 +833,12 @@
         btn.disabled = true;
         btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Procesando...';
 
+        const facturacion = {
+            usar_otros_datos: document.getElementById('check-facturacion').checked,
+            ruc: document.getElementById('factura-ruc').value,
+            nombre: document.getElementById('factura-nombre').value
+        };
+
         fetch(`/operations/api/crear-reserva/${VIAJE_PK}/`, {
             method: 'POST',
             headers: {
@@ -758,6 +849,7 @@
                 asiento_ids: asientoSeleccionado,
                 parada_origen_id: origenId,
                 parada_destino_id: destinoId,
+                facturacion: facturacion
             }),
         })
         .then(r => r.json())
@@ -766,11 +858,21 @@
                 // Éxito
                 document.getElementById('exito-mensaje').textContent = data.mensaje;
                 document.getElementById('exito-codigo').textContent = data.pasaje.codigo;
+                document.getElementById('exito-descripcion').textContent = data.pasaje.descripcion;
                 document.getElementById('exito-asiento').textContent = '#' + data.pasaje.asiento;
                 document.getElementById('exito-origen').textContent = data.pasaje.origen;
                 document.getElementById('exito-destino').textContent = data.pasaje.destino;
                 document.getElementById('exito-precio').textContent = 'Gs. ' + new Intl.NumberFormat('es-PY').format(data.pasaje.precio);
                 document.getElementById('exito-limite').textContent = data.pasaje.fecha_limite_pago;
+
+                // Mostrar facturación si aplica
+                const panelFactura = document.getElementById('exito-panel-facturacion');
+                if (data.pasaje.cliente_nombre) {
+                    panelFactura.style.display = 'block';
+                    document.getElementById('exito-factura-nombre').textContent = data.pasaje.cliente_nombre;
+                } else {
+                    panelFactura.style.display = 'none';
+                }
 
                 // Actualizar identificador y botones
                 currentPasajeId = data.pasaje.id;

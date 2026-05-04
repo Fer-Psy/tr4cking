@@ -74,4 +74,24 @@
         </div>
     </div>
 </div>
+
+{% include 'itineraries/partials/modal_parada_itinerario.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Organizar horarios en 3 columnas */
+    #div_id_horarios fieldset > div {
+        display: grid;
+        grid-template-rows: repeat(4, auto);
+        grid-auto-flow: column;
+        justify-content: start;
+        gap: 0.5rem 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 {% endblock %}

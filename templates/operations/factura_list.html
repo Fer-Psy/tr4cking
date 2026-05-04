@@ -59,6 +59,7 @@
                 <tr>
                     <th>Número</th>
                     <th>Fecha</th>
+                    <th>Empresa</th>
                     <th>Cliente</th>
                     <th>Condición</th>
                     <th class="text-end">Total</th>
@@ -75,6 +76,9 @@
                         </a>
                     </td>
                     <td>{{ factura.fecha_emision|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <span class="text-uppercase small font-weight-bold">{{ factura.timbrado.empresa.nombre }}</span>
+                    </td>
                     <td>
                         <div>{{ factura.cliente.nombre_completo }}</div>
                         <small class="text-muted">{{ factura.cliente.cedula }}</small>
@@ -109,7 +113,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="8" class="text-center py-5 text-muted">
                         <i class="bi bi-receipt h1"></i>
                         <p class="mb-0">No se encontraron facturas</p>
                     </td>

@@ -515,20 +515,68 @@ class ParadaCreateAjaxView(LoginRequiredMixin, CreateView):
         })
 
 def paradas_autocomplete_ajax(request):
-    """Retorna paradas filtradas por nombre o localidad para autocompletado."""
-    query = request.GET.get('q', '')
-    if len(query) < 2:
+    """Retorna paradas y localidades (extraídas de itinerarios) para autocompletado."""
+    query = request.GET.get('q', '').strip()
+    if len(query) < 1:
         return JsonResponse([], safe=False)
     
+    import unicodedata
+    def normalize_key(text):
+        if not text: return ""
+        # Normalizar: quitar acentos, pasar a minúsculas y quitar palabras comunes
+        text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
+        return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
+
     paradas = Parada.objects.filter(
         Q(nombre__icontains=query) | Q(localidad__nombre__icontains=query)
-    ).select_related('localidad')[:10]
+    ).select_related('localidad')
+    
+    # Agrupar por una versión normalizada del nombre y localidad para evitar duplicados visuales
+    unique_paradas = {}
+    for p in paradas:
+        norm_nombre = normalize_key(p.nombre)
+        norm_localidad = normalize_key(p.localidad.nombre if p.localidad else '')
+        key = f"{norm_nombre}-{norm_localidad}"
+        
+        if key not in unique_paradas:
+            unique_paradas[key] = p
+            
+    paradas_list = list(unique_paradas.values())[:10]
     
     results = [
         {
-            'id': p.id,
-            'text': f"{p.nombre} ({p.localidad.nombre})"
-        } for p in paradas
+            'id': str(p.id),
+            'text': f"{p.nombre} ({p.localidad.nombre})" if p.localidad else p.nombre
+        } for p in paradas_list
     ]
     
+    if len(results) < 10:
+        from itineraries.models import Itinerario
+        import re
+        
+        # Obtener todos los nombres de itinerarios activos
+        itinerarios = Itinerario.objects.filter(activo=True).values_list('nombre', flat=True)
+        
+        # Extraer las partes (origen/destino)
+        partes_unicas = set()
+        for nombre in itinerarios:
+            partes = re.split(r'\s*-\s*', nombre)
+            for parte in partes:
+                parte_limpia = parte.strip()
+                if query.lower() in parte_limpia.lower():
+                    partes_unicas.add(parte_limpia)
+        
+        textos_existentes = [r['text'].lower() for r in results]
+        
+        for parte in sorted(list(partes_unicas)):
+            ya_existe = any(parte.lower() in text for text in textos_existentes)
+            if not ya_existe:
+                results.append({
+                    'id': f"text_{parte}",
+                    'text': parte
+                })
+            
+            if len(results) >= 10:
+                break
+            
     return JsonResponse(results, safe=False)

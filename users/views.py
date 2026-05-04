@@ -290,11 +290,8 @@ class DashboardClienteView(LoginRequiredMixin, TemplateView):
         hoy = ahora.date()
         hora_actual = ahora.time()
         
-        # Viajes sugeridos (disponibles para compra)
-        context['proximos_viajes'] = Viaje.objects.filter(
-            Q(fecha_viaje__gt=hoy) | Q(fecha_viaje=hoy, horario__hora_salida__gt=hora_actual),
-            estado='programado'
-        ).order_by('fecha_viaje', 'horario__hora_salida')[:6]
+        # Viajes sugeridos omitidos para optimizar rendimiento
+        # context['proximos_viajes'] = ...
         
         return context
 

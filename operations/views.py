@@ -150,12 +150,17 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
             
         # Verificar viajes para mañana (alerta si faltan)
         mañana = hoy + timedelta(days=1)
-        # Filtramos por horarios activos que operan mañana
         dia_semana_mañana = mañana.weekday()
-        horarios_mañana = [h for h in Horario.objects.filter(activo=True, itinerario__activo=True) if h.itinerario.opera_en_dia(dia_semana_mañana)]
+        
+        itinerarios_activos = Itinerario.objects.filter(activo=True)
+        horarios_esperados = sum(
+            it.horarios.filter(activo=True).count()
+            for it in itinerarios_activos if it.opera_en_dia(dia_semana_mañana)
+        )
+        
         viajes_mañana = Viaje.objects.filter(fecha_viaje=mañana).count()
         
-        if len(horarios_mañana) > 0 and viajes_mañana < len(horarios_mañana):
+        if horarios_esperados > 0 and viajes_mañana < horarios_esperados:
             alertas.append({
                 'tipo': 'warning',
                 'mensaje': 'Faltan viajes programados para mañana. Clientes no pueden comprar pasajes aún.',
@@ -291,10 +296,9 @@ class GenerarViajesAutomaticosView(LoginRequiredMixin, View):
         ahora = timezone.localtime(timezone.now())
         hoy = ahora.date()
         
-        horarios = Horario.objects.filter(
-            activo=True, 
-            itinerario__activo=True
-        ).select_related('itinerario', 'itinerario__empresa')
+        itinerarios = Itinerario.objects.filter(
+            activo=True
+        ).prefetch_related('horarios').select_related('empresa', 'bus_predeterminado', 'chofer_predeterminado', 'ayudante_predeterminado')
         
         creados = 0
         errores = 0
@@ -303,36 +307,39 @@ class GenerarViajesAutomaticosView(LoginRequiredMixin, View):
             fecha = hoy + timedelta(days=i)
             dia_semana = fecha.weekday()
             
-            for h in horarios:
-                if h.itinerario.opera_en_dia(dia_semana):
-                    if not Viaje.objects.filter(itinerario=h.itinerario, horario=h, fecha_viaje=fecha).exists():
-                        try:
-                            bus = h.bus_predeterminado or h.itinerario.bus_predeterminado
-                            if bus and bus.estado != 'activo': bus = None
-                            
-                            chofer = h.chofer_predeterminado or h.itinerario.chofer_predeterminado
-                            ayudante = h.ayudante_predeterminado or h.itinerario.ayudante_predeterminado
-                            
-                            if bus and chofer:
-                                viaje = Viaje.objects.create(
-                                    itinerario=h.itinerario,
-                                    horario=h,
-                                    fecha_viaje=fecha,
-                                    bus=bus,
-                                    chofer=chofer,
-                                    empresa=h.itinerario.empresa,
-                                    estado='programado'
-                                )
-                                if ayudante:
-                                    viaje.ayudantes.add(ayudante)
-                                creados += 1
-                        except Exception:
-                            errores += 1
+            for it in itinerarios:
+                if it.opera_en_dia(dia_semana):
+                    for h in it.horarios.all():
+                        if not h.activo:
+                            continue
+                        if not Viaje.objects.filter(itinerario=it, horario=h, fecha_viaje=fecha).exists():
+                            try:
+                                bus = it.bus_predeterminado
+                                if bus and bus.estado != 'activo': bus = None
+                                
+                                chofer = it.chofer_predeterminado
+                                ayudante = it.ayudante_predeterminado
+                                
+                                if bus and chofer:
+                                    viaje = Viaje.objects.create(
+                                        itinerario=it,
+                                        horario=h,
+                                        fecha_viaje=fecha,
+                                        bus=bus,
+                                        chofer=chofer,
+                                        empresa=it.empresa,
+                                        estado='programado'
+                                    )
+                                    if ayudante:
+                                        viaje.ayudantes.add(ayudante)
+                                    creados += 1
+                            except Exception:
+                                errores += 1
         
         if creados > 0:
             messages.success(request, f"Se han generado {creados} viajes para los próximos {dias} días.")
         else:
-            messages.warning(request, "No se generaron viajes nuevos. Asegúrese de tener recursos predeterminados asignados en Itinerarios/Horarios.")
+            messages.warning(request, "No se generaron viajes nuevos. Asegúrese de tener recursos predeterminados asignados en los Itinerarios.")
             
         return redirect('operations:dashboard')
 
@@ -452,12 +459,12 @@ class ViajeDetailView(LoginRequiredMixin, DetailView):
 
 
 class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    """Crear un nuevo viaje."""
+    """Crear un nuevo viaje (programado por 8 días)."""
     model = Viaje
     form_class = ViajeForm
     template_name = 'operations/viaje_form.html'
     success_url = reverse_lazy('operations:viaje_list')
-    success_message = "Viaje programado exitosamente."
+    success_message = "Viaje(s) programado(s) exitosamente."
 
     def get_initial(self):
         initial = super().get_initial()
@@ -486,23 +493,99 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             try:
                 h = Horario.objects.get(pk=horario_id)
                 initial['horario'] = h.pk
-                # Predeterminados del horario (sobrescriben)
-                if h.bus_predeterminado and h.bus_predeterminado.estado == 'activo':
-                    initial['bus'] = h.bus_predeterminado_id
-                if h.chofer_predeterminado:
-                    initial['chofer'] = h.chofer_predeterminado_id
-                if h.ayudante_predeterminado:
-                    initial['ayudantes'] = [h.ayudante_predeterminado_id]
             except Horario.DoesNotExist:
                 pass
         
         if fecha:
             initial['fecha_viaje'] = fecha
         elif not initial.get('fecha_viaje'):
-            # Por defecto mañana o hoy si no hay fecha
+            # Por defecto hoy
             initial['fecha_viaje'] = timezone.now().date()
             
         return initial
+
+    def form_valid(self, form):
+        """
+        Al programar un viaje se crean viajes para los próximos 8 días
+        con el mismo bus, chofer y ayudantes, respetando los días de operación.
+        """
+        viaje_base = form.save(commit=False)
+        itinerario = viaje_base.itinerario
+        horario = viaje_base.horario
+        bus = viaje_base.bus
+        chofer = viaje_base.chofer
+        empresa = form.cleaned_data.get('empresa') or itinerario.empresa
+        ayudantes_ids = form.cleaned_data.get('ayudantes', [])
+        observaciones = viaje_base.observaciones
+        fecha_inicio = viaje_base.fecha_viaje
+        
+        creados = 0
+        omitidos = 0
+        errores_lista = []
+        
+        for i in range(8):
+            fecha = fecha_inicio + timedelta(days=i)
+            dia_semana = fecha.weekday()
+            
+            # Solo crear en días que opera el itinerario
+            if not itinerario.opera_en_dia(dia_semana):
+                omitidos += 1
+                continue
+            
+            # No crear si ya existe un viaje para ese itinerario+horario+fecha
+            if horario and Viaje.objects.filter(
+                itinerario=itinerario, horario=horario, fecha_viaje=fecha
+            ).exists():
+                omitidos += 1
+                continue
+            
+            # Validar fecha pasada
+            ahora = timezone.localtime(timezone.now())
+            if fecha < ahora.date():
+                continue
+            if fecha == ahora.date() and horario and horario.hora_salida < ahora.time():
+                continue
+            
+            try:
+                nuevo_viaje = Viaje.objects.create(
+                    itinerario=itinerario,
+                    horario=horario,
+                    bus=bus,
+                    chofer=chofer,
+                    empresa=empresa,
+                    fecha_viaje=fecha,
+                    estado='programado',
+                    observaciones=observaciones,
+                )
+                if ayudantes_ids:
+                    nuevo_viaje.ayudantes.set(ayudantes_ids)
+                creados += 1
+            except Exception as e:
+                errores_lista.append(f"{fecha.strftime('%d/%m')}: {str(e)}")
+        
+        if creados > 0:
+            messages.success(
+                self.request,
+                f"Se programaron {creados} viaje(s) para los próximos 8 días "
+                f"({itinerario.nombre} - Bus: {bus.placa})."
+            )
+        
+        if omitidos > 0:
+            messages.info(
+                self.request,
+                f"{omitidos} día(s) omitidos (no opera o ya existe viaje programado)."
+            )
+        
+        if errores_lista:
+            messages.warning(
+                self.request,
+                f"Errores en {len(errores_lista)} día(s): {'; '.join(errores_lista[:3])}"
+            )
+        
+        if creados == 0 and not errores_lista:
+            messages.warning(self.request, "No se creó ningún viaje. Verifique que el itinerario opera en los próximos días.")
+        
+        return redirect(self.success_url)
 
 
 class ViajeUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
@@ -990,7 +1073,15 @@ class CajaDashboardView(LoginRequiredMixin, TemplateView):
             )
             context['sesion_abierta'] = True
             context['sesion'] = sesion
-            context['movimientos'] = sesion.movimientos.order_by('-fecha')[:20]
+            context['movimientos'] = sesion.movimientos.select_related(
+                'factura__timbrado__empresa'
+            ).prefetch_related(
+                'factura__detalles__pasaje__viaje__itinerario',
+                'factura__detalles__pasaje__asiento',
+                'factura__detalles__pasaje__pasajero',
+                'factura__detalles__encomienda__parada_destino',
+                'factura__detalles__encomienda__remitente'
+            ).order_by('-fecha')[:20]
             context['total_actual'] = (
                 sesion.monto_apertura + 
                 sesion.total_ingresos - 
@@ -1192,7 +1283,8 @@ class FacturaListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(
                 Q(numero_factura__icontains=search) |
                 Q(cliente__cedula__icontains=search) |
-                Q(cliente__nombre__icontains=search)
+                Q(cliente__nombre__icontains=search) |
+                Q(timbrado__empresa__nombre__icontains=search)
             )
         
         return queryset.order_by('-fecha_emision')
@@ -1227,11 +1319,31 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
             detalles_factura__factura__estado='emitida'
         ).select_related('remitente', 'parada_destino')
         
+        # Filtro de búsqueda
+        search = self.request.GET.get('search', '').strip()
+        if search:
+            pasajes_sin_factura = pasajes_sin_factura.filter(
+                Q(pasajero__nombre__icontains=search) |
+                Q(pasajero__apellido__icontains=search) |
+                Q(pasajero__cedula__icontains=search) |
+                Q(cliente__nombre__icontains=search) |
+                Q(cliente__apellido__icontains=search) |
+                Q(cliente__cedula__icontains=search) |
+                Q(codigo__icontains=search)
+            )
+            encomiendas_sin_factura = encomiendas_sin_factura.filter(
+                Q(remitente__nombre__icontains=search) |
+                Q(remitente__apellido__icontains=search) |
+                Q(remitente__cedula__icontains=search) |
+                Q(codigo__icontains=search)
+            )
+        
         # Agrupar por cliente
         clientes_dict = {}
         
         for pasaje in pasajes_sin_factura:
-            cliente = pasaje.pasajero
+            # Priorizar al cliente pagador definido en la reserva
+            cliente = pasaje.cliente or pasaje.pasajero
             if cliente.pk not in clientes_dict:
                 clientes_dict[cliente.pk] = {
                     'cliente': cliente,
@@ -1270,6 +1382,7 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
         context['total_clientes'] = len(clientes)
         context['total_pasajes'] = pasajes_sin_factura.count()
         context['total_encomiendas'] = encomiendas_sin_factura.count()
+        context['search'] = search
         
         # Obtener timbrado vigente y próximo número
         from .services import FacturacionService
@@ -1282,6 +1395,90 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
                 context['proximo_numero'] = "Sin números disponibles"
         
         return context
+
+
+class CancelarReservaRapidaView(LoginRequiredMixin, View):
+    """Cancela una reserva rápidamente desde la lista de pendientes."""
+    
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        from django.utils import timezone
+        
+        pasaje = get_object_or_404(Pasaje, pk=pk)
+        
+        if pasaje.estado not in ['reservado', 'vendido']:
+            messages.error(request, "Este pasaje no puede ser cancelado.")
+            return redirect('operations:clientes_pendientes_factura')
+            
+        pasaje.estado = 'cancelado'
+        pasaje.fecha_cancelacion = timezone.now()
+        pasaje.motivo_cancelacion = "Cancelación rápida desde lista de pendientes de factura"
+        pasaje.save()
+        
+        messages.success(request, f"Reserva {pasaje.codigo} cancelada. El asiento {pasaje.asiento.numero_asiento} ha sido liberado.")
+        return redirect('operations:clientes_pendientes_factura')
+
+
+class CancelarEncomiendaRapidaView(LoginRequiredMixin, View):
+    """Cancela una encomienda rápidamente desde la lista de pendientes."""
+    
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        from django.utils import timezone
+        
+        encomienda = get_object_or_404(Encomienda, pk=pk)
+        
+        if encomienda.estado != 'registrado':
+            messages.error(request, "Esta encomienda ya está en tránsito o entregada, no se puede cancelar.")
+            return redirect('operations:clientes_pendientes_factura')
+            
+        encomienda.estado = 'cancelado'
+        encomienda.save()
+        
+        messages.success(request, f"Encomienda {encomienda.codigo} cancelada correctamente.")
+        return redirect('operations:clientes_pendientes_factura')
+
+
+class CancelarTodoPendienteView(LoginRequiredMixin, View):
+    """Cancela todos los items pendientes de un cliente."""
+    
+    def post(self, request, cedula):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        from django.db.models import Q
+        
+        persona = get_object_or_404(Persona, cedula=cedula)
+        
+        # Cancelar pasajes
+        pasajes = Pasaje.objects.filter(
+            Q(pasajero=persona) | Q(cliente=persona),
+            estado__in=['reservado', 'vendido']
+        ).exclude(
+            detalles_factura__factura__estado='emitida'
+        )
+        
+        count_pasajes = pasajes.count()
+        for p in pasajes:
+            p.estado = 'cancelado'
+            p.save()
+            
+        # Cancelar encomiendas
+        encomiendas = Encomienda.objects.filter(
+            remitente=persona,
+            estado='registrado'
+        ).exclude(
+            detalles_factura__factura__estado='emitida'
+        )
+        
+        count_encomiendas = encomiendas.count()
+        for e in encomiendas:
+            e.estado = 'cancelado'
+            e.save()
+            
+        messages.success(request, f"Se han cancelado {count_pasajes} pasajes y {count_encomiendas} encomiendas de {persona.nombre_completo}.")
+        return redirect('operations:clientes_pendientes_factura')
 
 
 class FacturaDetailView(LoginRequiredMixin, DetailView):
@@ -1763,7 +1960,7 @@ class BuscarClientesFacturaView(LoginRequiredMixin, View):
         for persona in personas:
             # Verificar si tiene pasajes pendientes (vendidos o reservados)
             pasajes_pendientes = Pasaje.objects.filter(
-                pasajero=persona,
+                Q(pasajero=persona) | Q(cliente=persona),
                 estado__in=['vendido', 'reservado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
@@ -1834,7 +2031,7 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
         
         # Obtener pasajes pendientes (vendidos o reservados)
         pasajes = Pasaje.objects.filter(
-            pasajero=persona,
+            Q(pasajero=persona) | Q(cliente=persona),
             estado__in=['vendido', 'reservado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
@@ -1848,7 +2045,8 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
                 'viaje': f"{p.viaje.itinerario.nombre} - {p.viaje.fecha_viaje.strftime('%d/%m')}",
                 'pasajero': p.pasajero.nombre_completo,
                 'asiento': p.asiento.numero_asiento if p.asiento else '-',
-                'precio': float(p.precio)
+                'precio': float(p.precio),
+                'empresa_id': p.viaje.empresa_id if p.viaje else None
             })
         
         # Obtener encomiendas pendientes
@@ -1857,7 +2055,7 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
             estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
-        ).select_related('parada_destino')
+        ).select_related('viaje', 'parada_destino')
         
         encomiendas_data = []
         for e in encomiendas:
@@ -1867,7 +2065,8 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
                 'tipo': e.get_tipo_display(),
                 'descripcion': e.descripcion[:30] if e.descripcion else '-',
                 'destino': e.parada_destino.nombre if e.parada_destino else '-',
-                'precio': float(e.precio)
+                'precio': float(e.precio),
+                'empresa_id': e.viaje.empresa_id if e.viaje else None
             })
         
         return JsonResponse({
@@ -1923,15 +2122,16 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
         # Si se seleccionó empresa, filtrar todo por esa empresa
         if empresa_id:
             try:
+                from django.db.models import Q
                 emp_id = int(empresa_id)
-                itinerarios = itinerarios.filter(empresa_id=emp_id)
+                itinerarios = itinerarios.filter(Q(empresa_id=emp_id) | Q(empresa__isnull=True))
                 buses = Bus.objects.filter(empresa_id=emp_id).order_by('placa')
                 choferes = Persona.objects.filter(empresa_id=emp_id, es_chofer=True).order_by('apellido', 'nombre')
                 ayudantes = Persona.objects.filter(empresa_id=emp_id, es_ayudante=True).order_by('apellido', 'nombre')
             except (ValueError, TypeError):
                 pass
         
-        # Obtener recursos predeterminados del itinerario o del horario
+        # Obtener recursos predeterminados del itinerario
         bus_pred_id = None
         chofer_pred_cedula = None
         ayudante_pred_cedula = None
@@ -1941,7 +2141,7 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
             try:
                 itinerario = Itinerario.objects.get(pk=itinerario_id)
                 
-                # Cargar predeterminados del itinerario primero
+                # Cargar predeterminados del itinerario
                 if itinerario.bus_predeterminado and itinerario.bus_predeterminado.estado == 'activo':
                     bus_pred_id = itinerario.bus_predeterminado_id
                 if itinerario.chofer_predeterminado:
@@ -1949,21 +2149,8 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                 if itinerario.ayudante_predeterminado:
                     ayudante_pred_cedula = itinerario.ayudante_predeterminado.cedula
 
-                # Obtener todos los horarios activos del itinerario
-                todos_horarios = Horario.objects.filter(itinerario=itinerario, activo=True).order_by('hora_salida')
-                
-                # Si hay un horario seleccionado, ver si tiene sus propios predeterminados
-                if horario_id:
-                    try:
-                        horario_obj = todos_horarios.get(pk=horario_id)
-                        if horario_obj.bus_predeterminado and horario_obj.bus_predeterminado.estado == 'activo':
-                            bus_pred_id = horario_obj.bus_predeterminado_id
-                        if horario_obj.chofer_predeterminado:
-                            chofer_pred_cedula = horario_obj.chofer_predeterminado.cedula
-                        if horario_obj.ayudante_predeterminado:
-                            ayudante_pred_cedula = horario_obj.ayudante_predeterminado.cedula
-                    except (Horario.DoesNotExist, ValueError):
-                        pass
+                # Obtener todos los horarios activos para que estén disponibles globalmente
+                todos_horarios = Horario.objects.filter(activo=True).order_by('hora_salida')
 
                 # Filtrar si la fecha es hoy
                 ahora = timezone.localtime(timezone.now())
@@ -1997,6 +2184,41 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                     ayudantes = Persona.objects.filter(empresa=itinerario.empresa, es_ayudante=True).order_by('apellido', 'nombre')
             except (ValueError, TypeError, Itinerario.DoesNotExist):
                 pass
+                
+        # Excluir recursos ya asignados en los próximos 8 días (o solo ese día si es un viaje único)
+        if fecha_str and horario_id:
+            try:
+                from datetime import datetime, timedelta
+                fecha_v = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                fecha_fin = fecha_v + timedelta(days=7) # El creador genera 8 días de viajes consecutivos
+                
+                viajes_ocupados = Viaje.objects.filter(
+                    fecha_viaje__range=[fecha_v, fecha_fin],
+                    horario_id=horario_id,
+                    estado__in=['programado', 'en_curso']
+                ).prefetch_related('ayudantes')
+                
+                viaje_id = request.GET.get('viaje_id')
+                if viaje_id:
+                    viajes_ocupados = viajes_ocupados.exclude(pk=viaje_id)
+                
+                buses_ocupados = viajes_ocupados.values_list('bus_id', flat=True)
+                choferes_ocupados = viajes_ocupados.values_list('chofer_id', flat=True)
+                
+                ayudantes_ocupados = set()
+                for v in viajes_ocupados:
+                    ayudantes_ocupados.update(v.ayudantes.values_list('cedula', flat=True))
+                
+                if buses is not None:
+                    buses = buses.exclude(id__in=buses_ocupados)
+                if choferes is not None:
+                    choferes = choferes.exclude(cedula__in=choferes_ocupados)
+                if ayudantes is not None:
+                    ayudantes = ayudantes.exclude(cedula__in=ayudantes_ocupados)
+            except (ValueError, TypeError):
+                pass
+        
+        viaje_id = request.GET.get('viaje_id')
         
         return render(request, 'operations/partials/horario_options.html', {
             'horarios': horarios_data,
@@ -2010,6 +2232,7 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
             'bus_pred_id': bus_pred_id,
             'chofer_pred_cedula': chofer_pred_cedula,
             'ayudante_pred_cedula': ayudante_pred_cedula,
+            'viaje_id': viaje_id,
         })
 
 
@@ -2288,6 +2511,7 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
+        from django.db.models import Q, F, Subquery, OuterRef
         context = super().get_context_data(**kwargs)
         ahora = timezone.now()
         hoy = ahora.date()
@@ -2300,10 +2524,12 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
         itinerario_id = self.request.GET.get('itinerario')
         origen_id = self.request.GET.get('origen_id')
         destino_id = self.request.GET.get('destino_id')
+        origen_text = self.request.GET.get('origen_text', '').strip()
+        destino_text = self.request.GET.get('destino_text', '').strip()
         fecha = self.request.GET.get('fecha')
 
         # Determinar si se ha realizado una búsqueda activa
-        ha_buscado = any([itinerario_id, origen_id, destino_id, fecha])
+        ha_buscado = any([itinerario_id, origen_id, destino_id, origen_text, destino_text, fecha])
         context['ha_buscado'] = ha_buscado
 
         if not ha_buscado:
@@ -2314,52 +2540,134 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
 
         # Consulta base (solo si hay filtros)
         viajes = Viaje.objects.filter(
-            Q(fecha_viaje__gt=hoy) | Q(fecha_viaje=hoy, horario__hora_salida__gt=hora_actual),
-            estado='programado',
+            Q(fecha_viaje__gt=hoy) | 
+            Q(fecha_viaje=hoy, horario__hora_salida__gt=hora_actual) |
+            Q(fecha_viaje=hoy, estado='en_curso'),
+            estado__in=['programado', 'en_curso'],
         ).select_related(
             'itinerario', 'bus', 'chofer', 'horario', 'empresa'
         )
 
+        # Procesar identificadores virtuales (text_) del autocompletado
+        if origen_id and origen_id.startswith('text_'):
+            origen_text = origen_id.replace('text_', '')
+            origen_id = ''
+        
+        if destino_id and destino_id.startswith('text_'):
+            destino_text = destino_id.replace('text_', '')
+            destino_id = ''
+
+        import unicodedata
+        def normalize_search(text):
+            if not text: return ""
+            # Quitar acentos, pasar a minúsculas y quitar palabras comunes
+            text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
+            return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
+
         # Filtrado por tramo (Origen -> Destino) mejorado
         if origen_id and destino_id:
-            from django.db.models import Subquery, OuterRef, F
             from itineraries.models import DetalleItinerario
+            from fleet.models import Parada
+            
+            origen_p = Parada.objects.filter(pk=origen_id).first()
+            destino_p = Parada.objects.filter(pk=destino_id).first()
+            
+            # Buscar IDs de paradas similares (por nombre o localidad normalizados)
+            def get_similar_ids(p):
+                if not p: return []
+                norm = normalize_search(p.nombre)
+                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
+                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
+                if loc_norm:
+                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
+                return Parada.objects.filter(query).values_list('id', flat=True)
+
+            origen_ids = get_similar_ids(origen_p) if origen_p else [origen_id]
+            destino_ids = get_similar_ids(destino_p) if destino_p else [destino_id]
             
             # Subconsulta para obtener el orden del origen
             sub_origen = DetalleItinerario.objects.filter(
                 itinerario_id=OuterRef('itinerario_id'),
-                parada_id=origen_id
+                parada_id__in=origen_ids
             ).values('orden')[:1]
             
             # Subconsulta para obtener el orden del destino
             sub_destino = DetalleItinerario.objects.filter(
                 itinerario_id=OuterRef('itinerario_id'),
-                parada_id=destino_id
+                parada_id__in=destino_ids
             ).values('orden')[:1]
             
-            # Aplicar anotaciones y filtrar por secuencia correcta
+            # Aplicar anotaciones y filtrar por secuencia correcta o por fallback si el itinerario no tiene paradas
             viajes = viajes.annotate(
                 orden_o=Subquery(sub_origen),
                 orden_d=Subquery(sub_destino)
             ).filter(
-                orden_o__isnull=False,
-                orden_d__isnull=False,
-                orden_o__lt=F('orden_d')
-            )
+                (Q(orden_o__isnull=False) & Q(orden_d__isnull=False) & Q(orden_o__lt=F('orden_d'))) |
+                (
+                    Q(itinerario__detalles__isnull=True) &
+                    Q(itinerario__nombre__icontains=normalize_search(origen_p.nombre if origen_p else origen_text)) &
+                    Q(itinerario__nombre__icontains=normalize_search(destino_p.nombre if destino_p else destino_text))
+                )
+            ).distinct()
             
-            # Guardar nombres para reconstruir el buscador en el template
-            from fleet.models import Parada
-            context['origen_nombre'] = Parada.objects.filter(pk=origen_id).values_list('nombre', flat=True).first()
-            context['destino_nombre'] = Parada.objects.filter(pk=destino_id).values_list('nombre', flat=True).first()
+            context['origen_nombre'] = origen_p.nombre if origen_p else ''
+            context['destino_nombre'] = destino_p.nombre if destino_p else ''
             context['origen_id'] = origen_id
             context['destino_id'] = destino_id
-        
         elif origen_id:
-            viajes = viajes.filter(itinerario__detalles__parada_id=origen_id).distinct()
+            from fleet.models import Parada
+            origen_p = Parada.objects.filter(pk=origen_id).first()
+            
+            def get_similar_ids(p):
+                if not p: return []
+                norm = normalize_search(p.nombre)
+                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
+                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
+                if loc_norm:
+                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
+                return Parada.objects.filter(query).values_list('id', flat=True)
+
+            origen_ids = get_similar_ids(origen_p) if origen_p else [origen_id]
+            viajes = viajes.filter(
+                Q(itinerario__detalles__parada_id__in=origen_ids) |
+                (
+                    Q(itinerario__detalles__isnull=True) &
+                    Q(itinerario__nombre__icontains=normalize_search(origen_p.nombre if origen_p else ''))
+                )
+            ).distinct()
             context['origen_id'] = origen_id
+            context['origen_nombre'] = origen_p.nombre if origen_p else ''
         elif destino_id:
-            viajes = viajes.filter(itinerario__detalles__parada_id=destino_id).distinct()
+            from fleet.models import Parada
+            destino_p = Parada.objects.filter(pk=destino_id).first()
+            
+            def get_similar_ids(p):
+                if not p: return []
+                norm = normalize_search(p.nombre)
+                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
+                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
+                if loc_norm:
+                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
+                return Parada.objects.filter(query).values_list('id', flat=True)
+
+            destino_ids = get_similar_ids(destino_p) if destino_p else [destino_id]
+            viajes = viajes.filter(
+                Q(itinerario__detalles__parada_id__in=destino_ids) |
+                (
+                    Q(itinerario__detalles__isnull=True) &
+                    Q(itinerario__nombre__icontains=normalize_search(destino_p.nombre if destino_p else ''))
+                )
+            ).distinct()
             context['destino_id'] = destino_id
+            context['destino_nombre'] = destino_p.nombre if destino_p else ''
+            
+        # Filtro de respaldo si el usuario escribe texto pero no selecciona parada del autocompletado
+        if origen_text and not origen_id:
+            viajes = viajes.filter(itinerario__nombre__icontains=normalize_search(origen_text)).distinct()
+            context['origen_nombre'] = origen_text
+        if destino_text and not destino_id:
+            viajes = viajes.filter(itinerario__nombre__icontains=normalize_search(destino_text)).distinct()
+            context['destino_nombre'] = destino_text
 
         if itinerario_id:
             viajes = viajes.filter(itinerario_id=itinerario_id)
@@ -2412,6 +2720,10 @@ class ReservarPasajeView(LoginRequiredMixin, TemplateView):
         # Todos los asientos del bus
         asientos = viaje.bus.asientos.all().order_by('piso', 'numero_asiento')
         context['asientos'] = asientos
+
+        # Origen y destino sugeridos (desde búsqueda)
+        context['initial_origen_id'] = self.request.GET.get('origen')
+        context['initial_destino_id'] = self.request.GET.get('destino')
 
         return context
 
@@ -2598,16 +2910,54 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
             except Asiento.DoesNotExist:
                  return JsonResponse({'error': f'Asiento ID {a_id} no encontrado'}, status=404)
 
-        # Calcular precio
-        precio = 0
-        try:
-            precio_obj = Precio.objects.get(
-                itinerario=viaje.itinerario,
+        # Calcular precio (Lookup flexible con fallbacks)
+        precio = None
+        # 1. Intento exacto: Por paradas e itinerario específico
+        precio_obj = Precio.objects.filter(
+            itinerario=viaje.itinerario,
+            origen=parada_origen,
+            destino=parada_destino
+        ).first()
+
+        if precio_obj:
+            precio = precio_obj.precio
+        else:
+            # 2. Intento por paradas (independientemente del itinerario)
+            precio_alternativo = Precio.objects.filter(
                 origen=parada_origen,
                 destino=parada_destino
-            )
-            precio = precio_obj.precio
-        except Precio.DoesNotExist:
+            ).first()
+            if precio_alternativo:
+                precio = precio_alternativo.precio
+            else:
+                # 3. Intento por NOMBRES
+                precio_por_nombre = Precio.objects.filter(
+                    origen__nombre=parada_origen.nombre,
+                    destino__nombre=parada_destino.nombre
+                ).first()
+                if precio_por_nombre:
+                    precio = precio_por_nombre.precio
+                else:
+                    # 4. Intento por LOCALIDADES
+                    precio_localidad = Precio.objects.filter(
+                        origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
+                        destino__localidad__nombre__iexact=parada_destino.localidad.nombre
+                    ).first()
+                    if precio_localidad:
+                        precio = precio_localidad.precio
+                    else:
+                        # 5. Intento Fuzzy
+                        o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        if len(o_search) > 3 and len(d_search) > 3:
+                            precio_fuzzy = Precio.objects.filter(
+                                Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
+                                Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
+                            ).first()
+                            if precio_fuzzy:
+                                precio = precio_fuzzy.precio
+
+        if precio is None:
             return JsonResponse({
                 'error': 'No hay precio definido para ese tramo. Contacte a la empresa.'
             }, status=400)
@@ -2626,6 +2976,36 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
                 'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la salida) ha concluido.'
             }, status=400)
 
+        # Manejar datos de facturación (cliente pagador opcional)
+        facturacion_data = body.get('facturacion', {})
+        cliente_pagador = None
+        if facturacion_data.get('usar_otros_datos'):
+            ruc_ci_raw = facturacion_data.get('ruc', '')
+            razon_social = facturacion_data.get('nombre', '')
+            
+            import re
+            ruc_ci_clean = re.sub(r'[^0-9]', '', str(ruc_ci_raw))
+            
+            if ruc_ci_clean and razon_social:
+                from users.models import Persona
+                try:
+                    cliente_pagador = Persona.objects.get(cedula=int(ruc_ci_clean))
+                except Persona.DoesNotExist:
+                    # Crear nueva persona para facturación
+                    parts = razon_social.split(' ', 1)
+                    if len(parts) > 1:
+                        p_nom, p_ape = parts[0], parts[1]
+                    else:
+                        p_nom, p_ape = razon_social, '.'
+                    cliente_pagador = Persona.objects.create(
+                        cedula=int(ruc_ci_clean),
+                        nombre=p_nom,
+                        apellido=p_ape,
+                        es_cliente=True
+                    )
+                except (ValueError, TypeError):
+                    pass
+
         # Crear reservas
         pasajes = []
         for asiento in asientos:
@@ -2633,6 +3013,7 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
                 viaje=viaje,
                 asiento=asiento,
                 pasajero=persona,
+                cliente=cliente_pagador,
                 parada_origen=parada_origen,
                 parada_destino=parada_destino,
                 orden_origen=orden_origen,
@@ -2662,9 +3043,11 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
             'pasaje': {
                 'id': p_main.pk,
                 'codigo': codigos,
+                'descripcion': p_main.descripcion,
                 'asiento': numero_asientos,
                 'origen': parada_origen.nombre,
                 'destino': parada_destino.nombre,
+                'cliente_nombre': p_main.cliente.nombre_completo if p_main.cliente else None,
                 'precio': float(precio_total),
                 'fecha_limite_pago': p_main.fecha_limite_pago.strftime('%d/%m/%Y %H:%M'),
                 'estado': 'reservado',

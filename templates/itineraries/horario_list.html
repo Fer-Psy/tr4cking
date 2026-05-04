@@ -29,17 +29,7 @@
                 <input type="text" id="search" name="search" class="form-control"
                     placeholder="Buscar por itinerario..." value="{{ search }}">
             </div>
-            <div class="col-md-3">
-                <label for="itinerario" class="form-label">Itinerario</label>
-                <select name="itinerario" id="itinerario" class="form-select">
-                    <option value="">Todos los itinerarios</option>
-                    {% for it in itinerarios %}
-                    <option value="{{ it.pk }}" {% if itinerario_filter == it.pk|stringformat:"d" %}selected{% endif %}>
-                        {{ it.nombre }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
+
             <div class="col-md-3">
                 <label for="estado" class="form-label">Estado</label>
                 <select name="estado" id="estado" class="form-select">
@@ -71,7 +61,7 @@
             <table class="table mb-0">
                 <thead>
                     <tr>
-                        <th>Itinerario</th>
+
                         <th>Hora de Salida</th>
                         <th>Estado</th>
                         <th class="text-end">Acciones</th>
@@ -80,12 +70,7 @@
                 <tbody>
                     {% for horario in horarios %}
                     <tr>
-                        <td>
-                            <a href="{% url 'itineraries:itinerario_detail' horario.itinerario.pk %}"
-                                class="text-decoration-none fw-semibold">
-                                {{ horario.itinerario.nombre }}
-                            </a>
-                        </td>
+
                         <td>
                             <i class="bi bi-alarm me-2 text-primary"></i>
                             <strong>{{ horario.hora_salida|time:"H:i" }}</strong>
@@ -99,10 +84,7 @@
                         </td>
                         <td>
                             <div class="table-actions justify-content-end">
-                                <a href="{% url 'itineraries:itinerario_detail' horario.itinerario.pk %}"
-                                    class="btn btn-ghost btn-icon btn-sm" title="Ver itinerario">
-                                    <i class="bi bi-eye"></i>
-                                </a>
+
                                 <a href="{% url 'itineraries:horario_edit' horario.pk %}"
                                     class="btn btn-ghost btn-icon btn-sm text-primary" title="Editar horario">
                                     <i class="bi bi-pencil"></i>

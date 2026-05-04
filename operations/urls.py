@@ -32,6 +32,7 @@ urlpatterns = [
     path('pasajes/<int:pk>/', views.PasajeDetailView.as_view(), name='pasaje_detail'),
     path('pasajes/<int:pk>/comprobante/', views.PasajeComprobanteView.as_view(), name='pasaje_comprobante'),
     path('pasajes/<int:pk>/cancelar/', views.PasajeCancelacionView.as_view(), name='pasaje_cancelar'),
+    path('pasajes/<int:pk>/cancelar-rapida/', views.CancelarReservaRapidaView.as_view(), name='cancelar_reserva_rapida'),
     
     # Venta de pasajes (desde un viaje)
     path('viajes/<int:viaje_pk>/vender-pasaje/', views.PasajeVentaView.as_view(), name='pasaje_venta'),
@@ -44,6 +45,7 @@ urlpatterns = [
     path('encomiendas/<int:pk>/entregar/', views.EncomiendaEntregarView.as_view(), name='encomienda_entregar'),
     path('encomiendas/<int:pk>/estado/', views.EncomiendaCambiarEstadoView.as_view(), name='encomienda_estado'),
     path('encomiendas/<int:pk>/ticket/', views.EncomiendaTicketView.as_view(), name='encomienda_ticket'),
+    path('encomiendas/<int:pk>/cancelar-rapida/', views.CancelarEncomiendaRapidaView.as_view(), name='cancelar_encomienda_rapida'),
     path('encomiendas/nueva/', views.EncomiendaCreateView.as_view(), name='encomienda_create_direct'),
     
     # Registro de encomiendas (desde un viaje)
@@ -76,6 +78,7 @@ urlpatterns = [
     path('facturas/<int:pk>/ticket/', views.FacturaTicketView.as_view(), name='factura_ticket'),
     path('facturas/<int:pk>/pdf/', views.FacturaPdfView.as_view(), name='factura_pdf'),
     path('facturas/<int:pk>/anular/', views.FacturaAnularView.as_view(), name='factura_anular'),
+    path('facturacion/cancelar-todo/<str:cedula>/', views.CancelarTodoPendienteView.as_view(), name='cancelar_todo_pendiente'),
     
     # ==========================================================================
     # INCIDENCIAS

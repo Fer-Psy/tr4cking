@@ -13,34 +13,81 @@ from fleet.models import Parada
 class ItinerarioForm(forms.ModelForm):
     """Formulario para crear/editar itinerarios."""
     
+    parada_origen = forms.ModelChoiceField(
+        queryset=Parada.objects.all(),
+        required=False,
+        label="Parada de Origen (Opcional)",
+        help_text="Se creará automáticamente con Orden 1."
+    )
+    parada_destino = forms.ModelChoiceField(
+        queryset=Parada.objects.all(),
+        required=False,
+        label="Parada de Destino (Opcional)",
+        help_text="Se creará automáticamente como parada final."
+    )
+
     class Meta:
         model = Itinerario
         fields = [
             'empresa', 'nombre', 'ruta', 'distancia_total_km', 'duracion_estimada_hs', 
-            'dias_semana', 'activo', 'bus_predeterminado', 'chofer_predeterminado', 
-            'ayudante_predeterminado'
+            'dias_semana', 'horarios', 'activo'
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={'placeholder': 'Ej: Asunción - CDE (Directo)'}),
             'ruta': forms.TextInput(attrs={'placeholder': 'Ej: PY02'}),
             'distancia_total_km': forms.NumberInput(attrs={'placeholder': 'Ej: 327.5', 'step': '0.01'}),
             'duracion_estimada_hs': forms.NumberInput(attrs={'placeholder': 'Ej: 5.5', 'step': '0.01'}),
-            'dias_semana': forms.TextInput(attrs={'placeholder': '1111100', 'maxlength': 7}),
+            'dias_semana': forms.TextInput(attrs={'placeholder': '1111111', 'maxlength': 7}),
+            'horarios': forms.CheckboxSelectMultiple(),
         }
         help_texts = {
-            'dias_semana': 'Patrón de 7 dígitos: 1=opera, 0=no opera. Ej: 1111100 = Lunes a Viernes',
+            'dias_semana': 'Patrón de 7 dígitos: 1=opera, 0=no opera. Ej: 1111111 = Todos los días',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Mejorar visualización de paradas
+        paradas_qs = Parada.objects.all().select_related('localidad').order_by('localidad__nombre', 'nombre')
+        self.fields['parada_origen'].queryset = paradas_qs
+        self.fields['parada_destino'].queryset = paradas_qs
+        
+        label_func = lambda obj: f"{obj.localidad.nombre}: {obj.nombre}"
+        self.fields['parada_origen'].label_from_instance = label_func
+        self.fields['parada_destino'].label_from_instance = label_func
+
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
             Fieldset(
                 'Información del Itinerario',
                 Row(
+                    Column('empresa', css_class='col-md-12'),
+                ),
+                Row(
                     Column('nombre', css_class='col-md-8'),
                     Column('ruta', css_class='col-md-4'),
+                ),
+            ),
+            Fieldset(
+                'Recorrido Inicial (Opcional)',
+                Row(
+                    Column(
+                        Div(
+                            Field('parada_origen', wrapper_class='flex-grow-1 mb-0'),
+                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
+                            css_class='d-flex align-items-start'
+                        ),
+                        css_class='col-md-6'
+                    ),
+                    Column(
+                        Div(
+                            Field('parada_destino', wrapper_class='flex-grow-1 mb-0'),
+                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
+                            css_class='d-flex align-items-start'
+                        ),
+                        css_class='col-md-6'
+                    ),
                 ),
             ),
             Fieldset(
@@ -51,7 +98,7 @@ class ItinerarioForm(forms.ModelForm):
                 ),
             ),
             Fieldset(
-                'Operación',
+                'Operación y Horarios',
                 Row(
                     Column('dias_semana', css_class='col-md-8'),
                     Column(
@@ -59,34 +106,11 @@ class ItinerarioForm(forms.ModelForm):
                         css_class='col-md-4'
                     ),
                 ),
-            ),
-            Fieldset(
-                'Recursos Predeterminados',
                 Row(
-                    Column('bus_predeterminado', css_class='col-md-4'),
-                    Column('chofer_predeterminado', css_class='col-md-4'),
-                    Column('ayudante_predeterminado', css_class='col-md-4'),
-                ),
-                HTML('''
-                    <div class="form-text mt-n2 mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Estos recursos se asignarán automáticamente al programar un viaje siguiendo este itinerario.
-                    </div>
-                '''),
+                    Column('horarios', css_class='col-md-12 mt-3')
+                )
             ),
         )
-        
-        # Filtrar si ya existe la empresa (edición o creación con itinerario prefijado)
-        empresa = getattr(self.instance, 'empresa', None)
-        if not empresa and 'empresa' in self.initial:
-            empresa = self.initial['empresa']
-        
-        if empresa:
-            from users.models import Persona
-            from fleet.models import Bus
-            self.fields['bus_predeterminado'].queryset = Bus.objects.filter(empresa=empresa)
-            self.fields['chofer_predeterminado'].queryset = Persona.objects.filter(empresa=empresa, es_chofer=True)
-            self.fields['ayudante_predeterminado'].queryset = Persona.objects.filter(empresa=empresa, es_ayudante=True)
     
     def clean_dias_semana(self):
         dias = self.cleaned_data['dias_semana']
@@ -159,35 +183,19 @@ class HorarioForm(forms.ModelForm):
     
     class Meta:
         model = Horario
-        fields = [
-            'itinerario', 'hora_salida', 'activo', 
-            'bus_predeterminado', 'chofer_predeterminado', 'ayudante_predeterminado'
-        ]
+        fields = ['hora_salida', 'activo']
         widgets = {
             'hora_salida': forms.TimeInput(attrs={'type': 'time'}),
         }
     
-    def __init__(self, *args, itinerario=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.itinerario_fijo = itinerario
-        
-        if self.itinerario_fijo:
-            self.fields['itinerario'].initial = self.itinerario_fijo
-            # Si se le pasa un itinerario fijo, lo ocultamos
-            self.fields['itinerario'].widget = forms.HiddenInput()
         
         self.helper = FormHelper()
         self.helper.form_tag = False
         
         # Layout dinámico
-        layout_elements = []
-        if self.itinerario_fijo:
-            # Si es fijo, todavía necesitamos renderizar el campo oculto
-            layout_elements.append('itinerario')
-        else:
-            layout_elements.append(Row(Column('itinerario', css_class='col-md-12')))
-            
-        layout_elements.append(
+        layout_elements = [
             Row(
                 Column('hora_salida', css_class='col-md-8'),
                 Column(
@@ -195,86 +203,19 @@ class HorarioForm(forms.ModelForm):
                     css_class='col-md-4'
                 ),
             )
-        )
-        layout_elements.append(
-            Fieldset(
-                'Recursos Predeterminados (Opcional)',
-                Row(
-                    Column('bus_predeterminado', css_class='col-md-4'),
-                    Column('chofer_predeterminado', css_class='col-md-4'),
-                    Column('ayudante_predeterminado', css_class='col-md-4'),
-                ),
-                HTML('''
-                    <div class="form-text mt-n2 mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Si se definen, estos recursos prevalecen sobre los del itinerario para este horario específico.
-                    </div>
-                '''),
-            )
-        )
+        ]
         self.helper.layout = Layout(*layout_elements)
-        
-        # Filtrar recursos por empresa del itinerario
-        it = self.itinerario_fijo
-        if not it and self.instance.pk:
-            it = self.instance.itinerario
-        
-        # Si no lo encontramos pero hay un valor inicial en el campo, lo recuperamos
-        if not it and self.fields['itinerario'].initial:
-            val = self.fields['itinerario'].initial
-            if isinstance(val, Itinerario):
-                it = val
-            else:
-                it = Itinerario.objects.filter(pk=val).first()
-            
-        if it and it.empresa:
-            from users.models import Persona
-            from fleet.models import Bus
-            self.fields['bus_predeterminado'].queryset = Bus.objects.filter(empresa=it.empresa)
-            self.fields['chofer_predeterminado'].queryset = Persona.objects.filter(empresa=it.empresa, es_chofer=True)
-            self.fields['ayudante_predeterminado'].queryset = Persona.objects.filter(empresa=it.empresa, es_ayudante=True)
     
     def clean(self):
         cleaned_data = super().clean()
-        itinerario = self.itinerario_fijo or cleaned_data.get('itinerario')
         hora = cleaned_data.get('hora_salida')
         
-        if itinerario and hora:
-            existing = Horario.objects.filter(itinerario=itinerario, hora_salida=hora)
+        if hora:
+            existing = Horario.objects.filter(hora_salida=hora)
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
-                raise forms.ValidationError(f"Ya existe un horario a las {hora.strftime('%H:%M')} en {itinerario.nombre}.")
-        
-        # Validar exclusividad de chofer predeterminado
-        chofer = cleaned_data.get('chofer_predeterminado')
-        if chofer:
-            exists_chofer = Horario.objects.filter(chofer_predeterminado=chofer)
-            if self.instance.pk:
-                exists_chofer = exists_chofer.exclude(pk=self.instance.pk)
-            if exists_chofer.exists():
-                h = exists_chofer.first()
-                raise forms.ValidationError(
-                    f"El chofer {chofer.nombre_completo} ya está asignado como predeterminado "
-                    f"en el horario {h.hora_salida.strftime('%H:%M')} de {h.itinerario.nombre}."
-                )
-        
-        # Validar exclusividad de ayudante predeterminado
-        ayudante = cleaned_data.get('ayudante_predeterminado')
-        if ayudante:
-            exists_ayudante = Horario.objects.filter(ayudante_predeterminado=ayudante)
-            if self.instance.pk:
-                exists_ayudante = exists_ayudante.exclude(pk=self.instance.pk)
-            if exists_ayudante.exists():
-                h = exists_ayudante.first()
-                raise forms.ValidationError(
-                    f"El ayudante {ayudante.nombre_completo} ya está asignado como predeterminado "
-                    f"en el horario {h.hora_salida.strftime('%H:%M')} de {h.itinerario.nombre}."
-                )
-        
-        # Si se pasó itinerario fijo, forzar que los datos limpios lo tengan
-        if self.itinerario_fijo:
-            cleaned_data['itinerario'] = self.itinerario_fijo
+                raise forms.ValidationError(f"Ya existe el horario de las {hora.strftime('%H:%M')}.")
             
         return cleaned_data
 

@@ -73,6 +73,13 @@ class Itinerario(models.Model):
         verbose_name="Ayudante predeterminado",
         limit_choices_to={'es_ayudante': True}
     )
+    
+    horarios = models.ManyToManyField(
+        'Horario',
+        related_name='itinerarios',
+        verbose_name="Horarios de salida",
+        blank=True
+    )
 
     class Meta:
         verbose_name = "Itinerario"
@@ -89,6 +96,15 @@ class Itinerario(models.Model):
     def primera_parada(self):
         """Retorna el primer DetalleItinerario (parada de origen) si existe."""
         return self.detalles.order_by('orden').first()
+
+    @property
+    def nombre_origen(self):
+        if self.nombre.startswith('Asunción'):
+            return 'Asunción'
+        parada = self.primera_parada
+        if parada and parada.parada:
+            return parada.parada.localidad.nombre if parada.parada.localidad else parada.parada.nombre
+        return 'Orígen Desconocido'
 
     @property
     def dias_operacion_texto(self):
@@ -116,67 +132,35 @@ class Itinerario(models.Model):
 
 class Horario(models.Model):
     """
-    Representa un horario de salida para un itinerario.
-    Ej: Itinerario "Asunción-Cnel. Oviedo" tiene horarios 11:00, 14:00, 17:00.
-    Cada horario genera un Viaje distinto en la misma fecha.
+    Representa un horario de salida general.
+    Ej: 11:00, 14:00, 17:00.
     """
-    itinerario = models.ForeignKey(
-        Itinerario,
-        on_delete=models.CASCADE,
-        related_name='horarios',
-        verbose_name="Itinerario"
-    )
     hora_salida = models.TimeField(
-        verbose_name="Hora de salida programada",
-        help_text="Hora en que el bus parte de la primera parada"
+        verbose_name="Hora de salida",
+        help_text="Hora de salida"
     )
     activo = models.BooleanField(
         default=True,
         verbose_name="Activo"
     )
-    
-    # Recursos predeterminados (sobrescriben los del itinerario si existen)
-    bus_predeterminado = models.ForeignKey(
-        'fleet.Bus',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='horarios_predeterminados',
-        verbose_name="Bus predeterminado"
-    )
-    chofer_predeterminado = models.ForeignKey(
-        'users.Persona',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='horarios_como_chofer_pred',
-        verbose_name="Chofer predeterminado",
-        limit_choices_to={'es_chofer': True}
-    )
-    ayudante_predeterminado = models.ForeignKey(
-        'users.Persona',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='horarios_como_ayudante_pred',
-        verbose_name="Ayudante predeterminado",
-        limit_choices_to={'es_ayudante': True}
-    )
 
     class Meta:
         verbose_name = "Horario"
         verbose_name_plural = "Horarios"
-        ordering = ['itinerario', 'hora_salida']
-        unique_together = ['itinerario', 'hora_salida']
+        ordering = ['hora_salida']
+        unique_together = ['hora_salida']
         constraints = [
             models.UniqueConstraint(
-                fields=['itinerario', 'hora_salida'],
-                name='unique_horario_por_itinerario'
+                fields=['hora_salida'],
+                name='unique_horario_salida'
             ),
         ]
 
     def __str__(self):
-        return f"{self.itinerario.nombre} - {self.hora_salida.strftime('%H:%M')}"
+        return self.hora_salida.strftime('%H:%M')
 
     def get_absolute_url(self):
-        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.itinerario.pk})
+        return reverse('itineraries:horario_list')
 
 
 class DetalleItinerario(models.Model):

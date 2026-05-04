@@ -50,6 +50,13 @@ class ItinerarioListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['search'] = self.request.GET.get('search', '')
         context['activo_filter'] = self.request.GET.get('activo', '')
+        
+        # Para los modales de creación rápida
+        from fleet.forms import ParadaForm
+        from users.forms import LocalidadForm
+        context['parada_form'] = ParadaForm()
+        context['localidad_form'] = LocalidadForm()
+        
         return context
 
 
@@ -86,10 +93,43 @@ class ItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             return ['itineraries/partials/itinerario_form_modal.html']
         return [self.template_name]
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from fleet.forms import ParadaForm
+        from users.forms import LocalidadForm
+        context['parada_form'] = ParadaForm()
+        context['localidad_form'] = LocalidadForm()
+        return context
+
     def form_valid(self, form):
+        self.object = form.save()
+        
+        # Crear paradas iniciales si se proporcionaron en el formulario
+        parada_origen = form.cleaned_data.get('parada_origen')
+        parada_destino = form.cleaned_data.get('parada_destino')
+        
+        if parada_origen:
+            DetalleItinerario.objects.get_or_create(
+                itinerario=self.object,
+                parada=parada_origen,
+                defaults={'orden': 1, 'minutos_desde_origen': 0}
+            )
+        
+        if parada_destino:
+            # Si hay origen, el destino es orden 2, si no, es orden 1
+            orden = 2 if parada_origen else 1
+            DetalleItinerario.objects.get_or_create(
+                itinerario=self.object,
+                parada=parada_destino,
+                defaults={
+                    'orden': orden, 
+                    'minutos_desde_origen': int(self.object.duracion_estimada_hs * 60) if self.object.duracion_estimada_hs else 0,
+                    'distancia_desde_origen_km': self.object.distancia_total_km
+                }
+            )
+
         if self.request.headers.get('HX-Request'):
             import json
-            self.object = form.save()
             messages.success(self.request, self.get_success_message(form.cleaned_data))
             response = HttpResponse(status=204)
             
@@ -116,6 +156,14 @@ class ItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         if self.request.headers.get('HX-Request'):
             return ['itineraries/partials/itinerario_form_modal.html']
         return [self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from fleet.forms import ParadaForm
+        from users.forms import LocalidadForm
+        context['parada_form'] = ParadaForm()
+        context['localidad_form'] = LocalidadForm()
+        return context
 
     def form_valid(self, form):
         if self.request.headers.get('HX-Request'):
@@ -229,7 +277,7 @@ class DetalleItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, Updat
         from fleet.forms import ParadaForm
         from users.models import Localidad
         from users.forms import LocalidadForm
-        context['parada_form'] = ParadaForm(initial={'empresa': self.itinerario.empresa})
+        context['parada_form'] = ParadaForm(initial={'empresa': self.object.itinerario.empresa})
         context['localidad_form'] = LocalidadForm()
         
         # Para el selector rápido de localidades (filtrado por empresa)
@@ -239,7 +287,7 @@ class DetalleItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, Updat
         
         pref_paradas = Prefetch(
             'paradas', 
-            queryset=Parada.objects.filter(empresa=self.itinerario.empresa).order_by('nombre')
+            queryset=Parada.objects.filter(empresa=self.object.itinerario.empresa).order_by('nombre')
         )
         context['localidades'] = Localidad.objects.prefetch_related(pref_paradas).order_by('nombre')
         
@@ -347,12 +395,7 @@ class HorarioListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('itinerario')
-        
-        # Filtro por itinerario
-        itinerario_id = self.request.GET.get('itinerario')
-        if itinerario_id:
-            queryset = queryset.filter(itinerario_id=itinerario_id)
+        queryset = super().get_queryset()
         
         # Filtro por estado
         estado = self.request.GET.get('estado')
@@ -361,21 +404,11 @@ class HorarioListView(LoginRequiredMixin, ListView):
         elif estado == 'inactivo':
             queryset = queryset.filter(activo=False)
         
-        # Búsqueda
-        search = self.request.GET.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(itinerario__nombre__icontains=search)
-            )
-        
-        return queryset.order_by('itinerario__nombre', 'hora_salida')
+        return queryset.order_by('hora_salida')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['itinerarios'] = Itinerario.objects.filter(activo=True).order_by('nombre')
-        context['itinerario_filter'] = self.request.GET.get('itinerario', '')
         context['estado_filter'] = self.request.GET.get('estado', '')
-        context['search'] = self.request.GET.get('search', '')
         return context
 
 class HorarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
@@ -385,24 +418,8 @@ class HorarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     template_name = 'itineraries/horario_form.html'
     success_message = "Horario agregado exitosamente."
     
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        if 'itinerario_pk' in self.kwargs:
-            self.itinerario = get_object_or_404(Itinerario, pk=self.kwargs['itinerario_pk'])
-            kwargs['itinerario'] = self.itinerario
-        else:
-            self.itinerario = None
-        return kwargs
-    
     def get_success_url(self):
-        if self.itinerario:
-            return reverse('itineraries:itinerario_detail', kwargs={'pk': self.itinerario.pk})
         return reverse('itineraries:horario_list')
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['itinerario'] = self.itinerario
-        return context
 
 
 class HorarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
@@ -412,18 +429,8 @@ class HorarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'itineraries/horario_form.html'
     success_message = "Horario actualizado exitosamente."
     
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['itinerario'] = self.object.itinerario
-        return kwargs
-    
     def get_success_url(self):
-        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.object.itinerario.pk})
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['itinerario'] = self.object.itinerario
-        return context
+        return reverse('itineraries:horario_list')
 
 
 class HorarioDeleteView(LoginRequiredMixin, DeleteView):
@@ -432,11 +439,7 @@ class HorarioDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'itineraries/horario_confirm_delete.html'
     
     def get_success_url(self):
-        # Si venimos del detalle iterario volvemos ahi, si no a la lista
-        referer = self.request.META.get('HTTP_REFERER', '')
-        if 'horarios' in referer and 'nuevo' not in referer:
-            return reverse('itineraries:horario_list')
-        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.object.itinerario.pk})
+        return reverse('itineraries:horario_list')
     
     def post(self, request, *args, **kwargs):
         try:

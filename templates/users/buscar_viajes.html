@@ -117,7 +117,7 @@
                     <i class="bi bi-geo-alt me-1 text-primary"></i>Origen
                 </label>
                 <div class="input-group input-group-flat">
-                    <input type="text" id="origen_input" class="form-control" autocomplete="off" placeholder="Escriba origen..." value="{{ origen_nombre|default:'' }}">
+                    <input type="text" id="origen_input" name="origen_text" class="form-control" autocomplete="off" placeholder="Escriba origen..." value="{{ origen_nombre|default:'' }}">
                     <span class="input-group-text">
                         <a href="javascript:void(0)" id="clear_origen" class="link-secondary" title="Limpiar" data-bs-toggle="tooltip">
                             <i class="bi bi-x-circle"></i>
@@ -132,7 +132,7 @@
                     <i class="bi bi-geo-alt-fill me-1 text-danger"></i>Destino
                 </label>
                 <div class="input-group input-group-flat">
-                    <input type="text" id="destino_input" class="form-control" autocomplete="off" placeholder="Escriba destino..." value="{{ destino_nombre|default:'' }}">
+                    <input type="text" id="destino_input" name="destino_text" class="form-control" autocomplete="off" placeholder="Escriba destino..." value="{{ destino_nombre|default:'' }}">
                     <span class="input-group-text">
                         <a href="javascript:void(0)" id="clear_destino" class="link-secondary" title="Limpiar" data-bs-toggle="tooltip">
                             <i class="bi bi-x-circle"></i>
@@ -146,7 +146,7 @@
                 <label class="form-label fw-bold">
                     <i class="bi bi-calendar-event me-1 text-primary"></i>¿Cuándo viajas?
                 </label>
-                <input type="date" name="fecha" class="form-control" value="{{ fecha_seleccionada|default:'' }}">
+                <input type="date" name="fecha" class="form-control" value="{{ fecha_seleccionada|default:'' }}" required>
             </div>
             <div class="col-md-3">
                 <button type="submit" class="btn btn-primary w-100" style="margin-top: auto;">
@@ -173,7 +173,14 @@
             <div class="col-md-5">
                 <h4 class="fw-bold mb-1">{{ info.viaje.itinerario.nombre }}</h4>
                 <div class="text-muted small mb-1">
-                    <i class="bi bi-building me-1"></i>{{ info.viaje.empresa.nombre }}
+                    <i class="bi bi-building me-1"></i>
+                    {% if info.viaje.empresa %}
+                        {{ info.viaje.empresa.nombre }}
+                    {% elif info.viaje.bus.empresa %}
+                        {{ info.viaje.bus.empresa.nombre }}
+                    {% else %}
+                        Empresa no especificada
+                    {% endif %}
                 </div>
                 <div class="ruta-visual">
                     <div class="ruta-dot"></div>
@@ -192,7 +199,12 @@
                 </div>
                 <div>
                     <i class="bi bi-bus-front me-1 text-muted"></i>
-                    <small class="text-muted">{{ info.viaje.bus.placa }}</small>
+                    <small class="text-muted">
+                        {{ info.viaje.bus.placa }} 
+                        {% if info.viaje.bus.empresa %}
+                            - {{ info.viaje.bus.empresa.nombre }}
+                        {% endif %}
+                    </small>
                 </div>
             </div>
             <div class="col-md-2 text-center">
@@ -216,7 +228,7 @@
             </div>
             <div class="col-md-2 text-end">
                 {% if info.asientos_libres > 0 %}
-                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}" 
+                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ origen_id }}&destino={{ destino_id }}" 
                    class="btn btn-primary btn-sm px-4 rounded-pill">
                     <i class="bi bi-ticket-perforated me-1"></i>Reservar
                 </a>
