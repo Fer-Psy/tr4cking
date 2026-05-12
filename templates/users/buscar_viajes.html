@@ -228,7 +228,7 @@
             </div>
             <div class="col-md-2 text-end">
                 {% if info.asientos_libres > 0 %}
-                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ origen_id }}&destino={{ destino_id }}" 
+                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
                    class="btn btn-primary btn-sm px-4 rounded-pill">
                     <i class="bi bi-ticket-perforated me-1"></i>Reservar
                 </a>

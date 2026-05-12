@@ -21,22 +21,47 @@
                 <form method="post" id="encomienda-form">
                     {% csrf_token %}
                     
+                    <!-- Origen y Destino -->
+                    <div class="card mb-4 border-green">
+                        <div class="card-header bg-green-lt">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-geo-alt me-2"></i>
+                                1. Establecer Origen y Destino
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Origen *</label>
+                                    {{ form.parada_origen }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Parada de Destino *</label>
+                                    {{ form.parada_destino }}
+                                </div>
+                            </div>
+                            <div class="alert alert-info py-2 mb-0">
+                                <small><i class="bi bi-info-circle me-1"></i> Seleccione el tramo para ver los buses disponibles.</small>
+                            </div>
+                        </div>
+                    </div>
+
                     {% if not viaje %}
                     <!-- Selector de Viaje/Bus -->
-                    <div class="card mb-4 border-primary">
+                    <div class="card mb-4 border-primary" id="viaje-selection-card">
                         <div class="card-header bg-primary-lt">
                             <h4 class="card-title mb-0">
                                 <i class="bi bi-bus-front me-2"></i>
-                                Seleccionar Viaje / Bus
+                                2. Seleccionar Bus / Empresa
                             </h4>
                         </div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-12">
-                                    <label class="form-label">Viaje Disponible *</label>
+                                    <label class="form-label">Buses que hacen este recorrido *</label>
                                     {{ form.viaje }}
                                     <small class="text-muted">
-                                        Seleccione el viaje en el que se enviará la encomienda
+                                        Seleccione el bus de acuerdo a la empresa y horario de preferencia.
                                     </small>
                                 </div>
                             </div>
@@ -117,28 +142,6 @@
                                             Complete los datos del destinatario. Si ya existe, se actualizarán; si no, se creará un nuevo registro.
                                         </small>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Origen y Destino -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-green-lt">
-                            <h4 class="card-title mb-0">
-                                <i class="bi bi-geo-alt me-2"></i>
-                                Origen y Destino
-                            </h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Parada de Origen *</label>
-                                    {{ form.parada_origen }}
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Parada de Destino *</label>
-                                    {{ form.parada_destino }}
                                 </div>
                             </div>
                         </div>
@@ -321,6 +324,54 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // ========================================================
+    // FILTRADO DE VIAJES POR ORIGEN/DESTINO
+    // ========================================================
+    function filtrarViajes() {
+        if (!viajeSelect) return; // Solo si estamos en creación directa
+        
+        const origen = paradaOrigen.value;
+        const destino = paradaDestino.value;
+        
+        if (!origen || !destino) return;
+        
+        const currentViaje = viajeSelect.value;
+        viajeSelect.innerHTML = '<option value="">-- Buscando viajes disponibles... --</option>';
+        
+        fetch(`/operations/api/viajes-compatibles/?origen=${origen}&destino=${destino}`)
+            .then(response => response.json())
+            .then(data => {
+                viajeSelect.innerHTML = '<option value="">-- Seleccione un viaje --</option>';
+                if (data.viajes && data.viajes.length > 0) {
+                    data.viajes.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = v.label;
+                        viajeSelect.appendChild(opt);
+                    });
+                    
+                    // Restaurar selección si sigue siendo válida
+                    if (currentViaje) {
+                        const stillValid = data.viajes.some(v => v.id == currentViaje);
+                        if (stillValid) {
+                            viajeSelect.value = currentViaje;
+                        }
+                    }
+                } else {
+                    viajeSelect.innerHTML = '<option value="">-- No hay buses para este tramo --</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error al filtrar viajes:', error);
+                viajeSelect.innerHTML = '<option value="">-- Error al cargar viajes --</option>';
+            });
+    }
+
+    if (paradaOrigen && paradaDestino) {
+        paradaOrigen.addEventListener('change', filtrarViajes);
+        paradaDestino.addEventListener('change', filtrarViajes);
+    }
+    
+    // ========================================================
     // BÚSQUEDA DE REMITENTE
     // ========================================================
     const buscarInput = document.getElementById('buscarRemitenteInput');
@@ -459,6 +510,31 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
+    // ========================================================
+    // PRECIOS AUTOMÁTICOS POR TIPO
+    // ========================================================
+    const tipoSelect = document.getElementById('id_tipo');
+    const precioInput = document.getElementById('id_precio');
+    
+    const preciosPorTipo = {
+        'sobre': 25000,
+        'mediano': 30000,
+        'grande': 40000
+    };
+    
+    if (tipoSelect && precioInput) {
+        tipoSelect.addEventListener('change', function() {
+            const tipo = this.value;
+            if (preciosPorTipo[tipo]) {
+                precioInput.value = preciosPorTipo[tipo];
+                
+                // Efecto visual para indicar el cambio
+                precioInput.classList.add('is-valid');
+                setTimeout(() => precioInput.classList.remove('is-valid'), 2000);
+            }
+        });
+    }
+
     // Limpiar búsqueda al abrir el modal
     document.getElementById('modalBuscarRemitente')?.addEventListener('shown.bs.modal', function() {
         buscarInput?.focus();

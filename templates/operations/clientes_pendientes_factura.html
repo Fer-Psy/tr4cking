@@ -22,6 +22,7 @@
             </div>
         </div>
     </div>
+    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
     <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
@@ -30,6 +31,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
     <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
@@ -115,9 +117,13 @@
                     <th>Cliente</th>
                     <th>Cédula/RUC</th>
                     <th class="text-center">Pasajes</th>
+                    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
                     <th class="text-center">Encomiendas</th>
+                    {% endif %}
                     <th class="text-end">Total Pasajes</th>
+                    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
                     <th class="text-end">Total Encomiendas</th>
+                    {% endif %}
                     <th class="text-end">Total General</th>
                     <th class="text-end">Acciones</th>
                 </tr>
@@ -145,6 +151,7 @@
                         <span class="text-muted">-</span>
                         {% endif %}
                     </td>
+                    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
                     <td class="text-center">
                         {% if item.encomiendas %}
                         <span class="badge bg-info">{{ item.encomiendas|length }}</span>
@@ -152,6 +159,7 @@
                         <span class="text-muted">-</span>
                         {% endif %}
                     </td>
+                    {% endif %}
                     <td class="text-end">
                         {% if item.total_pasajes %}
                         Gs. {{ item.total_pasajes|floatformat:0 }}
@@ -159,6 +167,7 @@
                         -
                         {% endif %}
                     </td>
+                    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
                     <td class="text-end">
                         {% if item.total_encomiendas %}
                         Gs. {{ item.total_encomiendas|floatformat:0 }}
@@ -166,6 +175,7 @@
                         -
                         {% endif %}
                     </td>
+                    {% endif %}
                     <td class="text-end">
                         <strong class="text-success">Gs. {{ item.total|floatformat:0 }}</strong>
                     </td>
@@ -187,7 +197,7 @@
                 </tr>
                 <!-- Detalle colapsable de items -->
                 <tr class="bg-light">
-                    <td colspan="8" class="p-0">
+                    <td colspan="{% if request.user.persona.es_ayudante or request.user.persona.es_chofer %}6{% else %}8{% endif %}" class="p-0">
                         <div class="collapse" id="detalle-{{ item.cliente.pk }}">
                             <div class="p-3">
                                 <div class="row">
@@ -212,22 +222,24 @@
                                         </ul>
                                     </div>
                                     {% endif %}
-                                    {% if item.encomiendas %}
-                                    <div class="col-md-6">
-                                        <h6 class="text-muted"><i class="bi bi-box me-1"></i> Encomiendas</h6>
-                                        <ul class="list-unstyled mb-0">
-                                            {% for e in item.encomiendas %}
-                                            <li class="d-flex justify-content-between align-items-center py-1">
-                                                <span>
-                                                    {{ e.codigo }} - {{ e.parada_destino.nombre }}
-                                                </span>
-                                                <div class="d-flex align-items-center">
-                                                    <strong class="me-2">Gs. {{ e.precio|floatformat:0 }}</strong>
-                                                </div>
-                                            </li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
+                                    {% if not request.user.persona.es_ayudante and not request.user.persona.es_chofer %}
+                                        {% if item.encomiendas %}
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted"><i class="bi bi-box me-1"></i> Encomiendas</h6>
+                                            <ul class="list-unstyled mb-0">
+                                                {% for e in item.encomiendas %}
+                                                <li class="d-flex justify-content-between align-items-center py-1">
+                                                    <span>
+                                                        {{ e.codigo }} - {{ e.parada_destino.nombre }}
+                                                    </span>
+                                                    <div class="d-flex align-items-center">
+                                                        <strong class="me-2">Gs. {{ e.precio|floatformat:0 }}</strong>
+                                                    </div>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -242,10 +254,10 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center py-5 text-muted">
+                    <td colspan="{% if request.user.persona.es_ayudante or request.user.persona.es_chofer %}6{% else %}8{% endif %}" class="text-center py-5 text-muted">
                         <i class="bi bi-check-circle h1 text-success"></i>
                         <p class="mb-0 mt-2">¡Todos los items están facturados!</p>
-                        <p class="text-muted">No hay pasajes ni encomiendas pendientes de facturar.</p>
+                        <p class="text-muted">No hay pasajes pendientes de facturar.</p>
                     </td>
                 </tr>
                 {% endfor %}

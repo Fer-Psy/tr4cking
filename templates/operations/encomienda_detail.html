@@ -46,6 +46,36 @@
                                 <th>Precio:</th>
                                 <td class="h5 text-green">Gs. {{ encomienda.precio|floatformat:0 }}</td>
                             </tr>
+                            {% if encomienda.viaje %}
+                            <tr>
+                                <th>Empresa:</th>
+                                <td>{{ encomienda.viaje.empresa.nombre|default:encomienda.viaje.bus.empresa.nombre }}</td>
+                            </tr>
+                            <tr>
+                                <th>Itinerario:</th>
+                                <td>{{ encomienda.viaje.itinerario.nombre }}</td>
+                            </tr>
+                            <tr>
+                                <th>Horario Salida:</th>
+                                <td>{{ encomienda.viaje.horario.hora_salida|time:"H:i" }} hs.</td>
+                            </tr>
+                            {% if encomienda.eta_llegada %}
+                            <tr>
+                                <th>Llegada Estimada:</th>
+                                <td class="text-azure fw-bold">{{ encomienda.eta_llegada|time:"H:i" }} hs.</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Bus:</th>
+                                <td>
+                                    <span class="badge bg-azure-lt">
+                                        <i class="bi bi-truck me-1"></i>
+                                        {{ encomienda.viaje.bus.placa }}
+                                        {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endif %}
                         </table>
                     </div>
                     <div class="col-md-6">
@@ -134,10 +164,16 @@
                             <i class="bi bi-printer me-1"></i> Imprimir Ticket
                         </a>
                         
-                        <!-- Botón de generar factura -->
+                        <!-- Botón de factura -->
+                        {% if encomienda.factura %}
+                        <a href="{% url 'operations:factura_detail' encomienda.factura.pk %}" class="btn btn-azure">
+                            <i class="bi bi-printer me-1"></i> Ver/Imprimir Factura
+                        </a>
+                        {% else %}
                         <a href="{% url 'operations:factura_create' %}?encomienda={{ encomienda.pk }}" class="btn btn-success">
                             <i class="bi bi-receipt me-1"></i> Generar Factura
                         </a>
+                        {% endif %}
                         
                         <div class="btn-group">
                             {% if encomienda.estado == 'en_destino' %}
@@ -147,6 +183,14 @@
                             {% endif %}
 
                             {% if encomienda.estado == 'registrado' %}
+                            <form method="post" action="{% url 'operations:cancelar_encomienda_rapida' encomienda.pk %}"
+                                class="d-inline" onsubmit="return confirm('¿Está seguro de que desea cancelar esta encomienda?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger">
+                                    <i class="bi bi-x-circle me-1"></i> Cancelar
+                                </button>
+                            </form>
+                            
                             <form method="post" action="{% url 'operations:encomienda_estado' encomienda.pk %}"
                                 class="d-inline">
                                 {% csrf_token %}
@@ -195,14 +239,21 @@
                 <h4 class="card-title mb-0">Viaje Asignado</h4>
             </div>
             <div class="card-body">
-                <a href="{% url 'operations:viaje_detail' encomienda.viaje.pk %}">
-                    <strong>{{ encomienda.viaje.itinerario.nombre }}</strong>
-                </a>
-                <br>
-                <small class="text-muted">
-                    {{ encomienda.viaje.fecha_viaje|date:"d/m/Y" }}<br>
-                    Bus: {{ encomienda.viaje.bus.placa }}
-                </small>
+                <div class="mb-2">
+                    <span class="badge bg-blue-lt mb-1">{{ encomienda.viaje.empresa.nombre|default:encomienda.viaje.bus.empresa.nombre }}</span>
+                    <br>
+                    <a href="{% url 'operations:viaje_detail' encomienda.viaje.pk %}">
+                        <strong>{{ encomienda.viaje.itinerario.nombre }}</strong>
+                    </a>
+                </div>
+                <div class="small text-muted">
+                    <div class="mb-1"><i class="bi bi-calendar3 me-1"></i> {{ encomienda.viaje.fecha_viaje|date:"d/m/Y" }}</div>
+                    <div class="mb-1"><i class="bi bi-clock me-1"></i> Salida: {{ encomienda.viaje.horario.hora_salida|time:"H:i" }} hs.</div>
+                    {% if encomienda.eta_llegada %}
+                    <div class="mb-1 text-azure fw-bold"><i class="bi bi-geo-alt me-1"></i> Llegada: {{ encomienda.eta_llegada|time:"H:i" }} hs.</div>
+                    {% endif %}
+                    <div><i class="bi bi-truck me-1"></i> Bus: {{ encomienda.viaje.bus.placa }} {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}</div>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -221,6 +272,9 @@
                     {% if encomienda.estado in 'en_transito,en_destino,entregado' %}
                     <div class="timeline-item completed">
                         <strong>En Tránsito</strong>
+                        {% if encomienda.viaje %}
+                        <p class="text-muted small mb-0">Asignado al bus: {{ encomienda.viaje.bus.placa }}</p>
+                        {% endif %}
                     </div>
                     {% endif %}
                     {% if encomienda.estado in 'en_destino,entregado' %}

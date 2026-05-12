@@ -1,4 +1,5 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load custom_filters %}
 
 {% block title %}Comprobante de Reserva - {{ pasaje.descripcion }} - TR4CKING{% endblock %}
 
@@ -64,7 +65,7 @@
                     <div class="col-6">
                         <div class="text-muted small">PASAJERO</div>
                         <div class="fw-bold">{{ pasaje.pasajero.nombre_completo }}</div>
-                        <div class="small">CI: {{ pasaje.pasajero.cedula }}</div>
+                        <div class="small">CI: {{ pasaje.pasajero.cedula|format_gs }}</div>
                     </div>
                     <div class="col-6 text-end">
                         <div class="text-muted small">FECHA DE RESERVA</div>
@@ -97,13 +98,26 @@
                         <div class="small text-muted">{{ pasaje.asiento.get_tipo_asiento_display }}</div>
                     </div>
 
+                    <div class="col-12 mt-2">
+                        <div class="text-muted small">EMPRESA</div>
+                        <div class="fw-bold">
+                            {% if pasaje.viaje.empresa %}
+                                {{ pasaje.viaje.empresa.nombre }}
+                            {% elif pasaje.viaje.bus.empresa %}
+                                {{ pasaje.viaje.bus.empresa.nombre }}
+                            {% else %}
+                                Empresa no especificada
+                            {% endif %}
+                        </div>
+                    </div>
+
                     <div class="col-12">
                         <div class="hr-text">PAGO</div>
                     </div>
 
                     <div class="col-6">
                         <div class="text-muted small">MONTO A PAGAR</div>
-                        <div class="h2 text-azure fw-bold mb-0">Gs. {{ pasaje.precio|floatformat:0 }}</div>
+                        <div class="h2 text-azure fw-bold mb-0">Gs. {{ pasaje.precio|format_gs }}</div>
                     </div>
                     <div class="col-6 text-end text-danger">
                         <div class="text-muted small">PAGAR ANTES DE</div>

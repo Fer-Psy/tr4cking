@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <!DOCTYPE html>
 <html lang="es">
 
@@ -470,7 +471,7 @@
              DATOS DEL CLIENTE
              ============================================================ -->
         <div class="cliente-section">
-            <div class="cliente-titulo">CLIENTE: C.I. {{ factura.cliente.cedula }}</div>
+            <div class="cliente-titulo">CLIENTE: C.I. {{ factura.cliente.cedula|format_gs }}</div>
             <div class="uppercase">{{ factura.cliente.nombre_completo }}</div>
         </div>
 
@@ -502,7 +503,7 @@
                 <span></span>
                 <span></span>
                 <span>{{ detalle.tasa_iva }}</span>
-                <span class="right">{{ detalle.subtotal|floatformat:0 }}</span>
+                <span class="right">{{ detalle.subtotal|format_gs }}</span>
             </div>
         </div>
         {% endfor %}
@@ -511,11 +512,11 @@
              TOTALES
              ============================================================ -->
         <div class="subtotal-row">
-            {{ factura.total|floatformat:0 }}
+            {{ factura.total|format_gs }}
         </div>
 
         <div class="total-principal">
-            *** TOTAL Gs. *** &nbsp;&nbsp;&nbsp; {{ factura.total|floatformat:0 }}
+            *** TOTAL Gs. *** &nbsp;&nbsp;&nbsp; {{ factura.total|format_gs }}
         </div>
 
         <!-- ============================================================
@@ -525,19 +526,19 @@
             <div class="iva-title">*** Liquidación del IVA ***</div>
             <div class="iva-row">
                 <span>Total Exenta</span>
-                <span>{{ factura.subtotal_exenta|floatformat:0 }}</span>
+                <span>{{ factura.subtotal_exenta|format_gs }}</span>
             </div>
             <div class="iva-row">
                 <span>Total I.V.A 5%</span>
-                <span>{{ factura.iva_5|floatformat:0 }}</span>
+                <span>{{ factura.iva_5|format_gs }}</span>
             </div>
             <div class="iva-row">
                 <span>Total I.V.A 10%</span>
-                <span>{{ factura.iva_10|floatformat:0 }}</span>
+                <span>{{ factura.iva_10|format_gs }}</span>
             </div>
             <div class="iva-row bold">
                 <span>TOTAL I.V.A</span>
-                <span>{{ factura.total_iva|floatformat:0 }}</span>
+                <span>{{ factura.total_iva|format_gs }}</span>
             </div>
         </div>
 

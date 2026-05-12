@@ -49,6 +49,92 @@
         background: #f8fafc;
         border-radius: 0 8px 8px 0;
     }
+    
+    /* Estilos para el Mapa de Asientos */
+    .seat-container {
+        max-width: 350px;
+        margin: 0 auto;
+        background: #f1f5f9;
+        padding: 20px;
+        border-radius: 20px;
+        border: 4px solid #e2e8f0;
+    }
+    .seat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr) 30px repeat(2, 1fr);
+        gap: 10px;
+    }
+    .seat-item {
+        aspect-ratio: 1;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        font-weight: bold;
+        position: relative;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .seat-libre {
+        background-color: #ffffff;
+        color: #94a3b8;
+        border-color: #e2e8f0;
+    }
+    .seat-vendido {
+        background-color: #2fb344;
+        color: white;
+        border-color: #28a745;
+    }
+    .seat-reservado {
+        background-color: #f59e0b;
+        color: white;
+        border-color: #d97706;
+    }
+    .seat-abordado {
+        background-color: #206bc4;
+        color: white;
+        border-color: #1a569d;
+    }
+    .seat-aisle {
+        width: 30px;
+    }
+    .seat-info {
+        position: absolute;
+        bottom: 115%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e293b;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        z-index: 100;
+        display: none;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    .seat-info::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1e293b transparent transparent transparent;
+    }
+    .seat-item:hover .seat-info {
+        display: block;
+    }
+    .seat-dest {
+        font-weight: normal;
+        display: block;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
 </style>
 {% endblock %}
 
@@ -167,6 +253,82 @@
         </div>
     </div>
 
+    <!-- Mapa de Asientos -->
+    <div class="row row-cards mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title fw-bold">
+                        <i class="bi bi-grid-3x3-gap me-2"></i> Ocupación del Bus
+                    </h3>
+                    <div class="d-none d-sm-flex gap-2">
+                        <span class="badge bg-success">Vendido</span>
+                        <span class="badge bg-warning">Reservado</span>
+                        <span class="badge bg-azure">Abordado</span>
+                        <span class="badge bg-white text-muted border">Libre</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if viaje_activo %}
+                    <div class="row justify-content-center">
+                        {% if piso_2 %}
+                        <div class="col-lg-5 col-md-6 border-end">
+                            <h5 class="text-center mb-4 text-muted text-uppercase fw-bold">Piso Superior</h5>
+                            <div class="seat-container">
+                                <div class="seat-grid">
+                                    {% for item in piso_2 %}
+                                        <div class="seat-item seat-{{ item.estado }}">
+                                            {{ item.numero }}
+                                            {% if item.ocupado %}
+                                            <div class="seat-info">
+                                                <div class="fw-bold">{{ item.pasajero }}</div>
+                                                <div><i class="bi bi-geo-alt-fill me-1"></i>Baja en: {{ item.destino }}</div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% if forloop.counter|divisibleby:2 and not forloop.counter|divisibleby:4 %}
+                                        <div class="seat-aisle"></div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-lg-5 col-md-6">
+                            <h5 class="text-center mb-4 text-muted text-uppercase fw-bold">
+                                {% if piso_2 %}Piso Inferior{% else %}Distribución de Asientos{% endif %}
+                            </h5>
+                            <div class="seat-container">
+                                <div class="seat-grid">
+                                    {% for item in piso_1 %}
+                                        <div class="seat-item seat-{{ item.estado }}">
+                                            {{ item.numero }}
+                                            {% if item.ocupado %}
+                                            <div class="seat-info">
+                                                <div class="fw-bold">{{ item.pasajero }}</div>
+                                                <div><i class="bi bi-geo-alt-fill me-1"></i>Baja en: {{ item.destino }}</div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% if forloop.counter|divisibleby:2 and not forloop.counter|divisibleby:4 %}
+                                        <div class="seat-aisle"></div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-bus-front fs-1 text-muted opacity-25"></i>
+                        <p class="mt-2 text-muted">Inicia un viaje para ver el mapa de asientos.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Operative Area -->
     <div class="row row-cards">
         <!-- Venta y Pasajes -->
@@ -202,6 +364,7 @@
                                     <tr>
                                         <th>Pasajero</th>
                                         <th>Asiento</th>
+                                        <th>Estado</th>
                                         <th>Monto</th>
                                         <th></th>
                                     </tr>
@@ -214,11 +377,25 @@
                                             <div class="text-muted small">CI: {{ pasaje.pasajero.cedula }}</div>
                                         </td>
                                         <td>
-                                            <span class="badge bg-purple">{{ pasaje.asiento.numero_asiento }}</span>
+                                            <span class="badge bg-purple-lt">{{ pasaje.asiento.numero_asiento }}</span>
                                         </td>
-                                        <td class="fw-bold">Gs. {{ pasaje.precio|floatformat:0 }}</td>
-                                        <td class="text-end">
-                                            <a href="{% url 'operations:pasaje_detail' pasaje.pk %}" class="btn btn-sm btn-ghost-primary">Ver</a>
+                                        <td>
+                                            <span id="status-badge-{{ pasaje.pk }}" class="badge {% if pasaje.estado == 'vendido' %}bg-success{% elif pasaje.estado == 'reservado' %}bg-warning{% else %}bg-azure{% endif %}">
+                                                {{ pasaje.get_estado_display }}
+                                            </span>
+                                        </td>
+                                        <td class="fw-bold text-nowrap">Gs. {{ pasaje.precio|floatformat:0 }}</td>
+                                        <td class="text-end text-nowrap">
+                                            <div class="btn-list flex-nowrap justify-content-end">
+                                                {% if pasaje.estado != 'abordado' %}
+                                                <button id="btn-abordar-{{ pasaje.pk }}" class="btn btn-sm btn-azure" onclick="abordarPasajero({{ pasaje.pk }})">
+                                                    <i class="bi bi-person-check"></i> <span class="d-none d-md-inline">Abordar</span>
+                                                </button>
+                                                {% endif %}
+                                                <a href="{% url 'operations:pasaje_detail' pasaje.pk %}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% empty %}
@@ -249,11 +426,7 @@
                     <h3 class="card-title fw-bold">Gestión de Encomiendas</h3>
                 </div>
                 <div class="card-body">
-                    <div class="mb-4">
-                        <a href="{% if viaje_activo %}{% url 'operations:encomienda_create' viaje_activo.pk %}{% else %}{% url 'operations:encomienda_create_direct' %}{% endif %}" class="btn btn-success w-100 shadow-sm">
-                            <i class="bi bi-plus-circle me-2"></i> Recibir Encomienda
-                        </a>
-                    </div>
+                    
                     
                     <h4 class="subheader mb-2">Paquetes en el Bus</h4>
                     <div id="encomiendas-list">
@@ -270,10 +443,16 @@
                             <div class="text-muted small mb-2">
                                 <i class="bi bi-person me-1"></i> Para: {{ enc.destinatario.nombre_completo }}
                             </div>
-                            <div class="d-grid mt-2">
-                                <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-outline-success">
-                                    <i class="bi bi-check2-circle me-1"></i> Confirmar Entrega
-                                </a>
+                            <div class="d-grid gap-2 mt-2">
+                                {% if enc.estado == 'registrado' %}
+                                <button id="btn-abordar-enc-{{ enc.pk }}" class="btn btn-sm btn-azure" onclick="abordarEncomienda({{ enc.pk }})">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i> Recibir en Bus
+                                </button>
+                                {% elif enc.estado == 'en_transito' %}
+                                <button id="btn-recibir-{{ enc.pk }}" class="btn btn-sm btn-outline-success" onclick="recibirEnTerminal({{ enc.pk }}, '{{ enc.parada_destino.nombre }}')">
+                                    <i class="bi bi-check2-circle me-1"></i> Entregar en Terminal
+                                </button>
+                                {% endif %}
                             </div>
                         </div>
                         {% empty %}
@@ -447,6 +626,112 @@
     // Si ya estaba activo al cargar (ej. refresh), iniciar el intervalo
     if (isTracking) {
         trackingInterval = setInterval(sendLocation, 30000);
+    }
+
+    function abordarPasajero(pasajeId) {
+        if (!confirm('¿Confirmar que el pasajero ya subió al bus?')) return;
+        
+        const btn = document.getElementById(`btn-abordar-${pasajeId}`);
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch(`/operations/pasajes/${pasajeId}/abordar/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.ok) {
+                // Actualizar badge de estado
+                const badge = document.getElementById(`status-badge-${pasajeId}`);
+                badge.className = 'badge bg-azure';
+                badge.textContent = 'Abordado';
+                // Quitar botón
+                btn.remove();
+                
+                // Opcional: Recargar página para actualizar el mapa de asientos o hacerlo vía JS
+                // Para una mejor UX, recargamos solo si es necesario o actualizamos el mapa manualmente
+                location.reload(); 
+            } else {
+                alert('Error: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión');
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        });
+    }
+    function abordarEncomienda(encId) {
+        if (!confirm('¿Confirmar que la encomienda ya subió al bus?')) return;
+        
+        const btn = document.getElementById(`btn-abordar-enc-${encId}`);
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch(`/operations/encomiendas/${encId}/abordar/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.ok) {
+                location.reload(); 
+            } else {
+                alert('Error: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión');
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        });
+    }
+    function recibirEnTerminal(encId, paradaNombre) {
+        if (!confirm(`¿Confirmar que la encomienda fue entregada al encargado en ${paradaNombre}?`)) return;
+        
+        const btn = document.getElementById(`btn-recibir-${encId}`);
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch(`/operations/encomiendas/${encId}/recibir-terminal/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.ok) {
+                location.reload(); 
+            } else {
+                alert('Error: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión');
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        });
     }
 </script>
 {% endblock %}

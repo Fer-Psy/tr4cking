@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-10">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
@@ -35,94 +35,8 @@
 
                 <form method="post">
                     {% csrf_token %}
-
-                    <div class="row">
-                        <div class="col-12 mb-4">
-                            <h5 class="text-primary border-bottom pb-2">1. Planificación del Viaje</h5>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Filtrar por Empresa</label>
-                            {{ form.empresa }}
-                            {% if form.empresa.errors %}
-                            <div class="invalid-feedback d-block">{{ form.empresa.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Itinerario</label>
-                            {{ form.itinerario }}
-                            {% if form.itinerario.errors %}
-                            <div class="invalid-feedback d-block">{{ form.itinerario.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Horario</label>
-                            {{ form.horario }}
-                            {% if form.horario.errors %}
-                            <div class="invalid-feedback d-block">{{ form.horario.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Fecha de inicio</label>
-                            {{ form.fecha_viaje }}
-                            {% if form.fecha_viaje.errors %}
-                            <div class="invalid-feedback d-block">{{ form.fecha_viaje.errors.0 }}</div>
-                            {% endif %}
-                            {% if not form.instance.pk %}
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle"></i> Se programarán 8 días a partir de esta fecha
-                            </small>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-12 mt-3 mb-4">
-                            <h5 class="text-success border-bottom pb-2">2. Asignación de Recursos</h5>
-                            <small class="text-muted d-block mb-3">
-                                <i class="bi bi-info-circle"></i> 
-                                {% if form.instance.pk %}
-                                Puedes cambiar el vehículo o el personal asignado en cualquier momento si hay un imprevisto, sin afectar el itinerario.
-                                {% else %}
-                                Los mismos recursos se asignarán a todos los viajes de los 8 días. 
-                                Los valores predeterminados vienen del itinerario seleccionado.
-                                {% endif %}
-                            </small>
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Vehículo (Bus)</label>
-                            {{ form.bus }}
-                            {% if form.bus.errors %}
-                            <div class="invalid-feedback d-block">{{ form.bus.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Chofer Asignado</label>
-                            {{ form.chofer }}
-                            {% if form.chofer.errors %}
-                            <div class="invalid-feedback d-block">{{ form.chofer.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Ayudantes Asignados</label>
-                            {{ form.ayudantes }}
-                            <small class="text-muted">Mantén presionado Ctrl para seleccionar varios</small>
-                            {% if form.ayudantes.errors %}
-                            <div class="invalid-feedback d-block">{{ form.ayudantes.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="col-12 mt-3 mb-3">
-                            <label class="form-label">Observaciones Adicionales</label>
-                            {{ form.observaciones }}
-                            {% if form.observaciones.errors %}
-                            <div class="invalid-feedback d-block">{{ form.observaciones.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
+                    
+                    {% crispy form %}
 
                     {% if form.non_field_errors %}
                     <div class="alert alert-danger">
@@ -144,4 +58,140 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var empresaSelect = document.getElementById('id_empresa');
+    var itinerarioSelect = document.getElementById('id_itinerario');
+    var horarioSelect = document.getElementById('id_horario');
+
+    if (!empresaSelect || !itinerarioSelect) return;
+
+    // ── Filtra itinerarios según empresa ─────────────────────────────────────
+    function cargarItinerarios(empresaId, itinerarioSeleccionado) {
+        var url = '/operations/api/itinerarios-por-empresa/?empresa_id=' + (empresaId || '');
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            try {
+                if (window.jQuery && $(itinerarioSelect).data('select2')) {
+                    $(itinerarioSelect).select2('destroy');
+                }
+            } catch(e) {}
+
+            itinerarioSelect.innerHTML = '<option value="">-- Seleccione un itinerario --</option>';
+            data.itinerarios.forEach(function(it) {
+                var opt = document.createElement('option');
+                opt.value = it.id;
+                opt.textContent = it.nombre;
+                if (itinerarioSeleccionado && String(it.id) === String(itinerarioSeleccionado)) {
+                    opt.selected = true;
+                }
+                itinerarioSelect.appendChild(opt);
+            });
+
+            try {
+                if (window.jQuery) {
+                    $(itinerarioSelect).select2({
+                        placeholder: '-- Seleccione un itinerario --',
+                        allowClear: true,
+                        width: '100%'
+                    });
+                    if (data.itinerarios.length === 1) {
+                        $(itinerarioSelect).val(data.itinerarios[0].id).trigger('change');
+                    } else if (itinerarioSeleccionado) {
+                        cargarHorarios(itinerarioSeleccionado, null);
+                    }
+                }
+            } catch(e) {}
+        })
+        .catch(function(err) { console.error('Error cargando itinerarios:', err); });
+    }
+
+    // ── Filtra horarios según itinerario ─────────────────────────────────────
+    function cargarHorarios(itinerarioId, horarioSeleccionado) {
+        if (!horarioSelect) return;
+        var url = '/operations/api/horarios-por-itinerario/?itinerario_id=' + (itinerarioId || '');
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            try {
+                if (window.jQuery && $(horarioSelect).data('select2')) {
+                    $(horarioSelect).select2('destroy');
+                }
+            } catch(e) {}
+
+            horarioSelect.innerHTML = '<option value="">-- Seleccione un horario --</option>';
+            data.horarios.forEach(function(h) {
+                var opt = document.createElement('option');
+                opt.value = h.id;
+                opt.textContent = h.hora;
+                if (horarioSeleccionado && String(h.id) === String(horarioSeleccionado)) {
+                    opt.selected = true;
+                }
+                horarioSelect.appendChild(opt);
+            });
+
+            try {
+                if (window.jQuery) {
+                    $(horarioSelect).select2({
+                        placeholder: '-- Seleccione un horario --',
+                        allowClear: true,
+                        width: '100%'
+                    });
+                    if (data.horarios.length === 1) {
+                        $(horarioSelect).val(data.horarios[0].id).trigger('change');
+                    }
+                }
+            } catch(e) {}
+        })
+        .catch(function(err) { console.error('Error cargando horarios:', err); });
+    }
+
+    // ── Eventos ──────────────────────────────────────────────────────────────
+
+    // Cambio de empresa → recargar itinerarios y limpiar horario
+    empresaSelect.addEventListener('change', function() {
+        cargarItinerarios(this.value, null);
+        if (horarioSelect) {
+            try {
+                if (window.jQuery && $(horarioSelect).data('select2')) {
+                    $(horarioSelect).select2('destroy');
+                }
+            } catch(e) {}
+            horarioSelect.innerHTML = '<option value="">-- Seleccione un horario --</option>';
+            try {
+                if (window.jQuery) {
+                    $(horarioSelect).select2({ placeholder: '-- Seleccione un horario --', allowClear: true, width: '100%' });
+                }
+            } catch(e) {}
+        }
+    });
+
+    // Cambio de itinerario → recargar horarios
+    if (window.jQuery) {
+        $(itinerarioSelect).on('change', function() {
+            cargarHorarios(this.value, null);
+        });
+    } else {
+        itinerarioSelect.addEventListener('change', function() {
+            cargarHorarios(this.value, null);
+        });
+    }
+
+    // Al cargar la página: si ya hay empresa/itinerario (modo edición), filtrar
+    if (empresaSelect.value) {
+        var itinerarioActual = itinerarioSelect.value;
+        var horarioActual = horarioSelect ? horarioSelect.value : null;
+        cargarItinerarios(empresaSelect.value, itinerarioActual);
+        if (itinerarioActual) {
+            cargarHorarios(itinerarioActual, horarioActual);
+        }
+    }
+});
+</script>
 {% endblock %}

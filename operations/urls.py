@@ -23,6 +23,8 @@ urlpatterns = [
     path('viajes/<int:pk>/editar/', views.ViajeUpdateView.as_view(), name='viaje_update'),
     path('viajes/<int:pk>/estado/', views.ViajeEstadoUpdateView.as_view(), name='viaje_estado'),
     path('viajes/<int:pk>/iniciar/', views.ViajeIniciarView.as_view(), name='viaje_iniciar'),
+    path('viajes/<int:pk>/cancelar/', views.ViajeCancelView.as_view(), name='viaje_cancel'),
+    path('viajes/bulk-cancelar/', views.ViajeBulkCancelView.as_view(), name='viaje_bulk_cancel'),
     path('viajes/generar-automaticos/', views.GenerarViajesAutomaticosView.as_view(), name='generar_viajes_automaticos'),
     
     # ==========================================================================
@@ -33,6 +35,7 @@ urlpatterns = [
     path('pasajes/<int:pk>/comprobante/', views.PasajeComprobanteView.as_view(), name='pasaje_comprobante'),
     path('pasajes/<int:pk>/cancelar/', views.PasajeCancelacionView.as_view(), name='pasaje_cancelar'),
     path('pasajes/<int:pk>/cancelar-rapida/', views.CancelarReservaRapidaView.as_view(), name='cancelar_reserva_rapida'),
+    path('pasajes/<int:pk>/abordar/', views.PasajeAbordarView.as_view(), name='pasaje_abordar'),
     
     # Venta de pasajes (desde un viaje)
     path('viajes/<int:viaje_pk>/vender-pasaje/', views.PasajeVentaView.as_view(), name='pasaje_venta'),
@@ -46,6 +49,8 @@ urlpatterns = [
     path('encomiendas/<int:pk>/estado/', views.EncomiendaCambiarEstadoView.as_view(), name='encomienda_estado'),
     path('encomiendas/<int:pk>/ticket/', views.EncomiendaTicketView.as_view(), name='encomienda_ticket'),
     path('encomiendas/<int:pk>/cancelar-rapida/', views.CancelarEncomiendaRapidaView.as_view(), name='cancelar_encomienda_rapida'),
+    path('encomiendas/<int:pk>/abordar/', views.EncomiendaAbordarView.as_view(), name='encomienda_abordar'),
+    path('encomiendas/<int:pk>/recibir-terminal/', views.EncomiendaRecibirTerminalView.as_view(), name='encomienda_recibir_terminal'),
     path('encomiendas/nueva/', views.EncomiendaCreateView.as_view(), name='encomienda_create_direct'),
     
     # Registro de encomiendas (desde un viaje)
@@ -112,6 +117,8 @@ urlpatterns = [
     
     # API para obtener paradas de un viaje
     path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
+    path('api/itinerarios-por-empresa/', views.APIItinerariosEmpresaView.as_view(), name='api_itinerarios_empresa'),
+    path('api/horarios-por-itinerario/', views.APIHorariosItinerarioView.as_view(), name='api_horarios_itinerario'),
     path('obtener-horarios/', views.ObtenerHorariosItinerarioView.as_view(), name='obtener_horarios'),
     
     # ==========================================================================
@@ -133,5 +140,6 @@ urlpatterns = [
     path('api/asientos-segmento/<int:viaje_pk>/', views.APIAsientosSegmentoView.as_view(), name='api_asientos_segmento'),
     path('api/enviar-comprobante/<int:pk>/', views.PasajeEnviarCorreoView.as_view(), name='api_enviar_comprobante'),
     path('api/crear-reserva/<int:viaje_pk>/', views.CrearReservaClienteView.as_view(), name='api_crear_reserva'),
+    path('api/viajes-compatibles/', views.APIObtenerViajesCompatiblesView.as_view(), name='api_viajes_compatibles'),
 ]
 

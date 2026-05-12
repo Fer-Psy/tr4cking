@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.db.models import Q, Count
 from django.db.models.deletion import ProtectedError
 
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from .models import Itinerario, DetalleItinerario, Precio, Horario
 from .forms import ItinerarioForm, DetalleItinerarioForm, PrecioForm, HorarioForm
 
@@ -44,12 +44,20 @@ class ItinerarioListView(LoginRequiredMixin, ListView):
         elif activo == '0':
             queryset = queryset.filter(activo=False)
         
+        empresa_id = self.request.GET.get('empresa', '')
+        if empresa_id:
+            queryset = queryset.filter(empresa_id=empresa_id)
+        
         return queryset
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['search'] = self.request.GET.get('search', '')
         context['activo_filter'] = self.request.GET.get('activo', '')
+        context['empresa_filter'] = self.request.GET.get('empresa', '')
+        
+        from fleet.models import Empresa
+        context['empresas'] = Empresa.objects.all()
         
         # Para los modales de creación rápida
         from fleet.forms import ParadaForm
@@ -329,19 +337,7 @@ class PrecioListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('itinerario', 'origen', 'destino')
-        
-        itinerario = self.request.GET.get('itinerario', '')
-        if itinerario:
-            queryset = queryset.filter(itinerario_id=itinerario)
-        
-        return queryset
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['itinerario_filter'] = self.request.GET.get('itinerario', '')
-        context['itinerarios'] = Itinerario.objects.all()
-        return context
+        return super().get_queryset().select_related('origen', 'destino')
 
 
 class PrecioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
@@ -454,3 +450,23 @@ class HorarioDeleteView(LoginRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.success(self.request, "Horario eliminado del itinerario.")
         return super().form_valid(form)
+
+
+class HorarioCreateAjaxView(LoginRequiredMixin, CreateView):
+    """Crear un nuevo horario vía AJAX."""
+    model = Horario
+    form_class = HorarioForm
+    
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({
+            'success': True,
+            'id': self.object.id,
+            'hora': self.object.hora_salida.strftime('%H:%M'),
+        })
+    
+    def form_invalid(self, form):
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors.as_text()
+        })

@@ -95,6 +95,20 @@
             if (container) {
                 lastTriggeredSelect = container.querySelector('select');
             }
+
+            // Sync Empresa from main form
+            const mainEmpresaSelect = document.querySelector('form:not(#formNuevaParada) #id_empresa');
+            const modalEmpresaSelect = document.querySelector('#formNuevaParada #id_empresa');
+            
+            if (mainEmpresaSelect && modalEmpresaSelect) {
+                const empresaVal = mainEmpresaSelect.value;
+                if (empresaVal) {
+                    modalEmpresaSelect.value = empresaVal;
+                    modalEmpresaSelect.disabled = true;
+                } else {
+                    modalEmpresaSelect.disabled = false;
+                }
+            }
         }
         
         if (e.target.closest('.btn-open-localidad-modal')) {
@@ -223,7 +237,16 @@
     });
 
     btnSavePar.addEventListener('click', function() {
+        // Temporary enable to ensure FormData captures it
+        const modalEmpresaSelect = document.querySelector('#formNuevaParada #id_empresa');
+        const wasDisabled = modalEmpresaSelect ? modalEmpresaSelect.disabled : false;
+        if (wasDisabled) modalEmpresaSelect.disabled = false;
+
         const formData = new FormData(formPar);
+        
+        // Restore disabled state
+        if (wasDisabled) modalEmpresaSelect.disabled = true;
+
         btnSavePar.disabled = true;
         btnSavePar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>...';
 

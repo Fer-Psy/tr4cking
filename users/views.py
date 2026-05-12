@@ -30,6 +30,11 @@ class PersonaListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         queryset = super().get_queryset()
         
+        # Filtro de seguridad: Ayudantes y Choferes solo pueden ver clientes
+        user_persona = getattr(self.request.user, 'persona', None)
+        if user_persona and (user_persona.es_chofer or user_persona.es_ayudante):
+            queryset = queryset.filter(es_cliente=True)
+        
         # Search filter
         search = self.request.GET.get('search', '')
         if search:

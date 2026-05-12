@@ -1,0 +1,116 @@
+{% load crispy_forms_tags %}
+
+<!-- Modal Nuevo Horario -->
+<div class="modal modal-blur fade" id="modalHorario" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-fill me-2"></i>
+                    Nuevo Horario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formNuevoHorario">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label requiredField">
+                            Hora de Salida<span class="asteriskField">*</span>
+                        </label>
+                        <input type="time" name="hora_salida" class="form-control form-control-lg" id="id_hora_salida_modal" required>
+                    </div>
+                    <div class="form-check form-switch mt-3">
+                        <input type="checkbox" name="activo" class="form-check-input" id="id_activo_modal" checked>
+                        <label class="form-check-label" for="id_activo_modal">Activo</label>
+                    </div>
+                </form>
+                <div id="horarioErrors" class="alert alert-danger mt-3 d-none"></div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary px-4" id="btnGuardarHorario">
+                    <i class="bi bi-check-lg me-1"></i>
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Delegated listener for the save button
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.id === 'btnGuardarHorario') {
+            const btnSaveHorario = e.target;
+            const modalHorarioEl = document.getElementById('modalHorario');
+            const formHorario = document.getElementById('formNuevoHorario');
+            const errorContainer = document.getElementById('horarioErrors');
+            
+            if (!formHorario) return;
+
+            const formData = new FormData(formHorario);
+            btnSaveHorario.disabled = true;
+            const originalHtml = btnSaveHorario.innerHTML;
+            btnSaveHorario.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+            errorContainer.classList.add('d-none');
+            errorContainer.innerHTML = '';
+
+            fetch("{% url 'itineraries:horario_create_ajax' %}", {
+                method: 'POST',
+                body: formData,
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Buscar el contenedor de horarios (probablemente en otro modal o en la página principal)
+                    const container = document.querySelector('#div_id_horarios fieldset > div') || document.querySelector('#id_horarios_container');
+                    
+                    if (container) {
+                        const div = document.createElement('div');
+                        div.className = 'form-check';
+                        const newId = `id_horarios_new_${data.id}`;
+                        div.innerHTML = `
+                            <input class="form-check-input" type="checkbox" name="horarios" value="${data.id}" id="${newId}" checked>
+                            <label class="form-check-label" for="${newId}">${data.hora}</label>
+                        `;
+                        container.appendChild(div);
+                    }
+                    
+                    const modal = bootstrap.Modal.getInstance(modalHorarioEl);
+                    if (modal) modal.hide();
+                    formHorario.reset();
+                    
+                    if (window.Toast) {
+                        new Toast({ message: 'Horario creado exitosamente', type: 'success' }).show();
+                    }
+                } else {
+                    errorContainer.innerHTML = data.errors;
+                    errorContainer.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                errorContainer.innerHTML = 'Error de conexión';
+                errorContainer.classList.remove('d-none');
+            })
+            .finally(() => {
+                btnSaveHorario.disabled = false;
+                btnSaveHorario.innerHTML = originalHtml;
+            });
+        }
+    });
+
+    // Delegated listener for modal hidden event
+    document.addEventListener('hidden.bs.modal', function (event) {
+        if (event.target.id === 'modalHorario') {
+            const form = event.target.querySelector('#formNuevoHorario');
+            const errors = event.target.querySelector('#horarioErrors');
+            if (form) form.reset();
+            if (errors) errors.classList.add('d-none');
+        }
+    });
+})();
+</script>

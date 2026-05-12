@@ -233,11 +233,36 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
                 estado__in=['registrado', 'en_transito', 'en_destino']
             ).select_related('remitente', 'destinatario', 'parada_destino')
 
-            # Pasajes vendidos recientemente en este viaje
+            # Pasajes vendidos/reservados recientemente en este viaje
             context['pasajes_recientes'] = Pasaje.objects.filter(
                 viaje=viaje_activo,
-                estado='vendido'
-            ).select_related('pasajero', 'asiento').order_by('-fecha_venta')[:5]
+                estado__in=['vendido', 'reservado']
+            ).select_related('pasajero', 'asiento').order_by('-fecha_venta', '-id')[:5]
+
+            # 6. Mapa de Asientos para el Ayudante
+            asientos = viaje_activo.bus.asientos.all().order_by('piso', 'numero_asiento')
+            pasajes_activos = Pasaje.objects.filter(
+                viaje=viaje_activo,
+                estado__in=['reservado', 'vendido', 'abordado']
+            ).select_related('asiento', 'pasajero', 'parada_destino')
+            
+            asientos_dict = {p.asiento_id: p for p in pasajes_activos}
+            asientos_data = []
+            for a in asientos:
+                pasaje = asientos_dict.get(a.id)
+                asientos_data.append({
+                    'id': a.id,
+                    'numero': a.numero_asiento,
+                    'piso': a.piso,
+                    'ocupado': pasaje is not None,
+                    'pasaje': pasaje,
+                    'destino': pasaje.parada_destino.nombre if pasaje else None,
+                    'pasajero': pasaje.pasajero.nombre_completo if pasaje else None,
+                    'estado': pasaje.estado if pasaje else 'libre'
+                })
+            context['asientos_mapa'] = asientos_data
+            context['piso_1'] = [a for a in asientos_data if a['piso'] == 1]
+            context['piso_2'] = [a for a in asientos_data if a['piso'] == 2]
 
         # 5. Cliente Ocasional (para facturación rápida)
         # Buscamos si existe la persona con CI 4444440
@@ -275,16 +300,73 @@ class ViajeIniciarView(LoginRequiredMixin, View):
         viaje.hora_salida_real = timezone.localtime().time()
         viaje.save()
 
-        # También activar ubicación si no está activa
+        # Preparar localización: desactivar sesiones previas de esta persona
         if persona:
-            UbicacionAyudante.objects.update_or_create(
-                persona=persona,
-                defaults={'activo': True, 'viaje': viaje}
-            )
+            UbicacionAyudante.objects.filter(persona=persona, activo=True).update(activo=False)
         
         return JsonResponse({
             'ok': True, 
             'mensaje': '¡Buen viaje! El viaje ahora está en curso y la localización activa.'
+        })
+
+
+
+class ViajeCancelView(LoginRequiredMixin, View):
+    """API para cancelar un viaje rápidamente."""
+    def post(self, request, pk):
+        viaje = get_object_or_404(Viaje, pk=pk)
+        
+        if viaje.estado == 'cancelado':
+            return JsonResponse({'error': 'El viaje ya está cancelado'}, status=400)
+        
+        if viaje.estado == 'completado':
+            return JsonResponse({'error': 'No se puede cancelar un viaje completado'}, status=400)
+
+        # Verificar si hay pasajes vendidos/reservados
+        pasajes_activos = viaje.pasajes.filter(estado__in=['vendido', 'reservado', 'abordado']).count()
+        if pasajes_activos > 0:
+            return JsonResponse({
+                'error': f'No se puede cancelar porque tiene {pasajes_activos} pasajes activos. Debe reubicarlos o cancelarlos primero.'
+            }, status=400)
+
+        viaje.estado = 'cancelado'
+        viaje.save()
+        
+        messages.success(request, f"Viaje #{viaje.id} cancelado correctamente.")
+        return JsonResponse({'ok': True, 'mensaje': f'Viaje #{viaje.id} cancelado correctamente.'})
+
+
+class ViajeBulkCancelView(LoginRequiredMixin, View):
+    """API para cancelar múltiples viajes."""
+    def post(self, request):
+        viaje_ids = request.POST.getlist('viaje_ids[]')
+        if not viaje_ids:
+            return JsonResponse({'error': 'No se seleccionaron viajes'}, status=400)
+            
+        viajes = Viaje.objects.filter(pk__in=viaje_ids)
+        cancelados = 0
+        omitidos = 0
+        
+        for viaje in viajes:
+            if viaje.estado in ['cancelado', 'completado']:
+                omitidos += 1
+                continue
+                
+            # No cancelar si tiene pasajes activos
+            if viaje.pasajes.filter(estado__in=['vendido', 'reservado', 'abordado']).exists():
+                omitidos += 1
+                continue
+                
+            viaje.estado = 'cancelado'
+            viaje.save()
+            cancelados += 1
+            
+        if cancelados > 0:
+            messages.success(request, f"Se han cancelado {cancelados} viaje(s) correctamente.")
+        
+        return JsonResponse({
+            'ok': True, 
+            'mensaje': f'Proceso completado. {cancelados} cancelados, {omitidos} omitidos.'
         })
 
 
@@ -376,6 +458,9 @@ class ViajeListView(LoginRequiredMixin, ListView):
         estado = self.request.GET.get('estado')
         if estado:
             queryset = queryset.filter(estado=estado)
+        else:
+            # Por defecto ocultar los cancelados a menos que se filtre específicamente
+            queryset = queryset.exclude(estado='cancelado')
         
         search = self.request.GET.get('search')
         if search:
@@ -638,6 +723,11 @@ class PasajeListView(LoginRequiredMixin, ListView):
             'viaje__itinerario', 'pasajero', 'asiento', 'parada_origen', 'parada_destino'
         )
         
+        # Filtro por usuario para ayudantes/choferes
+        persona = getattr(self.request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+            queryset = queryset.filter(vendedor=self.request.user)
+        
         # Filtros
         fecha = self.request.GET.get('fecha')
         if fecha:
@@ -753,7 +843,6 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
         # Obtener precio del itinerario
         try:
             precio_obj = Precio.objects.get(
-                itinerario=pasaje.viaje.itinerario,
                 origen=pasaje.parada_origen,
                 destino=pasaje.parada_destino
             )
@@ -820,6 +909,17 @@ class PasajeCancelacionView(LoginRequiredMixin, View):
             'pasaje': pasaje,
             'form': form
         })
+
+
+class PasajeAbordarView(LoginRequiredMixin, View):
+    """Marca un pasaje como abordado (el pasajero ya subió)."""
+    def post(self, request, pk):
+        pasaje = get_object_or_404(Pasaje, pk=pk)
+        if pasaje.estado in ['vendido', 'reservado']:
+            pasaje.estado = 'abordado'
+            pasaje.save()
+            return JsonResponse({'ok': True, 'mensaje': 'Pasajero marcado como abordado.'})
+        return JsonResponse({'ok': False, 'error': 'El estado del pasaje no permite abordaje.'}, status=400)
 
 
 # =============================================================================
@@ -992,6 +1092,28 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
             'encomienda': encomienda,
             'form': form
         })
+
+
+class EncomiendaAbordarView(LoginRequiredMixin, View):
+    """Marca una encomienda como recibida en el bus (En Tránsito)."""
+    def post(self, request, pk):
+        encomienda = get_object_or_404(Encomienda, pk=pk)
+        if encomienda.estado == 'registrado':
+            encomienda.estado = 'en_transito'
+            encomienda.save()
+            return JsonResponse({'ok': True, 'mensaje': 'Encomienda marcada como en tránsito.'})
+        return JsonResponse({'ok': False, 'error': 'El estado de la encomienda no permite esta acción.'}, status=400)
+
+
+class EncomiendaRecibirTerminalView(LoginRequiredMixin, View):
+    """Marca una encomienda como recibida en la terminal de destino (En Destino)."""
+    def post(self, request, pk):
+        encomienda = get_object_or_404(Encomienda, pk=pk)
+        if encomienda.estado == 'en_transito':
+            encomienda.estado = 'en_destino'
+            encomienda.save()
+            return JsonResponse({'ok': True, 'mensaje': 'Encomienda recibida en terminal. Lista para retiro.'})
+        return JsonResponse({'ok': False, 'error': 'El estado de la encomienda no permite esta acción.'}, status=400)
 
 
 class EncomiendaCambiarEstadoView(LoginRequiredMixin, View):
@@ -1268,6 +1390,11 @@ class FacturaListView(LoginRequiredMixin, ListView):
         queryset = super().get_queryset().select_related(
             'timbrado__empresa', 'cliente', 'cajero'
         )
+
+        # Filtro por usuario para ayudantes/choferes
+        persona = getattr(self.request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+            queryset = queryset.filter(cajero=self.request.user)
         
         # Filtros
         fecha = self.request.GET.get('fecha')
@@ -1312,12 +1439,18 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
             detalles_factura__factura__estado='emitida'
         ).select_related('pasajero', 'viaje__itinerario', 'asiento')
         
-        # Obtener encomiendas no facturadas
-        encomiendas_sin_factura = Encomienda.objects.filter(
-            estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
-        ).exclude(
-            detalles_factura__factura__estado='emitida'
-        ).select_related('remitente', 'parada_destino')
+        # Obtener encomiendas no facturadas (ocultas para ayudantes/choferes)
+        persona = getattr(self.request.user, 'persona', None)
+        es_ayudante_o_chofer = persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser
+        
+        if es_ayudante_o_chofer:
+            encomiendas_sin_factura = Encomienda.objects.none()
+        else:
+            encomiendas_sin_factura = Encomienda.objects.filter(
+                estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
+            ).exclude(
+                detalles_factura__factura__estado='emitida'
+            ).select_related('remitente', 'parada_destino')
         
         # Filtro de búsqueda
         search = self.request.GET.get('search', '').strip()
@@ -1395,6 +1528,10 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
                 context['proximo_numero'] = "Sin números disponibles"
         
         return context
+
+
+            
+        return redirect('operations:pasaje_list')
 
 
 class CancelarReservaRapidaView(LoginRequiredMixin, View):
@@ -1558,7 +1695,7 @@ class FacturaCreateView(LoginRequiredMixin, View):
         from .forms import FacturaForm, EncomiendaForm
         
         # ... logic ...
-        form = FacturaForm(cliente=cliente_cedula, pasaje=pasaje, encomienda=encomienda)
+        form = FacturaForm(cliente=cliente_cedula, pasaje=pasaje, encomienda=encomienda, user=request.user)
         encomienda_form = EncomiendaForm()
         
         return render(request, 'operations/factura_form.html', {
@@ -1575,7 +1712,7 @@ class FacturaCreateView(LoginRequiredMixin, View):
         cedula_cliente = request.POST.get('cedula_cliente', '').strip()
         
         # Construir el formulario con el cliente para que los querysets sean válidos
-        form = FacturaForm(request.POST, cliente=cedula_cliente)
+        form = FacturaForm(request.POST, cliente=cedula_cliente, user=request.user)
         
         if form.is_valid():
             try:
@@ -1884,8 +2021,10 @@ class BuscarPersonaView(LoginRequiredMixin, View):
     def get(self, request):
         cedula = request.GET.get('cedula')
         if cedula:
+            # Limpiar espacios y puntos
+            cedula_limpia = cedula.replace(' ', '').replace('\xa0', '').replace('.', '')
             try:
-                persona = Persona.objects.get(cedula=cedula)
+                persona = Persona.objects.get(cedula=cedula_limpia)
                 return render(request, 'operations/partials/persona_encontrada.html', {
                     'persona': persona
                 })
@@ -1926,15 +2065,51 @@ class ObtenerPrecioView(LoginRequiredMixin, View):
         
         if viaje_pk and origen_pk and destino_pk:
             try:
-                viaje = Viaje.objects.get(pk=viaje_pk)
-                precio = Precio.objects.get(
-                    itinerario=viaje.itinerario,
+                # 1. Intento por IDs exactos
+                precio_obj = Precio.objects.filter(
                     origen_id=origen_pk,
                     destino_id=destino_pk
-                )
-                return JsonResponse({'precio': float(precio.precio)})
-            except (Viaje.DoesNotExist, Precio.DoesNotExist):
+                ).first()
+                
+                if not precio_obj:
+                    # 2. Intento por LOCALIDADES (más flexible)
+                    from fleet.models import Parada
+                    try:
+                        p_origen = Parada.objects.get(pk=origen_pk)
+                        p_destino = Parada.objects.get(pk=destino_pk)
+                        
+                        if p_origen.localidad and p_destino.localidad:
+                            precio_obj = Precio.objects.filter(
+                                origen__localidad=p_origen.localidad,
+                                destino__localidad=p_destino.localidad
+                            ).first()
+                    except Parada.DoesNotExist:
+                        pass
+
+                if not precio_obj:
+                    # 3. Intento por NOMBRES (fuzzy)
+                    try:
+                        p_origen = Parada.objects.get(pk=origen_pk)
+                        p_destino = Parada.objects.get(pk=destino_pk)
+                        
+                        # Limpiar nombres comunes para mejorar coincidencia
+                        o_name = p_origen.nombre.replace('Terminal', '').strip()
+                        d_name = p_destino.nombre.replace('Terminal', '').strip()
+                        
+                        precio_obj = Precio.objects.filter(
+                            origen__nombre__icontains=o_name,
+                            destino__nombre__icontains=d_name
+                        ).first()
+                    except Parada.DoesNotExist:
+                        pass
+
+                if precio_obj:
+                    return JsonResponse({'precio': float(precio_obj.precio)})
+                
                 return JsonResponse({'precio': 0, 'error': 'No encontrado'})
+                
+            except Exception as e:
+                return JsonResponse({'precio': 0, 'error': str(e)})
         
         return JsonResponse({'precio': 0})
 
@@ -2007,10 +2182,13 @@ class BuscarClientesRegistradosView(LoginRequiredMixin, View):
         clientes = []
         for persona in personas:
             clientes.append({
+                'id': persona.pk,
                 'cedula': str(persona.cedula),
-                'nombre': persona.nombre_completo,
-                'telefono': persona.telefono or '-',
-                'direccion': persona.direccion or '-'
+                'nombre_completo': persona.nombre_completo,
+                'nombre': persona.nombre,
+                'apellido': persona.apellido,
+                'telefono': persona.telefono or '',
+                'direccion': persona.direccion or ''
             })
         
         return JsonResponse({'clientes': clientes})
@@ -2024,9 +2202,12 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
         if not cedula:
             return JsonResponse({'error': 'Cédula requerida'}, status=400)
         
+        # Limpiar espacios y puntos
+        cedula_limpia = cedula.replace(' ', '').replace('\xa0', '').replace('.', '')
+        
         try:
-            persona = Persona.objects.get(cedula=cedula)
-        except Persona.DoesNotExist:
+            persona = Persona.objects.get(cedula=cedula_limpia)
+        except (Persona.DoesNotExist, ValueError):
             return JsonResponse({'error': 'Cliente no encontrado'}, status=404)
         
         # Obtener pasajes pendientes (vendidos o reservados)
@@ -2079,6 +2260,46 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
         })
 
 
+class APIItinerariosEmpresaView(LoginRequiredMixin, View):
+    """API JSON para obtener itinerarios filtrados por empresa."""
+    
+    def get(self, request):
+        empresa_id = request.GET.get('empresa_id')
+        
+        if not empresa_id:
+            itinerarios = Itinerario.objects.filter(activo=True).order_by('nombre')
+        else:
+            try:
+                itinerarios = Itinerario.objects.filter(
+                    empresa_id=int(empresa_id),
+                    activo=True
+                ).order_by('nombre')
+            except (ValueError, TypeError):
+                itinerarios = Itinerario.objects.filter(activo=True).order_by('nombre')
+        
+        data = [{'id': it.pk, 'nombre': it.nombre} for it in itinerarios]
+        return JsonResponse({'itinerarios': data})
+
+
+class APIHorariosItinerarioView(LoginRequiredMixin, View):
+    """API JSON para obtener horarios filtrados por itinerario (Many2Many)."""
+    
+    def get(self, request):
+        itinerario_id = request.GET.get('itinerario_id')
+        
+        if not itinerario_id:
+            horarios = Horario.objects.filter(activo=True).order_by('hora_salida')
+        else:
+            try:
+                itinerario = Itinerario.objects.get(pk=int(itinerario_id))
+                horarios = itinerario.horarios.filter(activo=True).order_by('hora_salida')
+            except (ValueError, TypeError, Itinerario.DoesNotExist):
+                horarios = Horario.objects.filter(activo=True).order_by('hora_salida')
+        
+        data = [{'id': h.pk, 'hora': h.hora_salida.strftime('%H:%M')} for h in horarios]
+        return JsonResponse({'horarios': data})
+
+
 class ViajeParadasView(LoginRequiredMixin, View):
     """API para obtener las paradas de un viaje específico."""
     
@@ -2124,7 +2345,7 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
             try:
                 from django.db.models import Q
                 emp_id = int(empresa_id)
-                itinerarios = itinerarios.filter(Q(empresa_id=emp_id) | Q(empresa__isnull=True))
+                itinerarios = itinerarios.filter(empresa_id=emp_id)
                 buses = Bus.objects.filter(empresa_id=emp_id).order_by('placa')
                 choferes = Persona.objects.filter(empresa_id=emp_id, es_chofer=True).order_by('apellido', 'nombre')
                 ayudantes = Persona.objects.filter(empresa_id=emp_id, es_ayudante=True).order_by('apellido', 'nombre')
@@ -2546,7 +2767,7 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             estado__in=['programado', 'en_curso'],
         ).select_related(
             'itinerario', 'bus', 'chofer', 'horario', 'empresa'
-        )
+        ).prefetch_related('itinerario__detalles__parada__localidad')
 
         # Procesar identificadores virtuales (text_) del autocompletado
         if origen_id and origen_id.startswith('text_'):
@@ -2564,6 +2785,36 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
             return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
 
+        # Función para buscar IDs de paradas similares tolerante a acentos
+        def get_similar_ids(p, base_id=None):
+            if not p: return []
+            norm = normalize_search(p.nombre)
+            loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
+            matched_ids = []
+            if base_id:
+                matched_ids.append(base_id)
+            
+            from fleet.models import Parada
+            for db_p in Parada.objects.select_related('localidad').all():
+                if base_id and str(db_p.id) == str(base_id):
+                    continue
+                db_norm = normalize_search(db_p.nombre)
+                db_loc_norm = normalize_search(db_p.localidad.nombre if db_p.localidad else '')
+                
+                match = False
+                if norm and (norm in db_norm or db_norm in norm):
+                    match = True
+                elif loc_norm and (loc_norm in db_loc_norm or db_loc_norm in loc_norm):
+                    match = True
+                elif norm and db_loc_norm and norm in db_loc_norm:
+                    match = True
+                elif loc_norm and db_norm and loc_norm in db_norm:
+                    match = True
+                    
+                if match:
+                    matched_ids.append(db_p.id)
+            return matched_ids
+
         # Filtrado por tramo (Origen -> Destino) mejorado
         if origen_id and destino_id:
             from itineraries.models import DetalleItinerario
@@ -2571,19 +2822,9 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             
             origen_p = Parada.objects.filter(pk=origen_id).first()
             destino_p = Parada.objects.filter(pk=destino_id).first()
-            
-            # Buscar IDs de paradas similares (por nombre o localidad normalizados)
-            def get_similar_ids(p):
-                if not p: return []
-                norm = normalize_search(p.nombre)
-                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
-                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
-                if loc_norm:
-                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
-                return Parada.objects.filter(query).values_list('id', flat=True)
 
-            origen_ids = get_similar_ids(origen_p) if origen_p else [origen_id]
-            destino_ids = get_similar_ids(destino_p) if destino_p else [destino_id]
+            origen_ids = get_similar_ids(origen_p, origen_id) if origen_p else [origen_id]
+            destino_ids = get_similar_ids(destino_p, destino_id) if destino_p else [destino_id]
             
             # Subconsulta para obtener el orden del origen
             sub_origen = DetalleItinerario.objects.filter(
@@ -2618,16 +2859,7 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             from fleet.models import Parada
             origen_p = Parada.objects.filter(pk=origen_id).first()
             
-            def get_similar_ids(p):
-                if not p: return []
-                norm = normalize_search(p.nombre)
-                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
-                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
-                if loc_norm:
-                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
-                return Parada.objects.filter(query).values_list('id', flat=True)
-
-            origen_ids = get_similar_ids(origen_p) if origen_p else [origen_id]
+            origen_ids = get_similar_ids(origen_p, origen_id) if origen_p else [origen_id]
             viajes = viajes.filter(
                 Q(itinerario__detalles__parada_id__in=origen_ids) |
                 (
@@ -2641,16 +2873,7 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             from fleet.models import Parada
             destino_p = Parada.objects.filter(pk=destino_id).first()
             
-            def get_similar_ids(p):
-                if not p: return []
-                norm = normalize_search(p.nombre)
-                loc_norm = normalize_search(p.localidad.nombre if p.localidad else '')
-                query = Q(nombre__icontains=norm) | Q(localidad__nombre__icontains=norm)
-                if loc_norm:
-                    query |= Q(nombre__icontains=loc_norm) | Q(localidad__nombre__icontains=loc_norm)
-                return Parada.objects.filter(query).values_list('id', flat=True)
-
-            destino_ids = get_similar_ids(destino_p) if destino_p else [destino_id]
+            destino_ids = get_similar_ids(destino_p, destino_id) if destino_p else [destino_id]
             viajes = viajes.filter(
                 Q(itinerario__detalles__parada_id__in=destino_ids) |
                 (
@@ -2687,11 +2910,48 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
             pasajes_activos = viaje.pasajes.filter(
                 estado__in=['vendido', 'reservado']
             ).values('asiento_id').distinct().count()
+            
+            viaje_origen_id = ''
+            viaje_destino_id = ''
+            
+            # Use prefetched data and sort in memory
+            detalles = list(viaje.itinerario.detalles.all())
+            detalles.sort(key=lambda x: x.orden)
+            
+            # Buscar el mejor origen específico para este itinerario
+            if origen_text or origen_id:
+                for d in detalles:
+                    if origen_id and str(d.parada_id) == str(origen_id):
+                        viaje_origen_id = d.parada_id
+                        break
+                    norm_nombre = normalize_search(d.parada.nombre)
+                    norm_loc = normalize_search(d.parada.localidad.nombre if d.parada.localidad else '')
+                    search_term = normalize_search(origen_text)
+                    if search_term and (search_term in norm_nombre or search_term in norm_loc or norm_nombre in search_term or norm_loc in search_term):
+                        viaje_origen_id = d.parada_id
+                        break
+                        
+            # Buscar el mejor destino específico para este itinerario
+            if destino_text or destino_id:
+                detalles_rev = list(reversed(detalles))
+                for d in detalles_rev:
+                    if destino_id and str(d.parada_id) == str(destino_id):
+                        viaje_destino_id = d.parada_id
+                        break
+                    norm_nombre = normalize_search(d.parada.nombre)
+                    norm_loc = normalize_search(d.parada.localidad.nombre if d.parada.localidad else '')
+                    search_term = normalize_search(destino_text)
+                    if search_term and (search_term in norm_nombre or search_term in norm_loc or norm_nombre in search_term or norm_loc in search_term):
+                        viaje_destino_id = d.parada_id
+                        break
+
             viajes_con_info.append({
                 'viaje': viaje,
                 'asientos_libres': viaje.bus.capacidad_asientos - pasajes_activos,
                 'asientos_total': viaje.bus.capacidad_asientos,
                 'porcentaje_ocupacion': viaje.porcentaje_ocupacion,
+                'origen_id': viaje_origen_id,
+                'destino_id': viaje_destino_id,
             })
 
         context['viajes'] = viajes_con_info
@@ -2724,6 +2984,37 @@ class ReservarPasajeView(LoginRequiredMixin, TemplateView):
         # Origen y destino sugeridos (desde búsqueda)
         context['initial_origen_id'] = self.request.GET.get('origen')
         context['initial_destino_id'] = self.request.GET.get('destino')
+
+        # Verificar si ya tiene una reserva previa (para mostrar alerta al cargar)
+        persona = getattr(self.request.user, 'persona', None)
+        if persona:
+            # 1. Misma reserva específica
+            tiene_misma = Pasaje.objects.filter(
+                viaje=viaje,
+                pasajero=persona,
+                estado__in=['reservado', 'vendido', 'abordado']
+            ).exists()
+            
+            # 2. Otras reservas el mismo día (otra empresa o viaje)
+            otras_reservas = Pasaje.objects.filter(
+                viaje__fecha_viaje=viaje.fecha_viaje,
+                pasajero=persona,
+                estado__in=['reservado', 'vendido', 'abordado']
+            ).exclude(viaje=viaje).select_related('viaje__empresa', 'viaje__itinerario')
+            
+            empresa_actual = viaje.empresa.nombre if viaje.empresa else (viaje.bus.empresa.nombre if viaje.bus.empresa else "la empresa")
+            
+            if tiene_misma:
+                context['tiene_reserva_previa'] = True
+                context['reserva_previa_msg'] = f"Usted ya cuenta con una reserva activa para este viaje con {empresa_actual}."
+            elif otras_reservas.exists():
+                r_otra = otras_reservas.first()
+                empresa_otra = r_otra.viaje.empresa.nombre if r_otra.viaje.empresa else "otra empresa"
+                context['tiene_reserva_previa'] = True
+                context['reserva_previa_msg'] = (
+                    f"¡Atención! Usted ya tiene una reserva para el día {viaje.fecha_viaje.strftime('%d/%m/%Y')} "
+                    f"con la empresa {empresa_otra}. ¿Está seguro de que desea reservar también con {empresa_actual}?"
+                )
 
         return context
 
@@ -2768,53 +3059,42 @@ class APIAsientosSegmentoView(LoginRequiredMixin, View):
 
         # Precio
         precio = None
-        # 1. Intento exacto: Por paradas e itinerario específico
-        precio_obj = Precio.objects.filter(
-            itinerario=viaje.itinerario,
+        # 1. Intento exacto: Por paradas directas
+        precio_alternativo = Precio.objects.filter(
             origen=parada_origen,
             destino=parada_destino
         ).first()
 
-        if precio_obj:
-            precio = float(precio_obj.precio)
+        if precio_alternativo:
+            precio = float(precio_alternativo.precio)
         else:
-            # 2. Intento por paradas (independientemente del itinerario)
-            precio_alternativo = Precio.objects.filter(
-                origen=parada_origen,
-                destino=parada_destino
+            # 2. Intento por NOMBRES (cuando hay paradas duplicadas para distintas empresas)
+            precio_por_nombre = Precio.objects.filter(
+                origen__nombre=parada_origen.nombre,
+                destino__nombre=parada_destino.nombre
             ).first()
-            if precio_alternativo:
-                precio = float(precio_alternativo.precio)
+            if precio_por_nombre:
+                precio = float(precio_por_nombre.precio)
             else:
-                # 3. Intento por NOMBRES (cuando hay paradas duplicadas para distintas empresas)
-                # Buscamos cualquier precio que coincida con los nombres de origen y destino
-                precio_por_nombre = Precio.objects.filter(
-                    origen__nombre=parada_origen.nombre,
-                    destino__nombre=parada_destino.nombre
+                # 3. Intento por NOMBRES DE LOCALIDAD (Exacto)
+                precio_localidad = Precio.objects.filter(
+                    origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
+                    destino__localidad__nombre__iexact=parada_destino.localidad.nombre
                 ).first()
-                if precio_por_nombre:
-                    precio = float(precio_por_nombre.precio)
+                if precio_localidad:
+                    precio = float(precio_localidad.precio)
                 else:
-                    # 4. Intento por NOMBRES DE LOCALIDAD (Exacto)
-                    precio_localidad = Precio.objects.filter(
-                        origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
-                        destino__localidad__nombre__iexact=parada_destino.localidad.nombre
-                    ).first()
-                    if precio_localidad:
-                        precio = float(precio_localidad.precio)
-                    else:
-                        # 5. Intento SUPER FUZZY (Parcial): ej "Terminal Caaguazu" contiene "Caaguazu"
-                        # Limpiamos el nombre para buscar coincidencias parciales
-                        o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                        d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                        
-                        if len(o_search) > 3 and len(d_search) > 3:
-                            precio_fuzzy = Precio.objects.filter(
-                                Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
-                                Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
-                            ).first()
-                            if precio_fuzzy:
-                                precio = float(precio_fuzzy.precio)
+                    # 4. Intento SUPER FUZZY (Parcial)
+                    o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                    d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                    
+                    if len(o_search) > 3 and len(d_search) > 3:
+                        precio_fuzzy = Precio.objects.filter(
+                            Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
+                            Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
+                        ).first()
+                        if precio_fuzzy:
+                            precio = float(precio_fuzzy.precio)
 
         asientos_data = []
         for asiento in todos:
@@ -2878,6 +3158,41 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
         if not persona:
             return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
 
+        # Verificar si ya tiene una reserva para este viaje o para el mismo día
+        confirmar = body.get('confirmar', False)
+        if not confirmar:
+            # 1. Misma reserva específica
+            tiene_misma = Pasaje.objects.filter(
+                viaje=viaje,
+                pasajero=persona,
+                estado__in=['reservado', 'vendido', 'abordado']
+            ).exists()
+            
+            # 2. Otras reservas el mismo día
+            otras_reservas = Pasaje.objects.filter(
+                viaje__fecha_viaje=viaje.fecha_viaje,
+                pasajero=persona,
+                estado__in=['reservado', 'vendido', 'abordado']
+            ).exclude(viaje=viaje).select_related('viaje__empresa')
+
+            empresa_actual = viaje.empresa.nombre if viaje.empresa else (viaje.bus.empresa.nombre if viaje.bus.empresa else "la empresa")
+            
+            if tiene_misma:
+                return JsonResponse({
+                    'warning': f'Usted ya cuenta con una reserva o pasaje activo para este viaje con {empresa_actual}.',
+                    'confirmacion_requerida': True
+                })
+            elif otras_reservas.exists():
+                r_otra = otras_reservas.first()
+                empresa_otra = r_otra.viaje.empresa.nombre if r_otra.viaje.empresa else "otra empresa"
+                return JsonResponse({
+                    'warning': (
+                        f'Usted ya tiene una reserva para este mismo día ({viaje.fecha_viaje.strftime("%d/%m/%Y")}) '
+                        f'con la empresa {empresa_otra}.'
+                    ),
+                    'confirmacion_requerida': True
+                })
+
         # Validar paradas
         from .utils import obtener_orden_parada, asiento_disponible_en_tramo
         from fleet.models import Asiento
@@ -2912,68 +3227,66 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
 
         # Calcular precio (Lookup flexible con fallbacks)
         precio = None
-        # 1. Intento exacto: Por paradas e itinerario específico
-        precio_obj = Precio.objects.filter(
-            itinerario=viaje.itinerario,
+        # 1. Intento por paradas directas
+        precio_alternativo = Precio.objects.filter(
             origen=parada_origen,
             destino=parada_destino
         ).first()
-
-        if precio_obj:
-            precio = precio_obj.precio
+        if precio_alternativo:
+            precio = precio_alternativo.precio
         else:
-            # 2. Intento por paradas (independientemente del itinerario)
-            precio_alternativo = Precio.objects.filter(
-                origen=parada_origen,
-                destino=parada_destino
+            # 2. Intento por NOMBRES
+            precio_por_nombre = Precio.objects.filter(
+                origen__nombre=parada_origen.nombre,
+                destino__nombre=parada_destino.nombre
             ).first()
-            if precio_alternativo:
-                precio = precio_alternativo.precio
+            if precio_por_nombre:
+                precio = precio_por_nombre.precio
             else:
-                # 3. Intento por NOMBRES
-                precio_por_nombre = Precio.objects.filter(
-                    origen__nombre=parada_origen.nombre,
-                    destino__nombre=parada_destino.nombre
+                # 3. Intento por LOCALIDADES
+                precio_localidad = Precio.objects.filter(
+                    origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
+                    destino__localidad__nombre__iexact=parada_destino.localidad.nombre
                 ).first()
-                if precio_por_nombre:
-                    precio = precio_por_nombre.precio
+                if precio_localidad:
+                    precio = precio_localidad.precio
                 else:
-                    # 4. Intento por LOCALIDADES
-                    precio_localidad = Precio.objects.filter(
-                        origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
-                        destino__localidad__nombre__iexact=parada_destino.localidad.nombre
-                    ).first()
-                    if precio_localidad:
-                        precio = precio_localidad.precio
-                    else:
-                        # 5. Intento Fuzzy
-                        o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                        d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                        if len(o_search) > 3 and len(d_search) > 3:
-                            precio_fuzzy = Precio.objects.filter(
-                                Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
-                                Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
-                            ).first()
-                            if precio_fuzzy:
-                                precio = precio_fuzzy.precio
+                    # 4. Intento Fuzzy
+                    o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                    d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                    if len(o_search) > 3 and len(d_search) > 3:
+                        precio_fuzzy = Precio.objects.filter(
+                            Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
+                            Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
+                        ).first()
+                        if precio_fuzzy:
+                            precio = precio_fuzzy.precio
 
         if precio is None:
             return JsonResponse({
                 'error': 'No hay precio definido para ese tramo. Contacte a la empresa.'
             }, status=400)
 
-        from datetime import datetime
+        from datetime import datetime, timedelta
+        
+        detalle_origen = viaje.itinerario.detalles.filter(parada=parada_origen).first()
+        minutos_origen = detalle_origen.minutos_desde_origen if detalle_origen and detalle_origen.minutos_desde_origen else 0
+
         if viaje.horario:
-            fecha_hora_salida = timezone.make_aware(
+            fecha_hora_salida_origen = timezone.make_aware(
                 datetime.combine(viaje.fecha_viaje, viaje.horario.hora_salida)
             )
-            limite_pago = fecha_hora_salida - timedelta(minutes=30)
+            fecha_hora_llegada_parada = fecha_hora_salida_origen + timedelta(minutes=minutos_origen)
+            limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
+            hora_salida_str = viaje.horario.hora_salida.strftime("%H:%M")
         else:
-            limite_pago = timezone.now() + timedelta(minutes=30)
+            fecha_hora_llegada_parada = timezone.now() + timedelta(minutes=minutos_origen)
+            limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
+            hora_salida_str = "--:--"
             
         if timezone.now() >= limite_pago:
             return JsonResponse({
-                'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la salida) ha concluido.'
+                'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la llegada del bus a su parada) ha concluido.'
             }, status=400)
 
         # Manejar datos de facturación (cliente pagador opcional)
@@ -3038,6 +3351,10 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
              # y listamos todos los códigos si es necesario.
              pass
 
+        nombre_origen_itinerario = viaje.itinerario.nombre_origen
+        hora_llegada_str = fecha_hora_llegada_parada.strftime('%H:%M')
+        hora_limite_str = p_main.fecha_limite_pago.strftime('%H:%M')
+
         return JsonResponse({
             'ok': True,
             'pasaje': {
@@ -3056,9 +3373,11 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
             },
             'mensaje': (
                 f'¡Reserva confirmada de {len(pasajes)} asiento(s)! Asientos: {numero_asientos}. '
-                f'Tiene hasta 30 minutos antes de la salida para poder abonar en la agencia (Límite: {p_main.fecha_limite_pago.strftime("%d/%m/%Y %H:%M")}), '
-                f'de lo contrario su reserva se cancela automáticamente, por lo que dichos asientos quedarán libres. '
-            ),
+                f'El bus saldrá de {nombre_origen_itinerario} a las {hora_salida_str} hs. '
+                f'De acuerdo a los minutos de viaje, su hora estimada de abordaje en {parada_origen.nombre} es a las {hora_llegada_str} hs. '
+                f'Por favor, acérquese a su parada hasta 30 minutos antes (Límite: {hora_limite_str} hs) para abonar, '
+                f'de lo contrario su reserva se cancela automáticamente y los asientos quedarán libres.'
+            )
         })
 
 
@@ -3175,3 +3494,74 @@ class APICrearEncomiendaFacturacionView(LoginRequiredMixin, View):
             # Retornar errores de validación
             errors = {field: error_list[0]['message'] for field, error_list in form.errors.get_json_data().items()}
             return JsonResponse({'error': 'Datos inválidos', 'details': errors}, status=400)
+
+
+class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
+    """API que devuelve los viajes que cubren el tramo origen -> destino."""
+    def get(self, request):
+        origen_id = request.GET.get('origen')
+        destino_id = request.GET.get('destino')
+        
+        if not origen_id or not destino_id:
+            return JsonResponse({'viajes': []})
+            
+        from django.utils import timezone
+        
+        # Obtener fecha y hora local actual
+        ahora_local = timezone.localtime(timezone.now())
+        hoy = ahora_local.date()
+        hora_actual = ahora_local.time()
+        
+        # 1. Encontrar itinerarios que tengan ambas paradas en el orden correcto
+        from itineraries.models import DetalleItinerario
+        
+        detalles_origen = DetalleItinerario.objects.filter(parada_id=origen_id)
+        detalles_destino = DetalleItinerario.objects.filter(parada_id=destino_id)
+        
+        itinerarios_compatibles_ids = []
+        origen_map = {d.itinerario_id: d.orden for d in detalles_origen}
+        
+        for d_dest in detalles_destino:
+            it_id = d_dest.itinerario_id
+            if it_id in origen_map:
+                if origen_map[it_id] < d_dest.orden:
+                    itinerarios_compatibles_ids.append(it_id)
+        
+        if not itinerarios_compatibles_ids:
+            return JsonResponse({'viajes': []})
+            
+        # 2. Obtener viajes para esos itinerarios
+        viajes = Viaje.objects.filter(
+            itinerario_id__in=itinerarios_compatibles_ids,
+            fecha_viaje__gte=hoy,
+            estado__in=['programado', 'en_curso']
+        ).select_related('itinerario', 'bus', 'horario', 'empresa').order_by('fecha_viaje', 'horario__hora_salida')
+        
+        viajes_data = []
+        for v in viajes:
+            # Filtrado por tiempo: solo si el viaje es hoy y tiene horario
+            if v.fecha_viaje == hoy and v.horario:
+                if v.horario.hora_salida < hora_actual:
+                    continue
+            
+            # Los viajes de mañana en adelante (v.fecha_viaje > hoy) se muestran siempre
+            try:
+                hora_str = v.horario.hora_salida.strftime('%H:%M') if v.horario else 'Sin horario'
+                
+                # Obtener nombre de empresa de forma segura
+                if v.empresa:
+                    empresa_nombre = v.empresa.nombre
+                elif v.bus and v.bus.empresa:
+                    empresa_nombre = v.bus.empresa.nombre
+                else:
+                    empresa_nombre = "Sin Empresa"
+                    
+                label = f"{v.fecha_viaje.strftime('%d/%m/%Y')} - {empresa_nombre} - {v.itinerario.nombre} - Bus: {v.bus.placa} ({hora_str})"
+                viajes_data.append({
+                    'id': v.id,
+                    'label': label
+                })
+            except Exception:
+                continue
+            
+        return JsonResponse({'viajes': viajes_data})

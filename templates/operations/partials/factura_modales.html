@@ -1,0 +1,84 @@
+<!-- Modal para nueva encomienda rápida -->
+<div class="modal fade" id="modalNuevaEncomienda" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-box-seam me-2"></i>
+                    Registrar Nueva Encomienda
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-nueva-encomienda-quick">
+                    {% csrf_token %}
+                    <input type="hidden" name="remitente_id" id="quick-remitente-id">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Viaje *</label>
+                            {{ encomienda_form.viaje }}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Origen *</label>
+                            {{ encomienda_form.parada_origen }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Destino *</label>
+                            {{ encomienda_form.parada_destino }}
+                        </div>
+
+                        <div class="col-12 py-2 border-bottom">
+                            <h6 class="mb-0">Datos del Destinatario</h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Cédula Destinatario *</label>
+                            {{ encomienda_form.cedula_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre *</label>
+                            {{ encomienda_form.nombre_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido *</label>
+                            {{ encomienda_form.apellido_destinatario }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Teléfono *</label>
+                            {{ encomienda_form.telefono_destinatario }}
+                        </div>
+
+                        <div class="col-12 py-2 border-bottom">
+                            <h6 class="mb-0">Detalles de Encomienda</h6>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo *</label>
+                            {{ encomienda_form.tipo }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Peso (kg)</label>
+                            {{ encomienda_form.peso_kg }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Precio (Gs.) *</label>
+                            {{ encomienda_form.precio }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descripción</label>
+                            {{ encomienda_form.descripcion }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary ms-auto" id="btn-save-encomienda-quick">
+                    <i class="bi bi-save me-2"></i> Guardar y Agregar a Factura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

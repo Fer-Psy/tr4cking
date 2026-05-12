@@ -28,13 +28,7 @@ class ViajeForm(forms.ModelForm):
         required=False,
         label="Filtrar por Empresa",
         empty_label="-- Todas las Empresas --",
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_itinerario',
-            'hx-trigger': 'change',
-            'hx-include': '[name="fecha_via_viaje"]' # Just in case
-        })
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     class Meta:
@@ -54,6 +48,9 @@ class ViajeForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from crispy_forms.helper import FormHelper
+        from crispy_forms.layout import Layout, Row, Column, HTML, Field
+
         # Filtrar solo itinerarios activos
         self.fields['itinerario'].queryset = Itinerario.objects.filter(activo=True)
         
@@ -100,7 +97,7 @@ class ViajeForm(forms.ModelForm):
                 from django.db.models import Q
                 emp_id = int(empresa_id)
                 self.fields['itinerario'].queryset = Itinerario.objects.filter(
-                    Q(empresa_id=emp_id) | Q(empresa__isnull=True),
+                    empresa_id=emp_id,
                     activo=True
                 )
                 self.fields['bus'].queryset = Bus.objects.filter(
@@ -147,32 +144,29 @@ class ViajeForm(forms.ModelForm):
             'hx-get': '/operations/obtener-horarios/',
             'hx-target': '#id_horario',
             'hx-trigger': 'change',
-            'hx-vals': f'js:{{itinerario: this.value, fecha: document.getElementById("id_fecha_viaje")?.value || "", empresa: document.getElementById("id_empresa")?.value || "", viaje_id: {viaje_id_val}}}'
+            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
         })
         
         self.fields['fecha_viaje'].widget.attrs.update({
             'hx-get': '/operations/obtener-horarios/',
             'hx-target': '#id_horario',
             'hx-trigger': 'change, input',
-            'hx-vals': f'js:{{itinerario: document.getElementById("id_itinerario")?.value || "", fecha: this.value, empresa: document.getElementById("id_empresa")?.value || "", viaje_id: {viaje_id_val}}}'
+            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
         })
         
         self.fields['horario'].widget.attrs.update({
             'hx-get': '/operations/obtener-horarios/',
             'hx-target': '#id_horario',
             'hx-trigger': 'change',
-            'hx-vals': f'js:{{itinerario: document.getElementById("id_itinerario")?.value || "", fecha: document.getElementById("id_fecha_viaje")?.value || "", empresa: document.getElementById("id_empresa")?.value || "", horario: this.value, viaje_id: {viaje_id_val}}}'
-        })
-        
-        self.fields['empresa'].widget.attrs.update({
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_itinerario',
-            'hx-trigger': 'change',
-            'hx-vals': f'js:{{empresa: this.value, fecha: document.getElementById("id_fecha_viaje")?.value || "", viaje_id: {viaje_id_val}}}'
+            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
         })
         
         # Aplicar clases Bootstrap
         for field_name, field in self.fields.items():
+            if field_name == 'empresa':
+                # empresa se maneja con JS propio, no Select2
+                field.widget.attrs['class'] = 'form-select'
+                continue
             if not isinstance(field.widget, forms.Textarea):
                 if isinstance(field, forms.ModelMultipleChoiceField):
                     field.widget.attrs['class'] = 'form-select select2-multiple'
@@ -180,6 +174,36 @@ class ViajeForm(forms.ModelForm):
                     field.widget.attrs['class'] = 'form-select select2' if isinstance(
                         field, forms.ModelChoiceField
                     ) else 'form-control'
+
+        # Layout Crispy Forms para mejor distribución
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            HTML('<div class="mb-3"><h6 class="fw-bold text-primary text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">1. Planificación del Viaje</h6><hr class="my-2"></div>'),
+            Row(
+                Column('empresa', css_class='col-md-4'),
+                Column('itinerario', css_class='col-md-4'),
+                Column('horario', css_class='col-md-4'),
+                css_class='mb-2'
+            ),
+            Row(
+                Column('fecha_viaje', css_class='col-md-4'),
+                Column(
+                    HTML('<div class="alert alert-info py-2 px-3 mb-0 mt-md-4" style="font-size: 0.85rem;"><i class="bi bi-info-circle me-1"></i> Se programarán 8 días a partir de esta fecha</div>'),
+                    css_class='col-md-8'
+                ),
+                css_class='mb-4'
+            ),
+            HTML('<div class="mb-3 mt-2"><h6 class="fw-bold text-success text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">2. Asignación de Recursos</h6><hr class="my-2"></div>'),
+            Row(
+                Column('bus', css_class='col-md-4'),
+                Column('chofer', css_class='col-md-4'),
+                Column('ayudantes', css_class='col-md-4'),
+                css_class='mb-4'
+            ),
+            HTML('<div class="mb-2 mt-2"><h6 class="fw-bold text-secondary text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">3. Otros Detalles</h6><hr class="my-2"></div>'),
+            'observaciones',
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -563,8 +587,9 @@ class EncomiendaForm(forms.ModelForm):
             def get_viaje_label(obj):
                 # Obtener hora de salida del horario asignado al viaje
                 hora_str = obj.horario.hora_salida.strftime('%H:%M') if obj.horario else 'Sin horario'
+                empresa_nombre = obj.empresa.nombre if obj.empresa else (obj.bus.empresa.nombre if obj.bus.empresa else "Sin Empresa")
                 return (
-                    f"{obj.fecha_viaje.strftime('%d/%m/%Y')} - {obj.itinerario.nombre} - "
+                    f"{obj.fecha_viaje.strftime('%d/%m/%Y')} - {empresa_nombre} - {obj.itinerario.nombre} - "
                     f"Bus: {obj.bus.placa} ({hora_str})"
                 )
             
@@ -697,7 +722,7 @@ class FacturaForm(forms.ModelForm):
             'condicion': forms.Select(attrs={'class': 'form-select'}),
         }
 
-    def __init__(self, *args, cliente=None, pasaje=None, encomienda=None, **kwargs):
+    def __init__(self, *args, cliente=None, pasaje=None, encomienda=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         
         # Solo timbrados activos y vigentes
@@ -708,38 +733,67 @@ class FacturaForm(forms.ModelForm):
             fecha_fin__gte=hoy
         )
         
+        # Identificar si el usuario es ayudante o chofer
+        es_ayudante_o_chofer = False
+        if user:
+            persona = getattr(user, 'persona', None)
+            es_ayudante_o_chofer = persona and (persona.es_ayudante or persona.es_chofer) and not user.is_superuser
+
         # Convertir cliente a int si viene como string
         cliente_cedula = None
         if cliente:
-            try:
-                cliente_cedula = int(cliente) if isinstance(cliente, str) else cliente
-            except (ValueError, TypeError):
-                cliente_cedula = None
+            if isinstance(cliente, str):
+                # Limpiar espacios y caracteres de formato
+                cliente_limpio = cliente.replace(' ', '').replace('\xa0', '').replace('.', '')
+                try:
+                    cliente_cedula = int(cliente_limpio)
+                except (ValueError, TypeError):
+                    cliente_cedula = None
+            else:
+                cliente_cedula = cliente
         
-        # Pre-seleccionar pasaje o encomienda si viene de una venta
+        # Identificar empresa para pre-seleccionar timbrado
+        item_empresa = None
+        
+        # 1. Cargar Pasajes
         if pasaje:
             self.fields['pasajes'].queryset = Pasaje.objects.filter(pk=pasaje.pk)
             self.fields['pasajes'].initial = [pasaje]
+            if pasaje.viaje and pasaje.viaje.empresa:
+                item_empresa = pasaje.viaje.empresa
         elif cliente_cedula:
-            # Pasajes del cliente sin facturar (como pasajero o como pagador)
             self.fields['pasajes'].queryset = Pasaje.objects.filter(
                 Q(pasajero__cedula=cliente_cedula) | Q(cliente__cedula=cliente_cedula),
                 estado__in=['vendido', 'reservado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
             ).select_related('viaje', 'asiento')
-        
-        if encomienda:
+
+        # 2. Cargar Encomiendas (ocultar para ayudantes/choferes)
+        if es_ayudante_o_chofer:
+            self.fields['encomiendas'].queryset = Encomienda.objects.none()
+            self.fields['encomiendas'].widget = forms.HiddenInput()
+            self.fields['encomiendas'].label = ""
+        elif encomienda:
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(pk=encomienda.pk)
             self.fields['encomiendas'].initial = [encomienda]
+            if encomienda.viaje and encomienda.viaje.empresa:
+                item_empresa = encomienda.viaje.empresa
         elif cliente_cedula:
-            # Encomiendas del cliente sin facturar (como remitente)
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(
                 remitente__cedula=cliente_cedula,
                 estado__in=['registrado', 'en_transito', 'en_destino', 'entregado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
             ).select_related('viaje', 'parada_destino')
+        
+        # 3. Pre-seleccionar Timbrado si hay empresa identificada
+        if item_empresa and not self.initial.get('timbrado'):
+            timbrado_pred = self.fields['timbrado'].queryset.filter(empresa=item_empresa).first()
+            if timbrado_pred:
+                self.fields['timbrado'].initial = timbrado_pred
+                self.fields['timbrado'].widget.attrs['data-empresa-auto'] = item_empresa.id
+        
         
         for field_name, field in self.fields.items():
             if field_name not in ['pasajes', 'encomiendas'] and 'class' not in field.widget.attrs:

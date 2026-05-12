@@ -559,6 +559,12 @@
     const VIAJE_PK = "{{ viaje.pk }}";
     const INITIAL_ORIGEN_ID = "{{ initial_origen_id|default:'' }}";
     const INITIAL_DESTINO_ID = "{{ initial_destino_id|default:'' }}";
+    const TIENE_RESERVA_PREVIA = {% if tiene_reserva_previa %}true{% else %}false{% endif %};
+    const RESERVA_PREVIA_MSG = "{{ reserva_previa_msg|default:'' }}";
+
+    if (TIENE_RESERVA_PREVIA) {
+        alert(RESERVA_PREVIA_MSG);
+    }
     let currentPasajeId = null;
     let origenId = null, destinoId = null;
     let origenNombre = '', destinoNombre = '';
@@ -577,9 +583,9 @@
             // Mostrar botón reiniciar
             document.getElementById('btn-reiniciar-seleccion').style.display = 'block';
 
-            if (!origenId || orden <= origenOrden || (origenId && destinoId)) {
-                // Caso: No hay origen, o el clic es anterior/mismo que el origen, o ya se ha completado tramo
-                // En estos casos, el clic define el NUEVO ORIGEN
+            if (!origenId || (origenId && destinoId)) {
+                // Caso: No hay origen, o ya se ha completado tramo (reinicio)
+                // El clic define el NUEVO ORIGEN
                 
                 // Limpiar anterior si existia
                 document.querySelectorAll('.parada-item').forEach(p => p.classList.remove('selected-origen', 'selected-destino', 'disabled'));
@@ -598,7 +604,7 @@
                 document.getElementById('origen-nombre').textContent = nombre;
                 document.getElementById('resumen-origen').textContent = nombre;
 
-                // Deshabilitar paradas anteriores al origen (para cuando vaya a elegir destino)
+                // Deshabilitar paradas anteriores al origen (visual únicamente)
                 document.querySelectorAll('.parada-item').forEach(p => {
                     if (parseInt(p.dataset.orden) < orden) {
                         p.classList.add('disabled');
@@ -607,7 +613,13 @@
                 
                 avanzarPaso(1);
             } else {
-                // Seleccionar destino (porque es posterior al origen actual)
+                // Ya tenemos un origen, estamos eligiendo el DESTINO
+                if (orden <= origenOrden) {
+                    alert("Error: La parada de destino debe ser posterior a la parada de origen seleccionada (" + origenNombre + "). Por favor, elija una parada válida.");
+                    return;
+                }
+
+                // Seleccionar destino
                 destinoId = paradaId;
                 destinoOrden = orden;
                 destinoNombre = nombre;
@@ -637,20 +649,66 @@
         });
     });
 
-    // Auto-selección inicial
-    if (INITIAL_ORIGEN_ID && INITIAL_DESTINO_ID) {
-        const itemOrigen = document.querySelector(`.parada-item[data-parada-id="${INITIAL_ORIGEN_ID}"]`);
-        const itemDestino = document.querySelector(`.parada-item[data-parada-id="${INITIAL_DESTINO_ID}"]`);
-        
-        if (itemOrigen && itemDestino) {
-            // Primero origen
-            itemOrigen.click();
-            // Luego destino
-            itemDestino.click();
+    // Auto-selección inicial cuando vienen origen y destino desde la búsqueda
+    function aplicarSeleccionInicial(origenInitId, destinoInitId) {
+        const itemOrigen = document.querySelector(`.parada-item[data-parada-id="${origenInitId}"]`);
+        const itemDestino = destinoInitId
+            ? document.querySelector(`.parada-item[data-parada-id="${destinoInitId}"]`)
+            : null;
+
+        if (!itemOrigen) return; // parada no pertenece a este itinerario
+
+        // ── Establecer ORIGEN ────────────────────────────────────────────────
+        document.querySelectorAll('.parada-item').forEach(p =>
+            p.classList.remove('selected-origen', 'selected-destino', 'disabled')
+        );
+        origenId    = itemOrigen.dataset.paradaId;
+        origenOrden = parseInt(itemOrigen.dataset.orden);
+        origenNombre = itemOrigen.dataset.nombre;
+
+        itemOrigen.classList.add('selected-origen');
+        document.getElementById('origen-nombre').textContent = origenNombre;
+        document.getElementById('resumen-origen').textContent = origenNombre;
+        document.getElementById('btn-reiniciar-seleccion').style.display = 'block';
+
+        // Deshabilitar paradas anteriores al origen
+        document.querySelectorAll('.parada-item').forEach(p => {
+            if (parseInt(p.dataset.orden) < origenOrden) p.classList.add('disabled');
+        });
+
+        if (!itemDestino) {
+            avanzarPaso(1);
+            return;
         }
-    } else if (INITIAL_ORIGEN_ID) {
-        const itemOrigen = document.querySelector(`.parada-item[data-parada-id="${INITIAL_ORIGEN_ID}"]`);
-        if (itemOrigen) itemOrigen.click();
+
+        // ── Establecer DESTINO ───────────────────────────────────────────────
+        destinoId    = itemDestino.dataset.paradaId;
+        destinoOrden = parseInt(itemDestino.dataset.orden);
+        destinoNombre = itemDestino.dataset.nombre;
+
+        itemDestino.classList.add('selected-destino');
+        document.getElementById('destino-nombre').textContent = destinoNombre;
+        document.getElementById('resumen-destino').textContent = destinoNombre;
+
+        // Ocultar paradas no seleccionadas
+        document.querySelectorAll('.parada-item').forEach(p => {
+            const o = parseInt(p.dataset.orden);
+            if (o !== origenOrden && o !== destinoOrden) {
+                p.classList.add('disabled');
+                p.style.display = 'none';
+            }
+        });
+        document.querySelectorAll('.parada-line').forEach(l => l.style.display = 'none');
+
+        avanzarPaso(2);
+        cargarAsientos();
+    }
+
+    if (INITIAL_ORIGEN_ID) {
+        // Pequeño timeout para que el DOM esté listo
+        setTimeout(function() {
+            aplicarSeleccionInicial(INITIAL_ORIGEN_ID, INITIAL_DESTINO_ID);
+        }, 80);
     }
 
     window.resetSeleccion = function() {
@@ -826,7 +884,7 @@
     };
 
     // ========= Confirmar reserva =========
-    window.confirmarReserva = function() {
+    window.confirmarReserva = function(confirmed = false) {
         if (asientoSeleccionado.length === 0 || !origenId || !destinoId) return;
 
         const btn = document.getElementById('btn-confirmar');
@@ -849,11 +907,23 @@
                 asiento_ids: asientoSeleccionado,
                 parada_origen_id: origenId,
                 parada_destino_id: destinoId,
-                facturacion: facturacion
+                facturacion: facturacion,
+                confirmar: confirmed
             }),
         })
         .then(r => r.json())
         .then(data => {
+            if (data.confirmacion_requerida) {
+                // Notificar que ya tiene reserva y preguntar si desea otra
+                if (confirm(data.warning + '\n\n¿Está seguro de que desea realizar OTRA reserva para este mismo viaje?')) {
+                    confirmarReserva(true); // Reintentar con confirmación
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Confirmar Reserva';
+                }
+                return;
+            }
+
             if (data.ok) {
                 // Éxito
                 document.getElementById('exito-mensaje').textContent = data.mensaje;

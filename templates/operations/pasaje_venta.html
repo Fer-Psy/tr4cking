@@ -72,6 +72,14 @@
                             </h4>
                         </div>
                         <div class="card-body">
+                            <!-- Buscador de Cliente -->
+                            <div class="row mb-3 pb-3 border-bottom">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold"><i class="bi bi-search me-1"></i> Buscar Cliente Registrado</label>
+                                    <select id="cliente-autocomplete" class="form-select" data-placeholder="Escriba nombre o cédula para buscar..."></select>
+                                    <small class="text-muted">Busque por nombre o número de cédula para autocompletar los campos.</small>
+                                </div>
+                            </div>
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">Cédula del Pasajero *</label>
@@ -199,48 +207,115 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const paradaOrigen = document.getElementById('id_parada_origen');
-    const paradaDestino = document.getElementById('id_parada_destino');
-    const precioInput = document.getElementById('id_precio');
-    const viajeInput = document.getElementById('id_viaje');
+$(document).ready(function() {
+    const $paradaOrigen = $('#id_parada_origen');
+    const $paradaDestino = $('#id_parada_destino');
+    const $precioInput = $('#id_precio');
+    const $viajeInput = $('#id_viaje');
     
     function actualizarPrecio() {
-        const origenId = paradaOrigen.value;
-        const destinoId = paradaDestino.value;
-        const viajeId = viajeInput.value;
+        const origenId = $paradaOrigen.val();
+        const destinoId = $paradaDestino.val();
+        const viajeId = $viajeInput.val();
         
         if (origenId && destinoId && viajeId && origenId !== destinoId) {
-            fetch(`{% url 'operations:obtener_precio' %}?viaje=${viajeId}&origen=${origenId}&destino=${destinoId}`)
-                .then(response => response.json())
-                .then(data => {
+            // Mostrar estado de carga
+            $precioInput.val('').attr('placeholder', 'Cargando precio...');
+            
+            $.ajax({
+                url: '{% url "operations:obtener_precio" %}',
+                data: {
+                    'viaje': viajeId,
+                    'origen': origenId,
+                    'destino': destinoId
+                },
+                success: function(data) {
                     if (data.precio && data.precio > 0) {
-                        precioInput.value = data.precio;
-                        precioInput.classList.remove('is-invalid');
-                        precioInput.classList.add('is-valid');
+                        $precioInput.val(data.precio);
+                        $precioInput.removeClass('is-invalid').addClass('is-valid');
                     } else {
-                        precioInput.value = '';
-                        precioInput.placeholder = 'Precio no configurado - Ingrese manualmente';
-                        precioInput.classList.remove('is-valid');
-                        precioInput.classList.add('is-invalid');
+                        $precioInput.val('');
+                        $precioInput.attr('placeholder', 'Precio no configurado - Ingrese manualmente');
+                        $precioInput.removeClass('is-valid').addClass('is-invalid');
                     }
-                })
-                .catch(error => {
-                    console.error('Error al obtener precio:', error);
-                    precioInput.value = '';
-                    precioInput.placeholder = 'Error - Ingrese manualmente';
-                });
+                },
+                error: function() {
+                    $precioInput.val('');
+                    $precioInput.attr('placeholder', 'Error - Ingrese manualmente');
+                }
+            });
         } else {
-            precioInput.value = '';
-            precioInput.classList.remove('is-valid', 'is-invalid');
+            $precioInput.val('').removeClass('is-valid is-invalid');
         }
     }
     
-    // Escuchar cambios en las paradas
-    if (paradaOrigen && paradaDestino) {
-        paradaOrigen.addEventListener('change', actualizarPrecio);
-        paradaDestino.addEventListener('change', actualizarPrecio);
+    // Escuchar cambios en las paradas (usando jQuery para compatibilidad con Select2)
+    $paradaOrigen.on('change', actualizarPrecio);
+    $paradaDestino.on('change', actualizarPrecio);
+
+    // Si ya tienen valores al cargar (ej. redirección con params), disparar una vez
+    if ($paradaOrigen.val() && $paradaDestino.val()) {
+        actualizarPrecio();
     }
+
+    // =========================================================================
+    // BUSCADOR DE CLIENTE (AUTOCOMPLETE)
+    // =========================================================================
+    $('#cliente-autocomplete').select2({
+        theme: 'bootstrap-5',
+        ajax: {
+            url: '{% url "operations:api_buscar_clientes_registrados" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    q: params.term
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.clientes.map(function(item) {
+                        return {
+                            id: item.cedula,
+                            text: `${item.cedula} - ${item.nombre_completo}`,
+                            // Extra data for population
+                            raw: item
+                        };
+                    })
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 2,
+        language: {
+            inputTooShort: function() { return "Ingrese 2 o más caracteres..."; },
+            noResults: function() { return "No se encontraron clientes"; },
+            searching: function() { return "Buscando..."; }
+        }
+    });
+
+    // Acción al seleccionar un cliente
+    $('#cliente-autocomplete').on('select2:select', function (e) {
+        const data = e.params.data.raw;
+        
+        // Autocompletar campos
+        $('#id_cedula_pasajero').val(data.cedula);
+        $('#id_nombre_pasajero').val(data.nombre);
+        $('#id_apellido_pasajero').val(data.apellido);
+        $('#id_telefono_pasajero').val(data.telefono);
+        
+        // Limpiar buscador para permitir nueva búsqueda
+        $(this).val(null).trigger('change');
+        
+        // Disparar búsqueda de HTMX si es necesario (opcional ya que ya llenamos los campos)
+        // Pero es bueno que el campo de cédula tenga el foco o dispare el evento
+        $('#id_cedula_pasajero').trigger('blur');
+        
+        // Notificación opcional
+        if (typeof toastr !== 'undefined') {
+            toastr.success(`Campos completados para ${data.nombre_completo}`);
+        }
+    });
 });
 </script>
 {% endblock %}

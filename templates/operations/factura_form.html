@@ -17,6 +17,16 @@
                     </h4>
                 </div>
                 <div class="card-body">
+                    <!-- Buscador de Cliente Inteligente -->
+                    <div class="row mb-4 pb-3 border-bottom">
+                        <div class="col-12">
+                            <label class="form-label fw-bold"><i class="bi bi-search me-1"></i> Buscar Cliente Registrado</label>
+                            <select id="cliente-autocomplete" class="form-select" data-placeholder="Escriba nombre o cédula para buscar..."></select>
+                            <input type="hidden" name="cedula_cliente" id="cedula-cliente-hidden" value="{{ cliente_cedula|default:'' }}">
+                            <small class="text-muted">Busque por nombre o número de cédula para autocompletar los datos de facturación.</small>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Timbrado *</label>
@@ -38,33 +48,6 @@
                             {{ form.condicion }}
                         </div>
                     </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Cédula/RUC del Cliente *</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="cedula-busqueda" 
-                                       placeholder="Ingrese cédula o RUC para buscar"
-                                       value="{{ cliente_cedula|default:'' }}"
-                                       autocomplete="off">
-                                <button type="button" class="btn btn-primary" id="btn-buscar-cliente">
-                                    <i class="bi bi-search me-1"></i> Buscar
-                                </button>
-                            </div>
-                            <input type="hidden" name="cedula_cliente" id="cedula-cliente-hidden" value="{{ cliente_cedula|default:'' }}">
-                            <div id="info-cliente-factura" class="mt-2"></div>
-                            
-                            <!-- Dropdown de resultados de búsqueda -->
-                            <div id="resultados-busqueda" class="list-group position-absolute w-100 shadow-lg" 
-                                 style="z-index: 1050; max-height: 300px; overflow-y: auto; display: none;">
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Próximo Número</label>
-                            <input type="text" class="form-control" id="proximo-numero" readonly 
-                                   placeholder="Se calculará automáticamente">
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -78,7 +61,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-vcenter card-table table-striped">
                             <thead>
                                 <tr>
                                     <th width="40"></th>
@@ -113,7 +96,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-vcenter card-table table-striped">
                             <thead>
                                 <tr>
                                     <th width="40"></th>
@@ -139,7 +122,7 @@
             <div class="card mb-4" id="card-seleccionar-cliente">
                 <div class="card-body text-center text-muted py-5">
                     <i class="bi bi-person-search display-4 mb-3 d-block"></i>
-                    <p class="mb-0">Busque y seleccione un cliente para ver sus pasajes y encomiendas pendientes de facturar.</p>
+                    <p class="mb-0">Busque y seleccione un cliente para cargar sus pasajes y encomiendas pendientes.</p>
                 </div>
             </div>
 
@@ -160,13 +143,32 @@
         </form>
     </div>
 
+    <!-- Sidebar con Resumen e Info del Cliente -->
     <div class="col-lg-4">
-        <!-- Resumen -->
+        <!-- Info del Cliente -->
+        <div class="card mb-4" id="cliente-card" style="display: none;">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Información del Cliente</h4>
+            </div>
+            <div class="card-body">
+                <div class="datagrid" id="cliente-info">
+                    <!-- Se llena dinámicamente -->
+                </div>
+                <div class="mt-3">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Próximo Número</div>
+                        <div class="datagrid-content fw-bold text-azure" id="proximo-numero-display">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen de Totales -->
         <div class="card sticky-top" style="top: 1rem;">
             <div class="card-header">
                 <h4 class="card-title mb-0">
                     <i class="bi bi-calculator me-2"></i>
-                    Resumen
+                    Resumen de Cobro
                 </h4>
             </div>
             <div class="card-body">
@@ -174,155 +176,33 @@
                     <span>Items seleccionados:</span>
                     <span id="items-count" class="badge bg-primary">0</span>
                 </div>
-                <hr>
+                <hr class="my-2">
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Subtotal Gravado:</span>
-                    <span id="subtotal-exenta">Gs. 0</span>
+                    <span class="text-muted">Subtotal Gravado:</span>
+                    <span id="subtotal-exenta" class="fw-bold">Gs. 0</span>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span>IVA 10% (incluido):</span>
-                    <span id="subtotal-iva10">Gs. 0</span>
+                    <span class="text-muted">IVA 10% (incluido):</span>
+                    <span id="subtotal-iva10" class="fw-bold">Gs. 0</span>
                 </div>
-                <hr>
-                <div class="d-flex justify-content-between h4 mb-0">
-                    <span>TOTAL:</span>
-                    <span id="total" class="text-success">Gs. 0</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Info del Cliente -->
-        <div class="card mt-4" id="cliente-card" style="display: none;">
-            <div class="card-header">
-                <h4 class="card-title mb-0">Cliente</h4>
-            </div>
-            <div class="card-body" id="cliente-info">
-                <!-- Se llena dinámicamente -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para nueva encomienda rápida -->
-<div class="modal fade" id="modalNuevaEncomienda" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-box-seam me-2"></i>
-                    Registrar Nueva Encomienda
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="form-nueva-encomienda-quick">
-                    {% csrf_token %}
-                    <input type="hidden" name="remitente_id" id="quick-remitente-id">
-                    
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <label class="form-label">Viaje *</label>
-                            {{ encomienda_form.viaje }}
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label">Parada Origen *</label>
-                            {{ encomienda_form.parada_origen }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Parada Destino *</label>
-                            {{ encomienda_form.parada_destino }}
-                        </div>
-
-                        <div class="col-12 py-2 border-bottom">
-                            <h6 class="mb-0">Datos del Destinatario</h6>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Cédula Destinatario *</label>
-                            {{ encomienda_form.cedula_destinatario }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Nombre *</label>
-                            {{ encomienda_form.nombre_destinatario }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Apellido *</label>
-                            {{ encomienda_form.apellido_destinatario }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Teléfono *</label>
-                            {{ encomienda_form.telefono_destinatario }}
-                        </div>
-
-                        <div class="col-12 py-2 border-bottom">
-                            <h6 class="mb-0">Detalles de Encomienda</h6>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Tipo *</label>
-                            {{ encomienda_form.tipo }}
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Peso (kg)</label>
-                            {{ encomienda_form.peso_kg }}
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Precio (Gs.) *</label>
-                            {{ encomienda_form.precio }}
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Descripción</label>
-                            {{ encomienda_form.descripcion }}
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary ms-auto" id="btn-save-encomienda-quick">
-                    <i class="bi bi-save me-2"></i> Guardar y Agregar a Factura
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal de búsqueda de clientes -->
-<div class="modal fade" id="modalBuscarCliente" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-people me-2"></i>
-                    Seleccionar Cliente
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <input type="text" class="form-control form-control-lg" id="modal-busqueda-input"
-                           placeholder="Buscar por cédula, RUC o nombre...">
-                </div>
-                <div id="modal-resultados">
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-search display-6 mb-2 d-block"></i>
-                        <p>Ingrese al menos 2 caracteres para buscar</p>
-                    </div>
+                <hr class="my-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="h3 mb-0">TOTAL:</span>
+                    <span id="total" class="h2 mb-0 text-success fw-bold">Gs. 0</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modales -->
+{% include 'operations/partials/factura_modales.html' %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const cedulaBusqueda = document.getElementById('cedula-busqueda');
+$(document).ready(function() {
     const cedulaHidden = document.getElementById('cedula-cliente-hidden');
-    const btnBuscar = document.getElementById('btn-buscar-cliente');
-    const resultadosBusqueda = document.getElementById('resultados-busqueda');
     const cardPasajes = document.getElementById('card-pasajes');
     const cardEncomiendas = document.getElementById('card-encomiendas');
     const cardSeleccionarCliente = document.getElementById('card-seleccionar-cliente');
@@ -337,202 +217,83 @@ document.addEventListener('DOMContentLoaded', function() {
     const subtotalExenta = document.getElementById('subtotal-exenta');
     const subtotalIva10 = document.getElementById('subtotal-iva10');
     const totalEl = document.getElementById('total');
-    
-    let debounceTimer;
-    
-    // ===== BÚSQUEDA DE CLIENTES =====
-    function buscarClientes(query) {
-        if (query.length < 2) {
-            resultadosBusqueda.style.display = 'none';
-            return;
-        }
-        
-        fetch(`/operations/api/buscar-clientes/?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.clientes && data.clientes.length > 0) {
-                    let html = '';
-                    data.clientes.forEach(cliente => {
-                        html += `
-                            <a href="#" class="list-group-item list-group-item-action cliente-option"
-                               data-cedula="${cliente.cedula}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>${cliente.nombre}</strong>
-                                        <small class="text-muted d-block">
-                                            Cédula: ${cliente.cedula}
-                                        </small>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="badge bg-primary">${cliente.total_pendientes} pendiente(s)</span>
-                                        <small class="text-muted d-block">
-                                            ${cliente.pasajes_pendientes} pasaje(s) | ${cliente.encomiendas_pendientes} enc.
-                                        </small>
-                                    </div>
-                                </div>
-                            </a>
-                        `;
-                    });
-                    resultadosBusqueda.innerHTML = html;
-                    resultadosBusqueda.style.display = 'block';
-                    
-                    // Agregar eventos a las opciones
-                    document.querySelectorAll('.cliente-option').forEach(el => {
-                        el.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            seleccionarCliente(this.dataset.cedula);
-                        });
-                    });
-                } else {
-                    resultadosBusqueda.innerHTML = `
-                        <div class="list-group-item text-muted text-center">
-                            <i class="bi bi-info-circle me-1"></i>
-                            No se encontraron clientes con items pendientes
-                        </div>
-                    `;
-                    resultadosBusqueda.style.display = 'block';
-                }
-            })
-            .catch(err => {
-                console.error('Error buscando clientes:', err);
-            });
-    }
-    
-    // Evento de búsqueda con debounce
-    cedulaBusqueda.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            buscarClientes(this.value);
-        }, 300);
-    });
-    
-    // Botón buscar abre el modal
-    btnBuscar.addEventListener('click', function() {
-        const modal = new bootstrap.Modal(document.getElementById('modalBuscarCliente'));
-        modal.show();
-        document.getElementById('modal-busqueda-input').value = cedulaBusqueda.value;
-        document.getElementById('modal-busqueda-input').focus();
-    });
-    
-    // Búsqueda en modal
-    const modalBusquedaInput = document.getElementById('modal-busqueda-input');
-    const modalResultados = document.getElementById('modal-resultados');
-    
-    modalBusquedaInput.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            const query = this.value.trim();
-            if (query.length < 2) {
-                modalResultados.innerHTML = `
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-search display-6 mb-2 d-block"></i>
-                        <p>Ingrese al menos 2 caracteres para buscar</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            modalResultados.innerHTML = `
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2">Buscando clientes...</p>
-                </div>
-            `;
-            
-            fetch(`/operations/api/buscar-clientes/?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.clientes && data.clientes.length > 0) {
-                        let html = '<div class="list-group">';
-                        data.clientes.forEach(cliente => {
-                            html += `
-                                <a href="#" class="list-group-item list-group-item-action modal-cliente-option"
-                                   data-cedula="${cliente.cedula}">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="mb-1">${cliente.nombre}</h6>
-                                            <small class="text-muted">
-                                                Cédula: ${cliente.cedula}
-                                            </small>
-                                        </div>
-                                        <div class="text-end">
-                                            <span class="badge bg-primary fs-6">${cliente.total_pendientes}</span>
-                                            <small class="text-muted d-block">items pendientes</small>
-                                        </div>
-                                    </div>
-                                </a>
-                            `;
-                        });
-                        html += '</div>';
-                        modalResultados.innerHTML = html;
-                        
-                        // Agregar eventos a las opciones del modal
-                        document.querySelectorAll('.modal-cliente-option').forEach(el => {
-                            el.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                seleccionarCliente(this.dataset.cedula);
-                                bootstrap.Modal.getInstance(document.getElementById('modalBuscarCliente')).hide();
-                            });
-                        });
-                    } else {
-                        modalResultados.innerHTML = `
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-person-x display-6 mb-2 d-block"></i>
-                                <p>No se encontraron clientes con items pendientes de facturar</p>
-                            </div>
-                        `;
-                    }
-                })
-                .catch(err => {
-                    modalResultados.innerHTML = `
-                        <div class="alert alert-danger">Error al buscar clientes</div>
-                    `;
-                });
-        }, 300);
-    });
-    
-    // Ocultar resultados al hacer clic fuera
-    document.addEventListener('click', function(e) {
-        if (!resultadosBusqueda.contains(e.target) && e.target !== cedulaBusqueda) {
-            resultadosBusqueda.style.display = 'none';
+    const proximoNumeroDisplay = document.getElementById('proximo-numero-display');
+    const timbradoSelect = document.getElementById('id_timbrado');
+
+    // =========================================================================
+    // BUSCADOR DE CLIENTE (SELECT2)
+    // =========================================================================
+    $('#cliente-autocomplete').select2({
+        theme: 'bootstrap-5',
+        ajax: {
+            url: '{% url "operations:api_buscar_clientes_registrados" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { q: params.term };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.clientes.map(function(item) {
+                        return {
+                            id: item.cedula,
+                            text: `${item.cedula} - ${item.nombre_completo}`,
+                            raw: item
+                        };
+                    })
+                };
+            },
+            cache: true
+        },
+        placeholder: 'Escriba nombre o cédula para buscar...',
+        minimumInputLength: 2,
+        language: {
+            inputTooShort: function() { return "Ingrese 2 o más caracteres..."; },
+            noResults: function() { return "No se encontraron clientes"; },
+            searching: function() { return "Buscando..."; }
         }
     });
-    
+
+    // Acción al seleccionar un cliente
+    $('#cliente-autocomplete').on('select2:select', function (e) {
+        seleccionarCliente(e.params.data.id);
+    });
+
     // ===== SELECCIONAR CLIENTE Y CARGAR ITEMS =====
     function seleccionarCliente(cedula) {
-        resultadosBusqueda.style.display = 'none';
-        cedulaBusqueda.value = cedula;
-        cedulaHidden.value = cedula;
+        const cedulaLimpia = cedula.toString().replace(/\s/g, '').replace(/\./g, '');
+        cedulaHidden.value = cedulaLimpia;
         
         // Mostrar loader
         cardSeleccionarCliente.innerHTML = `
             <div class="card-body text-center py-5">
                 <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2">Cargando items del cliente...</p>
+                <p class="mt-2">Cargando ítems del cliente...</p>
             </div>
         `;
         
-        fetch(`/operations/api/items-pendientes/?cedula=${encodeURIComponent(cedula)}`)
+        fetch(`/operations/api/items-pendientes/?cedula=${encodeURIComponent(cedulaLimpia)}`)
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    cardSeleccionarCliente.innerHTML = `
-                        <div class="card-body text-center text-danger py-5">
-                            <i class="bi bi-exclamation-triangle display-4 mb-3 d-block"></i>
-                            <p>${data.error}</p>
-                        </div>
-                    `;
+                    alert(data.error);
                     return;
                 }
                 
                 // Ocultar mensaje de seleccionar cliente
                 cardSeleccionarCliente.style.display = 'none';
                 
-                // Mostrar info del cliente
+                // Mostrar info del cliente en la barra lateral
                 clienteCard.style.display = 'block';
                 clienteInfo.innerHTML = `
-                    <p class="mb-1"><strong>${data.cliente.nombre}</strong></p>
-                    <p class="mb-0 text-muted">Cédula: ${data.cliente.cedula}</p>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Razón Social</div>
+                        <div class="datagrid-content fw-bold text-uppercase">${data.cliente.nombre}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">RUC / Cédula</div>
+                        <div class="datagrid-content">${data.cliente.cedula}</div>
+                    </div>
                 `;
                 
                 // Cargar pasajes
@@ -549,11 +310,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                            data-precio="${p.precio}"
                                            data-empresa="${p.empresa_id}" checked>
                                 </td>
-                                <td>${p.codigo}</td>
-                                <td>${p.viaje}</td>
+                                <td><span class="badge bg-blue-lt fw-bold">${p.codigo}</span></td>
+                                <td class="small">${p.viaje}</td>
                                 <td>${p.pasajero}</td>
-                                <td>${p.asiento}</td>
-                                <td class="text-end">Gs. ${p.precio.toLocaleString('es-PY')}</td>
+                                <td><span class="badge bg-purple-lt">As. ${p.asiento}</span></td>
+                                <td class="text-end fw-bold">Gs. ${p.precio.toLocaleString('es-PY')}</td>
                             </tr>
                         `;
                     });
@@ -578,11 +339,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                            data-precio="${e.precio}"
                                            data-empresa="${e.empresa_id}" checked>
                                 </td>
-                                <td>${e.codigo}</td>
+                                <td><span class="badge bg-orange-lt fw-bold">${e.codigo}</span></td>
                                 <td>${e.tipo}</td>
-                                <td>${e.descripcion}</td>
-                                <td>${e.destino}</td>
-                                <td class="text-end">Gs. ${e.precio.toLocaleString('es-PY')}</td>
+                                <td class="small text-muted">${e.descripcion}</td>
+                                <td><i class="bi bi-geo-alt small me-1"></i>${e.destino}</td>
+                                <td class="text-end fw-bold">Gs. ${e.precio.toLocaleString('es-PY')}</td>
                             </tr>
                         `;
                     });
@@ -593,185 +354,76 @@ document.addEventListener('DOMContentLoaded', function() {
                     noEncomiendas.style.display = 'block';
                 }
                 
-                // Agregar eventos a los checkboxes
+                // Eventos checkboxes
                 document.querySelectorAll('.item-check').forEach(cb => {
                     cb.addEventListener('change', calcularTotales);
                 });
                 
-                // Calcular totales iniciales
                 calcularTotales();
             })
             .catch(err => {
-                console.error('Error cargando items:', err);
-                cardSeleccionarCliente.innerHTML = `
-                    <div class="card-body text-center text-danger py-5">
-                        <i class="bi bi-exclamation-triangle display-4 mb-3 d-block"></i>
-                        <p>Error al cargar los datos del cliente</p>
-                    </div>
-                `;
+                console.error('Error:', err);
+                alert('Error al cargar datos');
             });
     }
-    
+
     // ===== CALCULAR TOTALES =====
     function calcularTotales() {
         const checkboxes = document.querySelectorAll('.item-check');
         let count = 0;
         let total = 0;
+        const empresasSeleccionadas = new Set();
         
         checkboxes.forEach(cb => {
             if (cb.checked) {
                 count++;
                 total += parseFloat(cb.dataset.precio) || 0;
+                if (cb.dataset.empresa && cb.dataset.empresa !== 'null') {
+                    empresasSeleccionadas.add(cb.dataset.empresa);
+                }
             }
         });
         
-        // IVA 10% incluido: total / 11
         const iva10 = Math.round(total / 11);
-        // Gravada (base imponible): total - iva
         const gravada = total - iva10;
         
         itemsCount.textContent = count;
         subtotalExenta.textContent = 'Gs. ' + gravada.toLocaleString('es-PY');
         subtotalIva10.textContent = 'Gs. ' + iva10.toLocaleString('es-PY');
         totalEl.textContent = 'Gs. ' + total.toLocaleString('es-PY');
-        
-        // Habilitar/deshabilitar botón de generar
         btnGenerar.disabled = count === 0;
 
-        // ===== AUTO-SELECCIÓN DE TIMBRADO POR EMPRESA =====
-        const empresasSeleccionadas = new Set();
-        checkboxes.forEach(cb => {
-            if (cb.checked && cb.dataset.empresa && cb.dataset.empresa !== 'null') {
-                empresasSeleccionadas.add(cb.dataset.empresa);
-            }
-        });
-
-        const timbradoSelect = document.getElementById('id_timbrado');
+        // Auto-selección de Timbrado
         if (empresasSeleccionadas.size === 1) {
             const empresaId = Array.from(empresasSeleccionadas)[0];
-            // Filtrar opciones de timbrado
             Array.from(timbradoSelect.options).forEach(opt => {
-                if (!opt.value) return; // Saltar placeholder
-                
                 if (opt.dataset.empresa === empresaId) {
-                    opt.classList.add('bg-success-lt', 'fw-bold');
-                    // Auto-seleccionar si no hay uno seleccionado
                     if (!timbradoSelect.value) {
                         timbradoSelect.value = opt.value;
-                        timbradoSelect.dispatchEvent(new Event('change'));
+                        $(timbradoSelect).trigger('change');
                     }
-                } else {
-                    opt.classList.remove('bg-success-lt', 'fw-bold');
                 }
             });
-        } else {
-            // Limpiar estilos si hay múltiples empresas
-            Array.from(timbradoSelect.options).forEach(opt => {
-                opt.classList.remove('bg-success-lt', 'fw-bold');
-            });
         }
     }
-    
+
     // ===== TIMBRADO - SIGUIENTE NÚMERO =====
-    const timbradoSelect = document.getElementById('id_timbrado');
-    const proximoNumero = document.getElementById('proximo-numero');
-    
-    if (timbradoSelect) {
-        timbradoSelect.addEventListener('change', function() {
-            if (this.value) {
-                fetch(`/operations/timbrados/${this.value}/siguiente-numero/`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.numero) {
-                            proximoNumero.value = data.numero;
-                        } else if (data.error) {
-                            proximoNumero.value = data.error;
-                        }
-                    })
-                    .catch(() => {
-                        proximoNumero.value = 'Error al obtener';
-                    });
-            }
-        });
-        // Trigger al cargar si hay valor
-        if (timbradoSelect.value) {
-            timbradoSelect.dispatchEvent(new Event('change'));
-        }
-    }
-    
-    // ===== NUEVA ENCOMIENDA RÁPIDA =====
-    const btnNuevaEncomienda = document.getElementById('btn-nueva-encomienda');
-    const modalNuevaEncomienda = new bootstrap.Modal(document.getElementById('modalNuevaEncomienda'));
-    const btnSaveEncomienda = document.getElementById('btn-save-encomienda-quick');
-    const formQuick = document.getElementById('form-nueva-encomienda-quick');
-
-    btnNuevaEncomienda.addEventListener('click', function() {
-        if (!cedulaHidden.value) {
-            alert('Debe seleccionar un cliente primero');
-            return;
-        }
-        document.getElementById('quick-remitente-id').value = cedulaHidden.value;
-        modalNuevaEncomienda.show();
-    });
-
-    btnSaveEncomienda.addEventListener('click', function() {
-        const formData = new FormData(formQuick);
-        
-        btnSaveEncomienda.disabled = true;
-        btnSaveEncomienda.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
-
-        fetch('/operations/api/crear-encomienda-quick/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            btnSaveEncomienda.disabled = false;
-            btnSaveEncomienda.innerHTML = '<i class="bi bi-save me-2"></i> Guardar y Agregar a Factura';
-
-            if (data.ok) {
-                // Agregar a la tabla de encomiendas
-                noEncomiendas.style.display = 'none';
-                const e = data.encomienda;
-                const newRow = `
-                    <tr>
-                        <td>
-                            <input type="checkbox" name="encomiendas" value="${e.pk}" 
-                                   class="form-check-input item-check"
-                                   data-precio="${e.precio}" checked>
-                        </td>
-                        <td>${e.codigo}</td>
-                        <td>${e.tipo}</td>
-                        <td>${e.descripcion}</td>
-                        <td>${e.destino}</td>
-                        <td class="text-end">Gs. ${e.precio.toLocaleString('es-PY')}</td>
-                    </tr>
-                `;
-                tbodyEncomiendas.insertAdjacentHTML('beforeend', newRow);
-                
-                // Reconectar eventos de checkboxes
-                document.querySelectorAll('.item-check').forEach(cb => {
-                    cb.removeEventListener('change', calcularTotales);
-                    cb.addEventListener('change', calcularTotales);
+    $(timbradoSelect).on('change', function() {
+        if (this.value) {
+            fetch(`/operations/timbrados/${this.value}/siguiente-numero/`)
+                .then(response => response.json())
+                .then(data => {
+                    proximoNumeroDisplay.textContent = data.numero || data.error || '---';
+                })
+                .catch(() => {
+                    proximoNumeroDisplay.textContent = 'Error';
                 });
-
-                calcularTotales();
-                modalNuevaEncomienda.hide();
-                formQuick.reset();
-            } else {
-                alert(data.error + (data.details ? ': ' + JSON.stringify(data.details) : ''));
-            }
-        })
-        .catch(err => {
-            console.error('Error:', err);
-            btnSaveEncomienda.disabled = false;
-            btnSaveEncomienda.innerHTML = '<i class="bi bi-save me-2"></i> Guardar y Agregar a Factura';
-            alert('Error de conexión');
-        });
+        } else {
+            proximoNumeroDisplay.textContent = '---';
+        }
     });
+
+    if (timbradoSelect.value) $(timbradoSelect).trigger('change');
 
     // ===== SI VIENE CON CLIENTE PRESELECCIONADO =====
     {% if cliente_cedula %}

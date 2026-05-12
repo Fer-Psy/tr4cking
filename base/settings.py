@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     # Third-party apps
     'crispy_forms',
     'crispy_bootstrap5',
@@ -120,6 +121,15 @@ TIME_ZONE = 'America/Asuncion'
 USE_I18N = True
 
 USE_TZ = True
+
+# Format configuration
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = '.'
+DECIMAL_SEPARATOR = ','
+NUMBER_GROUPING = 3
+FORMAT_MODULE_PATH = [
+    'base.formats',
+]
 
 
 # Static files (CSS, JavaScript, Images)

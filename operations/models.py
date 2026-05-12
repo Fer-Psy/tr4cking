@@ -347,7 +347,9 @@ class Pasaje(models.Model):
     )
     vendedor = models.ForeignKey(
         User,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='pasajes_vendidos',
         verbose_name="Vendedor"
     )
@@ -389,7 +391,8 @@ class Pasaje(models.Model):
             origen = self.parada_origen.nombre.replace('Terminal ', '').replace('Terminal de ', '').strip()
             destino = self.parada_destino.nombre.replace('Terminal ', '').replace('Terminal de ', '').strip()
             num_asiento = self.asiento.numero_asiento
-            self.descripcion = f"Viaje {origen}-{destino} ({fecha} - As. {num_asiento})"
+            empresa_nom = self.viaje.empresa.nombre if self.viaje.empresa else (self.viaje.bus.empresa.nombre if self.viaje.bus.empresa else "Empresa")
+            self.descripcion = f"Viaje {origen}-{destino} ({empresa_nom} - {fecha} - Asiento {num_asiento})"
             
         # Salvar para obtener el ID si es nuevo
         is_new = self.pk is None
@@ -400,6 +403,12 @@ class Pasaje(models.Model):
             self.codigo = f"Pasaje {self.id:03d}"
             # Actualizamos solo el código para no disparar un save completo
             type(self).objects.filter(pk=self.pk).update(codigo=self.codigo)
+
+    @property
+    def factura(self):
+        """Retorna la factura asociada si existe."""
+        detalle = self.detalles_factura.filter(factura__estado='emitida').first()
+        return detalle.factura if detalle else None
 
     @property
     def cliente_efectivo(self):
@@ -425,10 +434,9 @@ class Encomienda(models.Model):
     ]
 
     TIPO_CHOICES = [
-        ('paquete', 'Paquete'),
-        ('documento', 'Documento'),
-        ('valija', 'Valija'),
-        ('carga', 'Carga'),
+        ('sobre', 'Sobre / Paquete Pequeño'),
+        ('mediano', 'Paquete Mediano'),
+        ('grande', 'Paquete Grande'),
     ]
 
     viaje = models.ForeignKey(
@@ -524,8 +532,26 @@ class Encomienda(models.Model):
     def __str__(self):
         return f"{self.codigo} - {self.tipo} ({self.estado})"
 
+    @property
+    def factura(self):
+        """Retorna la factura asociada si existe."""
+        detalle = self.detalles_factura.filter(factura__estado='emitida').first()
+        return detalle.factura if detalle else None
+
     def get_absolute_url(self):
         return reverse('operations:encomienda_detail', kwargs={'pk': self.pk})
+
+    @property
+    def eta_llegada(self):
+        """Calcula la hora estimada de llegada a la parada de destino."""
+        if not self.viaje or not self.parada_destino or not self.viaje.horario:
+            return None
+        
+        try:
+            detalle = self.viaje.itinerario.detalles.get(parada=self.parada_destino)
+            return detalle.hora_estimada(self.viaje.horario.hora_salida)
+        except Exception:
+            return None
 
     def save(self, *args, **kwargs):
         # Salvar para obtener el ID si es nuevo

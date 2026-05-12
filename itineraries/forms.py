@@ -107,7 +107,15 @@ class ItinerarioForm(forms.ModelForm):
                     ),
                 ),
                 Row(
-                    Column('horarios', css_class='col-md-12 mt-3')
+                    Column(
+                        Div(
+                            HTML('<label class="form-label fw-semibold">Horarios de salida</label>'),
+                             HTML('<button type="button" class="btn btn-outline-primary btn-sm btn-icon ms-2" data-bs-toggle="modal" data-bs-target="#modalHorario" title="Nuevo Horario"><i class="bi bi-plus-lg"></i></button>'),
+                            css_class='d-flex align-items-center'
+                        ),
+                        Field('horarios', label_class='d-none', css_id='id_horarios_container'),
+                        css_class='col-md-12 mt-2'
+                    )
                 )
             ),
         )
@@ -225,7 +233,7 @@ class PrecioForm(forms.ModelForm):
     
     class Meta:
         model = Precio
-        fields = ['itinerario', 'origen', 'destino', 'precio']
+        fields = ['origen', 'destino', 'precio']
         widgets = {
             'precio': forms.NumberInput(attrs={'min': 0, 'step': '100', 'placeholder': 'Ej: 85000'}),
         }
@@ -235,16 +243,6 @@ class PrecioForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
-            Row(
-                Column(
-                    Div(
-                        Field('itinerario', wrapper_class='flex-grow-1 mb-0'),
-                        HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" hx-get="' + reverse('itineraries:itinerario_create') + '" hx-target="#modal-itinerario .modal-content" data-bs-toggle="modal" data-bs-target="#modal-itinerario" title="Nuevo Itinerario"><i class="bi bi-plus-lg"></i></button>'),
-                        css_class='d-flex align-items-start'
-                    ),
-                    css_class='col-md-12'
-                ),
-            ),
             Row(
                 Column('origen', css_class='col-md-6'),
                 Column('destino', css_class='col-md-6'),

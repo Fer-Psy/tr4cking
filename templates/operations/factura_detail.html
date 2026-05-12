@@ -1,4 +1,5 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load custom_filters %}
 
 {% block title %}Factura {{ factura.numero_completo }} - TR4CKING{% endblock %}
 {% block title_content %}Factura: {{ factura.numero_completo }}{% endblock %}
@@ -52,7 +53,7 @@
                         <table class="table table-sm">
                             <tr>
                                 <th>Cédula/RUC:</th>
-                                <td>{{ factura.cliente.cedula }}</td>
+                                <td>{{ factura.cliente.cedula|format_gs }}</td>
                             </tr>
                             <tr>
                                 <th>Nombre:</th>
@@ -85,8 +86,8 @@
                             <td>{{ d.cantidad|floatformat:0 }}</td>
                             <td>{{ d.descripcion }}</td>
                             <td class="text-center">{{ d.tasa_iva }}%</td>
-                            <td class="text-end">Gs. {{ d.precio_unitario|floatformat:0 }}</td>
-                            <td class="text-end">Gs. {{ d.subtotal|floatformat:0 }}</td>
+                            <td class="text-end">Gs. {{ d.precio_unitario|format_gs }}</td>
+                            <td class="text-end">Gs. {{ d.subtotal|format_gs }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -141,21 +142,21 @@
                 <table class="table table-sm">
                     <tr>
                         <td>Subtotal Exenta:</td>
-                        <td class="text-end">Gs. {{ factura.subtotal_exenta|floatformat:0 }}</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_exenta|format_gs }}</td>
                     </tr>
                     <tr>
                         <td>Gravada 5%:</td>
-                        <td class="text-end">Gs. {{ factura.subtotal_iva5|floatformat:0 }}</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_iva5|format_gs }}</td>
                     </tr>
                     <tr>
                         <td>Gravada 10%:</td>
-                        <td class="text-end">Gs. {{ factura.subtotal_iva10|floatformat:0 }}</td>
+                        <td class="text-end">Gs. {{ factura.subtotal_iva10|format_gs }}</td>
                     </tr>
                 </table>
                 <hr>
                 <div class="d-flex justify-content-between h3 mb-0">
                     <span>TOTAL:</span>
-                    <span class="text-green">Gs. {{ factura.total|floatformat:0 }}</span>
+                    <span class="text-green">Gs. {{ factura.total|format_gs }}</span>
                 </div>
             </div>
         </div>
@@ -169,17 +170,17 @@
                 <table class="table table-sm">
                     <tr>
                         <td>IVA 5%:</td>
-                        <td class="text-end">Gs. {{ factura.iva_5|floatformat:0 }}</td>
+                        <td class="text-end">Gs. {{ factura.iva_5|format_gs }}</td>
                     </tr>
                     <tr>
                         <td>IVA 10%:</td>
-                        <td class="text-end">Gs. {{ factura.iva_10|floatformat:0 }}</td>
+                        <td class="text-end">Gs. {{ factura.iva_10|format_gs }}</td>
                     </tr>
                 </table>
                 <hr>
                 <div class="d-flex justify-content-between h5 mb-0">
                     <span>Total IVA:</span>
-                    <span>Gs. {{ factura.total_iva|floatformat:0 }}</span>
+                    <span>Gs. {{ factura.total_iva|format_gs }}</span>
                 </div>
             </div>
         </div>

@@ -178,7 +178,7 @@
                             {% elif encomienda.estado == 'en_transito' %}bg-primary
                             {% elif encomienda.estado == 'en_destino' %}bg-info
                             {% else %}bg-warning{% endif %} text-white">
-                            {{ encomienda.get_estado_display }}
+                            {% if encomienda.estado == 'en_transito' %}En Ruta{% else %}{{ encomienda.get_estado_display }}{% endif %}
                         </span>
                     </div>
 
@@ -207,10 +207,14 @@
 
                         <div
                             class="timeline-item {% if encomienda.estado == 'en_transito' %}active{% elif encomienda.estado in 'en_destino,entregado' %}completed{% endif %}">
-                            <strong>En Tránsito</strong>
+                            <strong>En Ruta</strong>
                             <p class="text-muted mb-0 small">
                                 {% if encomienda.viaje %}
-                                Viaje: {{ encomienda.viaje.itinerario.nombre }}
+                                <i class="bi bi-bus-front me-1"></i> Bus: {{ encomienda.viaje.bus.placa }}<br>
+                                <i class="bi bi-map me-1"></i> {{ encomienda.viaje.itinerario.nombre }}<br>
+                                {% if encomienda.eta_llegada %}
+                                <i class="bi bi-clock me-1"></i> Llegada est.: {{ encomienda.eta_llegada|time:"H:i" }} hs
+                                {% endif %}
                                 {% endif %}
                             </p>
                         </div>

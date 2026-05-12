@@ -12,13 +12,6 @@ class DetalleItinerarioInline(admin.TabularInline):
     autocomplete_fields = ('parada',)
 
 
-class PrecioInline(admin.TabularInline):
-    """Inline para ver/editar precios de un itinerario."""
-    model = Precio
-    extra = 1
-    fields = ('origen', 'destino', 'precio')
-    autocomplete_fields = ('origen', 'destino')
-
 
 @admin.register(Itinerario)
 class ItinerarioAdmin(admin.ModelAdmin):
@@ -27,7 +20,7 @@ class ItinerarioAdmin(admin.ModelAdmin):
     list_filter = ('empresa', 'activo', 'ruta')
     search_fields = ('nombre', 'ruta', 'empresa__nombre')
     ordering = ('nombre',)
-    inlines = [DetalleItinerarioInline, PrecioInline]
+    inlines = [DetalleItinerarioInline]
     fieldsets = (
         ('Información General', {
             'fields': ('empresa', 'nombre', 'ruta', 'activo')
@@ -68,8 +61,7 @@ class DetalleItinerarioAdmin(admin.ModelAdmin):
 @admin.register(Precio)
 class PrecioAdmin(admin.ModelAdmin):
     """Admin para gestionar matriz de precios."""
-    list_display = ('itinerario', 'origen', 'destino', 'precio')
-    list_filter = ('itinerario',)
-    search_fields = ('itinerario__nombre', 'origen__nombre', 'destino__nombre')
-    ordering = ('itinerario', 'origen', 'destino')
-    autocomplete_fields = ('itinerario', 'origen', 'destino')
+    list_display = ('origen', 'destino', 'precio')
+    search_fields = ('origen__nombre', 'destino__nombre')
+    ordering = ('origen', 'destino')
+    autocomplete_fields = ('origen', 'destino')

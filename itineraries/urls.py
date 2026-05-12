@@ -31,4 +31,5 @@ urlpatterns = [
     path('<int:itinerario_pk>/horarios/nuevo/', views.HorarioCreateView.as_view(), name='horario_create'),
     path('horarios/<int:pk>/editar/', views.HorarioUpdateView.as_view(), name='horario_edit'),
     path('horarios/<int:pk>/eliminar/', views.HorarioDeleteView.as_view(), name='horario_delete'),
+    path('horarios/crear-ajax/', views.HorarioCreateAjaxView.as_view(), name='horario_create_ajax'),
 ]

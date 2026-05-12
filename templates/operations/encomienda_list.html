@@ -49,6 +49,7 @@
                     <th>Tipo</th>
                     <th>Remitente</th>
                     <th>Destinatario</th>
+                    <th>Origen</th>
                     <th>Destino</th>
                     <th>Precio</th>
                     <th>Estado</th>
@@ -74,6 +75,7 @@
                         <div>{{ enc.destinatario.nombre_completo }}</div>
                         <small class="text-muted">{{ enc.destinatario.cedula }}</small>
                     </td>
+                    <td>{{ enc.parada_origen.nombre }}</td>
                     <td>{{ enc.parada_destino.nombre }}</td>
                     <td>Gs. {{ enc.precio|floatformat:0 }}</td>
                     <td>
@@ -89,11 +91,22 @@
                     <td class="text-end">
                         <div class="btn-group">
                             <a href="{% url 'operations:encomienda_detail' enc.pk %}"
-                                class="btn btn-sm btn-outline-primary">
+                                class="btn btn-sm btn-outline-primary" title="Ver detalle">
                                 <i class="bi bi-eye"></i>
                             </a>
+                            
+                            {% if enc.estado == 'registrado' %}
+                            <form method="post" action="{% url 'operations:cancelar_encomienda_rapida' enc.pk %}"
+                                class="d-inline" onsubmit="return confirm('¿Está seguro de cancelar esta encomienda?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+
                             {% if enc.estado == 'en_destino' %}
-                            <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-green">
+                            <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-green" title="Entregar">
                                 <i class="bi bi-check-lg"></i>
                             </a>
                             {% endif %}
@@ -102,7 +115,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center py-5 text-muted">
+                    <td colspan="9" class="text-center py-5 text-muted">
                         <i class="bi bi-box-seam h1"></i>
                         <p class="mb-0">No se encontraron encomiendas</p>
                     </td>

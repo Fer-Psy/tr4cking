@@ -42,9 +42,14 @@
     <div>
         <span class="text-muted">{{ page_obj.paginator.count }} viajes encontrados</span>
     </div>
-    <a href="{% url 'operations:viaje_create' %}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i> Nuevo Viaje
-    </a>
+    <div class="d-flex gap-2">
+        <button type="button" id="btn-bulk-cancel" class="btn btn-danger d-none" data-url="{% url 'operations:viaje_bulk_cancel' %}">
+            <i class="bi bi-trash me-1"></i> Cancelar Seleccionados
+        </button>
+        <a href="{% url 'operations:viaje_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nuevo Viaje
+        </a>
+    </div>
 </div>
 
 <!-- Lista de Viajes -->
@@ -53,6 +58,9 @@
         <table class="table table-vcenter card-table table-hover">
             <thead>
                 <tr>
+                    <th style="width: 30px;">
+                        <input type="checkbox" id="select-all" class="form-check-input">
+                    </th>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Itinerario</th>
@@ -67,6 +75,11 @@
             <tbody>
                 {% for viaje in viajes %}
                 <tr>
+                    <td>
+                        {% if viaje.estado != 'cancelado' and viaje.estado != 'completado' %}
+                        <input type="checkbox" class="form-check-input viaje-checkbox" value="{{ viaje.pk }}">
+                        {% endif %}
+                    </td>
                     <td>#{{ viaje.pk }}</td>
                     <td><strong>{{ viaje.fecha_viaje|date:"d/m/Y" }}</strong></td>
                     <td>
@@ -131,6 +144,16 @@
                                 class="btn btn-sm btn-outline-secondary" title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </a>
+
+                            {% if viaje.estado != 'cancelado' and viaje.estado != 'completado' %}
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger btn-cancelar-viaje" 
+                                    data-url="{% url 'operations:viaje_cancel' viaje.pk %}"
+                                    data-id="{{ viaje.pk }}"
+                                    title="Cancelar viaje">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -184,4 +207,91 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Select all checkboxes
+    $('#select-all').on('click', function() {
+        $('.viaje-checkbox').prop('checked', this.checked);
+        updateBulkButton();
+    });
+
+    $('.viaje-checkbox').on('change', function() {
+        updateBulkButton();
+    });
+
+    function updateBulkButton() {
+        const count = $('.viaje-checkbox:checked').length;
+        if (count > 0) {
+            $('#btn-bulk-cancel').removeClass('d-none');
+        } else {
+            $('#btn-bulk-cancel').addClass('d-none');
+        }
+    }
+
+    // Single cancel
+    $('.btn-cancelar-viaje').on('click', function() {
+        const btn = $(this);
+        const url = btn.data('url');
+        const viajeId = btn.data('id');
+        
+        if (confirm('¿Estás seguro de que deseas cancelar el viaje #' + viajeId + '?')) {
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+            
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                },
+                error: function(xhr) {
+                    btn.prop('disabled', false).html('<i class="bi bi-x-lg"></i>');
+                    const error = xhr.responseJSON ? xhr.responseJSON.error : 'Ocurrió un error al cancelar el viaje.';
+                    alert(error);
+                }
+            });
+        }
+    });
+
+    // Bulk cancel
+    $('#btn-bulk-cancel').on('click', function() {
+        const url = $(this).data('url');
+        const ids = $('.viaje-checkbox:checked').map(function() {
+            return $(this).val();
+        }).get();
+        
+        if (confirm('¿Estás seguro de que deseas cancelar los ' + ids.length + ' viajes seleccionados?')) {
+            $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Cancelando...');
+            
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: {
+                    'viaje_ids[]': ids
+                },
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                },
+                error: function(xhr) {
+                    $('#btn-bulk-cancel').prop('disabled', false).html('<i class="bi bi-trash me-1"></i> Cancelar Seleccionados');
+                    const error = xhr.responseJSON ? xhr.responseJSON.error : 'Ocurrió un error al cancelar los viajes.';
+                    alert(error);
+                }
+            });
+        }
+    });
+});
+</script>
 {% endblock %}

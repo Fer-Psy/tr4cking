@@ -233,15 +233,9 @@ class DetalleItinerario(models.Model):
 
 class Precio(models.Model):
     """
-    Define la matriz de precios de un itinerario.
-    Almacena cuánto cuesta ir de una parada origen a una parada destino.
+    Define la matriz de precios general.
+    Almacena cuánto cuesta ir de una parada origen a una parada destino, independiente del itinerario.
     """
-    itinerario = models.ForeignKey(
-        Itinerario, 
-        on_delete=models.CASCADE, 
-        related_name='precios',
-        verbose_name="Itinerario"
-    )
     origen = models.ForeignKey(
         Parada, 
         on_delete=models.PROTECT, 
@@ -263,17 +257,17 @@ class Precio(models.Model):
     class Meta:
         verbose_name = "Precio"
         verbose_name_plural = "Precios"
-        ordering = ['itinerario', 'origen', 'destino']
-        unique_together = ['itinerario', 'origen', 'destino']
+        ordering = ['origen', 'destino']
+        unique_together = ['origen', 'destino']
         constraints = [
             models.UniqueConstraint(
-                fields=['itinerario', 'origen', 'destino'],
-                name='unique_precio_por_tramo'
+                fields=['origen', 'destino'],
+                name='unique_precio_por_tramo_global'
             )
         ]
 
     def __str__(self):
-        return f"{self.itinerario.nombre}: {self.origen.nombre} -> {self.destino.nombre} = Gs. {self.precio:,.0f}"
+        return f"{self.origen.nombre} -> {self.destino.nombre} = Gs. {self.precio:,.0f}"
 
     def get_absolute_url(self):
         return reverse('itineraries:precio_detail', kwargs={'pk': self.pk})
