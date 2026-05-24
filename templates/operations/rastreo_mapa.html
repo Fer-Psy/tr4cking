@@ -48,6 +48,12 @@
         color: white;
         font-size: 1.3rem;
     }
+    /* Marcador sin GPS activo */
+    .bus-marker-inner.no-gps {
+        background: linear-gradient(135deg, #6c757d, #adb5bd);
+        box-shadow: 0 4px 15px rgba(108,117,125,0.4);
+        animation: none;
+    }
     @keyframes pulse-ring {
         0% { box-shadow: 0 0 0 0 rgba(32,107,196,0.4); }
         70% { box-shadow: 0 0 0 15px rgba(32,107,196,0); }
@@ -100,6 +106,49 @@
         border-radius: 8px 8px 0 0;
         margin: -14px -14px 10px -14px;
     }
+    .gps-badge-on {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(47, 179, 68, 0.15);
+        color: #2fb344;
+        font-weight: 600;
+    }
+    .gps-badge-off {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(214, 57, 57, 0.15);
+        color: #d63939;
+        font-weight: 600;
+    }
+    .gps-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .gps-dot.on { background: #2fb344; animation: blink 1.5s infinite; }
+    .gps-dot.off { background: #d63939; }
+    .ultima-act {
+        font-size: 0.65rem;
+        color: #868e96;
+        margin-top: 2px;
+    }
+    .ruta-line {
+        stroke-dasharray: 8, 4;
+        stroke-dashoffset: 0;
+        animation: dash-move 1s linear infinite;
+    }
+    @keyframes dash-move {
+        to { stroke-dashoffset: -12; }
+    }
 </style>
 {% endblock %}
 
@@ -108,6 +157,7 @@
     <span class="stat-pulse"></span>
     Rastreo en Vivo
     <span class="badge bg-primary ms-2" id="badge-total">{{ total_en_curso }} en curso</span>
+    <span class="badge bg-green-lt ms-1" id="badge-gps-count">0 con GPS</span>
 </div>
 {% endblock %}
 
@@ -129,45 +179,11 @@
             </div>
 
             <div id="lista-viajes">
-                {% for viaje in viajes_en_curso %}
-                <div class="card viaje-card mb-2 border-0 shadow-sm" data-viaje-id="{{ viaje.pk }}" onclick="centrarViaje({{ viaje.pk }})">
-                    <div class="card-body py-3 px-3">
-                        <div class="d-flex align-items-start justify-content-between mb-2">
-                            <div>
-                                <h4 class="card-title mb-0 fs-6 fw-bold">{{ viaje.itinerario.nombre }}</h4>
-                                <small class="text-muted">{{ viaje.empresa.nombre }}</small>
-                            </div>
-                            <span class="badge bg-green-lt">En curso</span>
-                        </div>
-                        <div class="row g-2 mt-1">
-                            <div class="col-6">
-                                <div class="text-muted small">
-                                    <i class="bi bi-bus-front me-1"></i>{{ viaje.bus.placa }}
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="text-muted small">
-                                    <i class="bi bi-clock me-1"></i>{{ viaje.horario.hora_salida|time:"H:i" }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span><i class="bi bi-person-fill text-primary me-1"></i>Ocupación</span>
-                                <span class="fw-bold ocupacion-pct" data-viaje="{{ viaje.pk }}">--</span>
-                            </div>
-                            <div class="ocupacion-bar">
-                                <div class="ocupacion-fill bg-primary" style="width: 0%" data-viaje-bar="{{ viaje.pk }}"></div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Se genera dinámicamente desde la API -->
+                <div class="text-center text-muted py-5" id="lista-vacia">
+                    <i class="bi bi-arrow-repeat spin" style="font-size: 2rem; opacity: 0.3;"></i>
+                    <p class="mt-2 mb-0">Cargando viajes...</p>
                 </div>
-                {% empty %}
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-geo-alt" style="font-size: 3rem; opacity: 0.3;"></i>
-                    <p class="mt-2">No hay viajes en curso en este momento.</p>
-                </div>
-                {% endfor %}
             </div>
         </div>
     </div>
@@ -175,15 +191,12 @@
     <!-- Mapa -->
     <div class="col-lg-8 col-xl-9 position-relative">
         <div id="mapa-rastreo"></div>
-        {% if not viajes_en_curso %}
-        <div class="no-viajes-overlay">
+        <div class="no-viajes-overlay" id="no-viajes-overlay" style="display: none;">
             <i class="bi bi-bus-front" style="font-size: 4rem; color: #206bc4; opacity: 0.4;"></i>
             <h3 class="mt-3">Sin viajes en curso</h3>
             <p class="text-muted">Cuando un viaje cambie a estado "En Curso", aparecerá aquí.<br>
-            El mapa se actualiza automáticamente cada 30 segundos.</p>
-
+            El mapa se actualiza automáticamente cada 10 segundos.</p>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -195,6 +208,7 @@
     // Centro de Paraguay
     const MAP_CENTER = [-23.5, -57.5];
     const MAP_ZOOM = 7;
+    const REFRESH_INTERVAL = 10000; // 10 segundos
 
     const map = L.map('mapa-rastreo', {
         zoomControl: true,
@@ -205,14 +219,18 @@
         maxZoom: 19,
     }).addTo(map);
 
-    // Marcadores de buses
+    // Marcadores y líneas
     let busMarkers = {};
     let paradaMarkers = {};
+    let rutaLines = {};
+    let firstLoad = true;
 
-    function crearIconoBus() {
+    function crearIconoBus(tieneGps) {
+        const extraClass = tieneGps ? '' : ' no-gps';
+        const icon = tieneGps ? 'bi-bus-front-fill' : 'bi-bus-front';
         return L.divIcon({
             className: 'bus-icon-marker',
-            html: '<div class="bus-marker-inner"><i class="bi bi-bus-front-fill"></i></div>',
+            html: `<div class="bus-marker-inner${extraClass}"><i class="bi ${icon}"></i></div>`,
             iconSize: [48, 48],
             iconAnchor: [24, 24],
             popupAnchor: [0, -28],
@@ -234,49 +252,195 @@
         return '#d63939';
     }
 
+    // Obtener coordenadas del bus (GPS real o primera parada como fallback)
+    function obtenerCoordenadas(v) {
+        if (v.ubicacion && v.ubicacion.lat && v.ubicacion.lng) {
+            return { lat: v.ubicacion.lat, lng: v.ubicacion.lng, esGps: true };
+        }
+        // Fallback: primera parada con coordenadas
+        if (v.paradas && v.paradas.length > 0) {
+            for (let p of v.paradas) {
+                if (p.lat && p.lng) {
+                    return { lat: p.lat, lng: p.lng, esGps: false };
+                }
+            }
+        }
+        return null;
+    }
+
     function crearPopupContent(v) {
         const pct = v.porcentaje_ocupacion;
         const color = getOcupacionColor(pct);
+        const tieneGps = v.ubicacion != null;
+        const gpsBadge = tieneGps
+            ? `<span class="gps-badge-on"><span class="gps-dot on"></span> GPS Activo</span>`
+            : `<span class="gps-badge-off"><span class="gps-dot off"></span> Sin GPS</span>`;
+        const velocidadHtml = tieneGps && v.ubicacion.velocidad != null
+            ? `<div class="col-6 small text-end"><i class="bi bi-speedometer2 me-1 text-muted"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
+            : '';
+
         return `
-            <div style="min-width: 240px;">
+            <div style="min-width: 260px;">
                 <div class="popup-header">
-                    <div class="fw-bold"><i class="bi bi-bus-front-fill me-2"></i>${v.itinerario}</div>
-                    <small>${v.empresa}</small>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="fw-bold fs-3"><i class="bi bi-bus-front-fill me-2"></i>${v.itinerario}</div>
+                        ${gpsBadge}
+                    </div>
+                    <div class="small opacity-75">${v.empresa}</div>
                 </div>
-                <div class="px-1">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span><i class="bi bi-truck me-1"></i>${v.bus_placa}</span>
-                        <span class="text-muted">${v.bus_marca}</span>
+                <div class="p-2">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="text-muted small mb-0"><i class="bi bi-truck me-1"></i>Bus</div>
+                            <div class="fw-bold">${v.bus_placa}</div>
+                            <div class="text-muted smaller">${v.bus_marca}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small mb-0"><i class="bi bi-person-badge me-1"></i>Chofer</div>
+                            <div class="fw-bold text-truncate" title="${v.chofer}">${v.chofer}</div>
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between mb-1">
-                        <span><i class="bi bi-person me-1"></i>${v.chofer}</span>
+
+                    <div class="row g-2 text-center mb-3">
+                        <div class="col-4">
+                            <div class="bg-success-lt p-2 rounded">
+                                <div class="text-muted smaller">Libres</div>
+                                <div class="fw-bold text-success fs-4">${v.asientos_libres}</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-danger-lt p-2 rounded">
+                                <div class="text-muted smaller">Ocupados</div>
+                                <div class="fw-bold text-danger fs-4">${v.asientos_ocupados}</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-warning-lt p-2 rounded">
+                                <div class="text-muted smaller">Reservas</div>
+                                <div class="fw-bold text-warning fs-4">${v.asientos_reservados}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between mb-1">
-                        <span><i class="bi bi-clock me-1"></i>Salida: ${v.hora_salida_real || v.hora_salida}</span>
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between smaller mb-1">
+                            <span class="text-muted">Estado de Ocupación</span>
+                            <span class="fw-bold" style="color:${color}">${pct}%</span>
+                        </div>
+                        <div class="ocupacion-bar" style="height: 4px;">
+                            <div class="ocupacion-fill" style="width:${pct}%;background:${color};"></div>
+                        </div>
                     </div>
-                    ${v.ubicacion ? `<div class="mb-1"><i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>` : ''}
-                    <hr class="my-2">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold">Asientos</span>
-                        <span style="color:${color};" class="fw-bold">${pct}% ocupado</span>
+
+                    <div class="row g-1 mt-2 border-top pt-2">
+                        <div class="col-6 small"><i class="bi bi-clock me-1 text-muted"></i>Salida: ${v.hora_salida}</div>
+                        ${velocidadHtml}
                     </div>
-                    <div class="d-flex gap-3">
-                        <span class="badge bg-danger-lt"><i class="bi bi-person-fill me-1"></i>${v.asientos_ocupados} ocupados</span>
-                        <span class="badge bg-success-lt"><i class="bi bi-check-circle me-1"></i>${v.asientos_libres} libres</span>
-                    </div>
-                    <div class="ocupacion-bar mt-2">
-                        <div class="ocupacion-fill" style="width:${pct}%;background:${color};"></div>
-                    </div>
+                    ${!tieneGps ? '<div class="mt-1 smaller text-warning text-center"><i class="bi bi-exclamation-triangle me-1"></i>Ubicación estimada (sin GPS activo)</div>' : ''}
+                    <div class="mt-1 smaller text-muted text-center italic">Capacidad: ${v.asientos_total} asientos</div>
                 </div>
             </div>`;
+    }
+
+    // Generar card HTML para el panel lateral
+    function crearCardViaje(v) {
+        const tieneGps = v.ubicacion != null;
+        const pct = v.porcentaje_ocupacion;
+        const color = getOcupacionColor(pct);
+        const gpsBadge = tieneGps
+            ? '<span class="gps-badge-on"><span class="gps-dot on"></span> GPS</span>'
+            : '<span class="gps-badge-off"><span class="gps-dot off"></span> Sin GPS</span>';
+
+        return `
+        <div class="card viaje-card mb-2 border-0 shadow-sm" data-viaje-id="${v.id}" onclick="centrarViaje(${v.id})">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div>
+                        <h4 class="card-title mb-0 fs-6 fw-bold">${v.itinerario}</h4>
+                        <small class="text-muted">${v.empresa}</small>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-1">
+                        <span class="badge bg-green-lt">En curso</span>
+                        ${gpsBadge}
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <div class="text-muted small">
+                            <i class="bi bi-bus-front me-1"></i>${v.bus_placa}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small">
+                            <i class="bi bi-clock me-1"></i>${v.hora_salida}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span><i class="bi bi-person-fill text-primary me-1"></i>Ocupación</span>
+                        <span class="fw-bold" style="color:${color}">${pct}%</span>
+                    </div>
+                    <div class="ocupacion-bar mb-2">
+                        <div class="ocupacion-fill" style="width: ${pct}%; background: ${color};"></div>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted" style="font-size: 0.7rem;">
+                        <span title="Ocupados"><i class="bi bi-person-check-fill text-danger"></i> ${v.asientos_ocupados}</span>
+                        <span title="Reservados"><i class="bi bi-calendar-event text-warning"></i> ${v.asientos_reservados}</span>
+                        <span title="Libres"><i class="bi bi-check-circle text-success"></i> ${v.asientos_libres}</span>
+                        <span title="Total"><i class="bi bi-bus-front"></i> ${v.asientos_total}</span>
+                    </div>
+                </div>
+                ${tieneGps && v.ubicacion.velocidad != null ? `
+                <div class="mt-2 pt-2 border-top">
+                    <span class="text-muted" style="font-size: 0.7rem;">
+                        <i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h
+                    </span>
+                </div>` : ''}
+            </div>
+        </div>`;
     }
 
     function actualizarMapa() {
         fetch("{% url 'operations:api_viajes_en_curso' %}")
             .then(r => r.json())
             .then(data => {
+                const overlay = document.getElementById('no-viajes-overlay');
                 document.getElementById('badge-total').textContent = data.total + ' en curso';
                 document.getElementById('total-buses').textContent = data.total;
+
+                // Contar cuántos tienen GPS
+                const conGps = data.viajes.filter(v => v.ubicacion != null).length;
+                document.getElementById('badge-gps-count').textContent = conGps + ' con GPS';
+
+                // Mostrar/ocultar overlay
+                if (data.total === 0) {
+                    overlay.style.display = '';
+                } else {
+                    overlay.style.display = 'none';
+                }
+
+                // Actualizar lista lateral dinámicamente
+                const listaEl = document.getElementById('lista-viajes');
+                if (data.viajes.length === 0) {
+                    listaEl.innerHTML = `
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-geo-alt" style="font-size: 3rem; opacity: 0.3;"></i>
+                            <p class="mt-2">No hay viajes en curso en este momento.</p>
+                        </div>`;
+                } else {
+                    // Preservar selección activa
+                    const activeCard = document.querySelector('.viaje-card.active');
+                    const activeId = activeCard ? activeCard.dataset.viajeId : null;
+
+                    listaEl.innerHTML = data.viajes.map(v => crearCardViaje(v)).join('');
+
+                    // Restaurar selección
+                    if (activeId) {
+                        const card = document.querySelector(`[data-viaje-id="${activeId}"]`);
+                        if (card) card.classList.add('active');
+                    }
+                }
 
                 // Limpiar marcadores viejos que ya no existen
                 Object.keys(busMarkers).forEach(id => {
@@ -286,58 +450,96 @@
                     }
                 });
 
-                        data.viajes.forEach((v, index) => {
-                            // Actualizar panel lateral
-                            const pctEl = document.querySelector(`[data-viaje="${v.id}"]`);
-                            if (pctEl) pctEl.textContent = v.porcentaje_ocupacion + '%';
-                            const barEl = document.querySelector(`[data-viaje-bar="${v.id}"]`);
-                            if (barEl) {
-                                barEl.style.width = v.porcentaje_ocupacion + '%';
-                                barEl.style.background = getOcupacionColor(v.porcentaje_ocupacion);
+                // Limpiar paradas y rutas de viajes que ya no existen
+                Object.keys(paradaMarkers).forEach(key => {
+                    const viajeId = key.split('-')[0];
+                    if (!data.viajes.find(v => v.id == viajeId)) {
+                        map.removeLayer(paradaMarkers[key]);
+                        delete paradaMarkers[key];
+                    }
+                });
+                Object.keys(rutaLines).forEach(id => {
+                    if (!data.viajes.find(v => v.id == id)) {
+                        map.removeLayer(rutaLines[id]);
+                        delete rutaLines[id];
+                    }
+                });
+
+                data.viajes.forEach((v, index) => {
+                    const coords = obtenerCoordenadas(v);
+                    const tieneGps = v.ubicacion != null;
+
+                    if (coords) {
+                        const latlng = [coords.lat, coords.lng];
+
+                        if (busMarkers[v.id]) {
+                            // Mover marcador existente
+                            const old = busMarkers[v.id].getLatLng();
+                            if (old.lat !== latlng[0] || old.lng !== latlng[1]) {
+                                busMarkers[v.id].setLatLng(latlng);
                             }
+                            // Actualizar icono si cambió el estado GPS
+                            busMarkers[v.id].setIcon(crearIconoBus(tieneGps));
+                            busMarkers[v.id].setPopupContent(crearPopupContent(v));
+                        } else {
+                            // Crear nuevo marcador
+                            const marker = L.marker(latlng, {
+                                icon: crearIconoBus(tieneGps),
+                                zIndexOffset: 1000,
+                            }).addTo(map).bindPopup(crearPopupContent(v));
+                            busMarkers[v.id] = marker;
 
-                            if (v.ubicacion) {
-                                const latlng = [v.ubicacion.lat, v.ubicacion.lng];
-
-                                if (busMarkers[v.id]) {
-                                    // Mover marcador existente con animación suave
-                                    if (busMarkers[v.id].getLatLng().lat !== latlng[0] || busMarkers[v.id].getLatLng().lng !== latlng[1]) {
-                                        busMarkers[v.id].setLatLng(latlng);
-                                    }
-                                    busMarkers[v.id].setPopupContent(crearPopupContent(v));
-                                } else {
-                                    // Crear nuevo marcador
-                                    const marker = L.marker(latlng, {
-                                        icon: crearIconoBus(),
-                                        zIndexOffset: 1000,
-                                    }).addTo(map).bindPopup(crearPopupContent(v));
-                                    busMarkers[v.id] = marker;
-
-                                    // Auto-centrar en el primero si no hay interacción del usuario aún
-                                    if (Object.keys(busMarkers).length === 1) {
-                                        centrarViaje(v.id);
-                                    }
-                                }
-
-
-                        // Agregar paradas si no existen
-                        v.paradas.forEach(p => {
-                            if (p.lat && p.lng) {
-                                const key = `${v.id}-${p.orden}`;
-                                if (!paradaMarkers[key]) {
-                                    const pm = L.marker([p.lat, p.lng], {
-                                        icon: crearIconoParada(),
-                                    }).addTo(map).bindTooltip(p.nombre, {
-                                        permanent: false,
-                                        direction: 'top',
-                                        offset: [0, -10],
-                                    });
-                                    paradaMarkers[key] = pm;
-                                }
+                            // Auto-centrar en el primero en la primera carga
+                            if (firstLoad && index === 0) {
+                                // Hacer zoom al conjunto de paradas + bus
+                                const bounds = L.latLngBounds([latlng]);
+                                v.paradas.forEach(p => {
+                                    if (p.lat && p.lng) bounds.extend([p.lat, p.lng]);
+                                });
+                                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
                             }
+                        }
+                    }
+
+                    // Agregar paradas (siempre, independiente del GPS)
+                    const paradasConCoords = [];
+                    v.paradas.forEach(p => {
+                        if (p.lat && p.lng) {
+                            paradasConCoords.push([p.lat, p.lng]);
+                            const key = `${v.id}-${p.orden}`;
+                            if (!paradaMarkers[key]) {
+                                const pm = L.marker([p.lat, p.lng], {
+                                    icon: crearIconoParada(),
+                                }).addTo(map).bindTooltip(p.nombre, {
+                                    permanent: false,
+                                    direction: 'top',
+                                    offset: [0, -10],
+                                });
+                                paradaMarkers[key] = pm;
+                            }
+                        }
+                    });
+
+                    // Dibujar línea de ruta entre paradas
+                    if (paradasConCoords.length >= 2) {
+                        if (rutaLines[v.id]) {
+                            rutaLines[v.id].setLatLngs(paradasConCoords);
+                        } else {
+                            rutaLines[v.id] = L.polyline(paradasConCoords, {
+                                color: tieneGps ? '#4dabf7' : '#6c757d',
+                                weight: 3,
+                                opacity: 0.6,
+                                dashArray: '8, 6',
+                            }).addTo(map);
+                        }
+                        // Actualizar color de la ruta según estado GPS
+                        rutaLines[v.id].setStyle({
+                            color: tieneGps ? '#4dabf7' : '#6c757d',
                         });
                     }
                 });
+
+                firstLoad = false;
             })
             .catch(err => console.error('Error al actualizar mapa:', err));
     }
@@ -354,9 +556,9 @@
         if (card) card.classList.add('active');
     };
 
-    // Actualizar cada 30 segundos
+    // Actualizar cada 10 segundos para tiempo real
     actualizarMapa();
-    setInterval(actualizarMapa, 30000);
+    setInterval(actualizarMapa, REFRESH_INTERVAL);
 
 })();
 </script>

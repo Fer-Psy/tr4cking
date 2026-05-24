@@ -23,6 +23,7 @@ urlpatterns = [
     path('viajes/<int:pk>/editar/', views.ViajeUpdateView.as_view(), name='viaje_update'),
     path('viajes/<int:pk>/estado/', views.ViajeEstadoUpdateView.as_view(), name='viaje_estado'),
     path('viajes/<int:pk>/iniciar/', views.ViajeIniciarView.as_view(), name='viaje_iniciar'),
+    path('viajes/<int:pk>/toggle-reservas/', views.ViajeToggleReservaView.as_view(), name='viaje_toggle_reservas'),
     path('viajes/<int:pk>/cancelar/', views.ViajeCancelView.as_view(), name='viaje_cancel'),
     path('viajes/bulk-cancelar/', views.ViajeBulkCancelView.as_view(), name='viaje_bulk_cancel'),
     path('viajes/generar-automaticos/', views.GenerarViajesAutomaticosView.as_view(), name='generar_viajes_automaticos'),
@@ -57,7 +58,7 @@ urlpatterns = [
     path('viajes/<int:viaje_pk>/encomienda/', views.EncomiendaCreateView.as_view(), name='encomienda_create'),
     
     # Tracking público (sin login)
-    path('tracking/', views.TrackingPublicoView.as_view(), name='tracking_publico'),
+    path('rastreo/', views.TrackingPublicoView.as_view(), name='tracking_publico'),
     
     # ==========================================================================
     # CAJA
@@ -88,13 +89,13 @@ urlpatterns = [
     # ==========================================================================
     # INCIDENCIAS
     # ==========================================================================
-    path('incidencias/', views.IncidenciaListView.as_view(), name='incidencia_list'),
-    path('incidencias/nueva/', views.IncidenciaCreateView.as_view(), name='incidencia_create'),
-    path('incidencias/<int:pk>/', views.IncidenciaDetailView.as_view(), name='incidencia_detail'),
-    path('incidencias/<int:pk>/resolver/', views.IncidenciaResolverView.as_view(), name='incidencia_resolver'),
+    # path('incidencias/', views.IncidenciaListView.as_view(), name='incidencia_list'),
+    # path('incidencias/nueva/', views.IncidenciaCreateView.as_view(), name='incidencia_create'),
+    # path('incidencias/<int:pk>/', views.IncidenciaDetailView.as_view(), name='incidencia_detail'),
+    # path('incidencias/<int:pk>/resolver/', views.IncidenciaResolverView.as_view(), name='incidencia_resolver'),
     
     # Incidencia desde viaje
-    path('viajes/<int:viaje_pk>/incidencia/', views.IncidenciaCreateView.as_view(), name='incidencia_viaje_create'),
+    # path('viajes/<int:viaje_pk>/incidencia/', views.IncidenciaCreateView.as_view(), name='incidencia_viaje_create'),
     
     # ==========================================================================
     # REPORTES
@@ -114,6 +115,7 @@ urlpatterns = [
     path('api/items-pendientes/', views.ObtenerItemsPendientesClienteView.as_view(), name='api_items_pendientes'),
     path('api/crear-encomienda-quick/', views.APICrearEncomiendaFacturacionView.as_view(), name='api_crear_encomienda_quick'),
     path('api/buscar-clientes-registrados/', views.BuscarClientesRegistradosView.as_view(), name='api_buscar_clientes_registrados'),
+    path('api/crear-cliente/', views.CrearClienteAjaxView.as_view(), name='api_crear_cliente'),
     
     # API para obtener paradas de un viaje
     path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
@@ -124,7 +126,7 @@ urlpatterns = [
     # ==========================================================================
     # RASTREO EN TIEMPO REAL
     # ==========================================================================
-    path('rastreo/', views.RastreoMapaView.as_view(), name='rastreo_mapa'),
+    path('rastreo-mapa/', views.RastreoMapaView.as_view(), name='rastreo_mapa'),
     path('api/viajes-en-curso/', views.APIViajosEnCursoView.as_view(), name='api_viajes_en_curso'),
     path('api/viajes-publico/', views.APIViajesPublicosView.as_view(), name='api_viajes_publico'),
     path('rastreo-publico/', views.RastreoPublicoView.as_view(), name='rastreo_publico'),
@@ -141,5 +143,6 @@ urlpatterns = [
     path('api/enviar-comprobante/<int:pk>/', views.PasajeEnviarCorreoView.as_view(), name='api_enviar_comprobante'),
     path('api/crear-reserva/<int:viaje_pk>/', views.CrearReservaClienteView.as_view(), name='api_crear_reserva'),
     path('api/viajes-compatibles/', views.APIObtenerViajesCompatiblesView.as_view(), name='api_viajes_compatibles'),
+    path('mis-encomiendas/', views.MisEncomiendasClienteView.as_view(), name='mis_encomiendas_cliente'),
 ]
 

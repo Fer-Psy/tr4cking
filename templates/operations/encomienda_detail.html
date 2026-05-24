@@ -269,23 +269,40 @@
                         <strong>Registrado</strong>
                         <p class="text-muted small mb-0">{{ encomienda.fecha_registro|date:"d/m/Y H:i" }}</p>
                     </div>
-                    {% if encomienda.estado in 'en_transito,en_destino,entregado' %}
-                    <div class="timeline-item completed">
+                    {% if encomienda.estado != 'registrado' or encomienda.fecha_en_transito %}
+                    <div class="timeline-item {% if encomienda.fecha_en_transito %}completed{% endif %}">
                         <strong>En Tránsito</strong>
+                        {% if encomienda.fecha_en_transito %}
+                        <p class="text-muted small mb-0">{{ encomienda.fecha_en_transito|date:"d/m/Y H:i" }}</p>
+                        {% endif %}
                         {% if encomienda.viaje %}
-                        <p class="text-muted small mb-0">Asignado al bus: {{ encomienda.viaje.bus.placa }}</p>
+                        <p class="text-muted small mb-0">
+                            Asignado al bus: <strong>{{ encomienda.viaje.bus.placa }}</strong>
+                            {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}
+                        </p>
                         {% endif %}
                     </div>
                     {% endif %}
-                    {% if encomienda.estado in 'en_destino,entregado' %}
-                    <div class="timeline-item completed">
+                    
+                    {% if encomienda.estado == 'en_destino' or encomienda.estado == 'entregado' or encomienda.fecha_en_destino %}
+                    <div class="timeline-item {% if encomienda.fecha_en_destino %}completed{% endif %}">
                         <strong>En Destino</strong>
+                        {% if encomienda.fecha_en_destino %}
+                        <p class="text-muted small mb-0">{{ encomienda.fecha_en_destino|date:"d/m/Y H:i" }}</p>
+                        {% endif %}
+                        <p class="text-muted small mb-0">Llegó a {{ encomienda.parada_destino.nombre }}</p>
                     </div>
                     {% endif %}
-                    {% if encomienda.fecha_entrega %}
+                    
+                    {% if encomienda.fecha_entrega or encomienda.estado == 'entregado' %}
                     <div class="timeline-item completed">
                         <strong>Entregado</strong>
-                        <p class="text-muted small mb-0">{{ encomienda.fecha_entrega|date:"d/m/Y H:i" }}</p>
+                        {% if encomienda.fecha_entrega %}
+                        <p class="text-muted small mb-0">{{ encomienda.fecha_entrega|date:"d/m/Y H:i" }} hs.</p>
+                        {% endif %}
+                        {% if encomienda.receptor_nombre %}
+                        <p class="text-muted small mb-0">Recibido por: {{ encomienda.receptor_nombre }}</p>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>

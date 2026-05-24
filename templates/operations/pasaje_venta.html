@@ -6,142 +6,322 @@
 
 {% block extra_css %}
 <style>
-    .seat-selector {
+    .seat-selector-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-        max-width: 280px;
+        gap: 12px;
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 15px;
+        border: 2px solid #e9ecef;
+        position: relative;
     }
 
-    .seat-btn {
-        width: 50px;
-        height: 50px;
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-        background: #e8f5e9;
+    /* Pasillo en medio */
+    .seat-selector-grid::after {
+        content: '';
+        grid-column: 3;
+        grid-row: 1 / -1;
+    }
+
+    .seat-item {
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
         cursor: pointer;
-        font-weight: bold;
         transition: all 0.2s;
+        border: 2px solid transparent;
+        position: relative;
+        font-weight: bold;
     }
 
-    .seat-btn:hover:not(:disabled) {
-        transform: scale(1.1);
-        border-color: #206bc4;
+    .seat-item i {
+        font-size: 1.5rem;
+        margin-bottom: -5px;
     }
 
-    .seat-btn.selected {
-        background: #206bc4;
-        color: white;
-        border-color: #206bc4;
+    .seat-item .seat-num {
+        font-size: 0.75rem;
     }
 
-    .seat-btn:disabled {
+    .seat-available {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-color: #c8e6c9;
+    }
+
+    .seat-available:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-color: #2e7d32;
+    }
+
+    .seat-occupied {
         background: #ffebee;
-        border-color: #f44336;
         color: #c62828;
+        border-color: #ffcdd2;
         cursor: not-allowed;
     }
 
-    .seat-btn:nth-child(2n) {
-        margin-right: 15px;
+    .seat-reserved {
+        background: #fff3e0;
+        color: #ef6c00;
+        border-color: #ffe0b2;
+        cursor: not-allowed;
+    }
+
+    .seat-selected {
+        background: #206bc4 !important;
+        color: white !important;
+        border-color: #185fb4 !important;
+        transform: scale(1.1);
+        z-index: 10;
+    }
+
+    .seat-overbookable {
+        background: #ffebee;
+        color: #c62828;
+        border-color: #ef9a9a;
+        cursor: pointer;
+    }
+
+    .seat-overbookable:hover {
+        background: #fce4ec;
+        border-color: #c62828;
+        transform: translateY(-3px);
+    }
+
+    .seat-overbookable::after {
+        content: 'OCUP';
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 0.5rem;
+        background: #c62828;
+        color: white;
+        padding: 1px 3px;
+        border-radius: 3px;
+    }
+
+    .bus-front {
+        grid-column: 1 / span 4;
+        text-align: center;
+        padding: 10px;
+        background: #343a40;
+        color: white;
+        border-radius: 50% 50% 10px 10px;
+        margin-bottom: 15px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+    }
+
+    /* Estilos Premium para el Formulario de Venta */
+    .form-card {
+        border-radius: 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+        transition: all 0.3s ease !important;
+        background: #ffffff !important;
+        overflow: hidden;
+    }
+    .form-card:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06) !important;
+    }
+    .form-card-header {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        padding: 1.25rem 1.5rem !important;
+    }
+    .form-card-title {
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        font-size: 1.05rem !important;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .form-control, .form-select {
+        border-radius: 8px !important;
+        border: 1.5px solid #cbd5e1 !important;
+        padding: 0.6rem 0.85rem !important;
+        font-weight: 500 !important;
+        color: #334155 !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important;
+    }
+    .label-premium {
+        font-weight: 600 !important;
+        color: #475569 !important;
+        margin-bottom: 0.4rem !important;
+        font-size: 0.88rem !important;
+    }
+    .required-star {
+        color: #ef4444 !important;
+    }
+    .quick-search-box {
+        background: linear-gradient(135deg, #eff6ff, #f8fafc) !important;
+        border: 2px solid #bfdbfe !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.05) !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection {
+        border: 2px solid #3b82f6 !important;
+        border-radius: 8px !important;
+        min-height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08) !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+    }
+    
+    /* Segment Connector Line */
+    .segment-connector-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding-top: 1.5rem;
+    }
+    .segment-connector-line {
+        height: 4px;
+        background: linear-gradient(90deg, #3b82f6, #10b981);
+        flex-grow: 1;
+        border-radius: 2px;
+        position: relative;
+    }
+    .segment-connector-line::after {
+        content: '\F138'; /* bi-arrow-right-short */
+        font-family: "bootstrap-icons";
+        position: absolute;
+        right: -8px;
+        top: -10px;
+        font-size: 1.5rem;
+        color: #10b981;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="bi bi-ticket me-2"></i>
-                    Venta de Pasaje - {{ viaje.itinerario.nombre }}
+    <div class="col-lg-9">
+        <div class="card form-card shadow-sm">
+            <div class="card-header form-card-header bg-primary-lt py-3">
+                <h3 class="card-title form-card-title fw-bold text-primary mb-0">
+                    <i class="bi bi-ticket-perforated-fill fs-2"></i>
+                    {% if request.GET.cliente %}Facturación Cliente Ocasional{% else %}Venta de Pasaje{% endif %} - {{ viaje.itinerario.nombre }}
                 </h3>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
                 <form method="post" id="venta-form">
                     {% csrf_token %}
                     {{ form.viaje }}
 
                     <!-- Datos del Pasajero -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h4 class="card-title mb-0">
-                                <i class="bi bi-person me-2"></i>
+                    <div class="card form-card mb-3">
+                        <div class="card-header form-card-header py-2">
+                            <h4 class="card-title form-card-title mb-0">
+                                <i class="bi bi-person-fill text-primary"></i>
                                 Datos del Pasajero
                             </h4>
                         </div>
-                        <div class="card-body">
-                            <!-- Buscador de Cliente -->
-                            <div class="row mb-3 pb-3 border-bottom">
-                                <div class="col-12">
-                                    <label class="form-label fw-bold"><i class="bi bi-search me-1"></i> Buscar Cliente Registrado</label>
-                                    <select id="cliente-autocomplete" class="form-select" data-placeholder="Escriba nombre o cédula para buscar..."></select>
-                                    <small class="text-muted">Busque por nombre o número de cédula para autocompletar los campos.</small>
+                        <div class="card-body p-3">
+                            <!-- Buscador de Cliente y Acciones Rápidas (Muy Visible) -->
+                            <div class="p-2 mb-3 quick-search-box border rounded-3">
+                                <label class="form-label fw-bold text-primary mb-2"><i class="bi bi-search me-1"></i> BUSCAR CLIENTE REGISTRADO</label>
+                                <div class="row g-3 align-items-start">
+                                    <div class="col-md-6">
+                                        <select id="cliente-autocomplete" class="form-select" data-placeholder="Escriba nombre o cédula para buscar..."></select>
+                                        <small class="text-muted mt-1 d-block"><i class="bi bi-info-circle me-1"></i>Busque por nombre o cédula para autocompletar.</small>
+                                    </div>
+                                    <div class="col-md-6 d-flex gap-2">
+                                        <button type="button" class="btn btn-primary flex-grow-1 d-flex align-items-center justify-content-center gap-2 fw-bold" data-bs-toggle="modal" data-bs-target="#modal-nuevo-cliente" title="Registrar nuevo cliente" style="height: 40px;">
+                                            <i class="bi bi-person-plus-fill"></i>
+                                            <span>Nuevo Cliente</span>
+                                        </button>
+                                        <button type="button" id="btn-cliente-ocasional" class="btn btn-outline-info flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-bold" style="border-width: 2px; height: 40px;">
+                                            <i class="bi bi-person-dash-fill"></i>
+                                            <span>Cliente Ocasional</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Cédula del Pasajero *</label>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label label-premium">Cédula del Pasajero <span class="required-star">*</span></label>
                                     {{ form.cedula_pasajero }}
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Nombre</label>
+                                <div class="col-md-3">
+                                    <label class="form-label label-premium">Nombre</label>
                                     {{ form.nombre_pasajero }}
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Apellido</label>
+                                <div class="col-md-3">
+                                    <label class="form-label label-premium">Apellido</label>
                                     {{ form.apellido_pasajero }}
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Teléfono</label>
+                                <div class="col-md-3">
+                                    <label class="form-label label-premium">Teléfono</label>
                                     {{ form.telefono_pasajero }}
                                 </div>
                             </div>
+                            <div id="info-pasajero" class="mt-3"></div>
                             <div id="datos-pasajero"></div>
                         </div>
                     </div>
 
-                    <!-- Selección de Tramo -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h4 class="card-title mb-0">
-                                <i class="bi bi-signpost me-2"></i>
-                                Tramo del Viaje
+                    <!-- Detalles del Pasaje (Tramo y Asiento) -->
+                    <div class="card form-card mb-3">
+                        <div class="card-header form-card-header py-2">
+                            <h4 class="card-title form-card-title mb-0">
+                                <i class="bi bi-signpost-2-fill text-primary"></i>
+                                Detalles del Pasaje
                             </h4>
                         </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Parada de Origen *</label>
+                        <div class="card-body p-3">
+                            <div class="row align-items-center mb-3">
+                                <div class="col-md-5 mb-2 mb-md-0">
+                                    <label class="form-label label-premium"><i class="bi bi-geo-alt-fill text-danger me-1"></i>Parada de Origen <span class="required-star">*</span></label>
                                     {{ form.parada_origen }}
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Parada de Destino *</label>
+                                <div class="col-md-2 d-none d-md-block text-center">
+                                    <div class="segment-connector-wrapper">
+                                        <div class="segment-connector-line"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-5 mb-2 mb-md-0">
+                                    <label class="form-label label-premium"><i class="bi bi-pin-map-fill text-success me-1"></i>Parada de Destino <span class="required-star">*</span></label>
                                     {{ form.parada_destino }}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Selección de Asiento -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h4 class="card-title mb-0">
-                                <i class="bi bi-grid-3x3-gap me-2"></i>
-                                Selección de Asiento
-                            </h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
+                            
+                            <hr class="my-3 opacity-25">
+                            
+                            <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label">Asiento *</label>
-                                    {{ form.asiento }}
+                                    <label class="form-label label-premium"><i class="bi bi-chair-fill text-azure me-1"></i>Asiento <span class="required-star">*</span></label>
+                                    <div class="input-group cursor-pointer shadow-sm" id="btn-trigger-mapa">
+                                        <span class="input-group-text bg-primary-lt border-primary-subtle text-primary"><i class="bi bi-grid-3x3-gap-fill"></i></span>
+                                        <input type="text" id="asiento-display" class="form-control cursor-pointer fw-bold border-primary-subtle" placeholder="Tocar para elegir..." readonly style="background: #fff; border-right: none;">
+                                        <button class="btn btn-primary fw-bold px-3" type="button" id="btn-abrir-mapa"><i class="bi bi-map me-1"></i>Mapa</button>
+                                    </div>
+                                    <div style="display: none;">
+                                        {{ form.asiento }}
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Precio</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">Gs.</span>
+                                    <label class="form-label label-premium"><i class="bi bi-currency-dollar text-success me-1"></i>Precio del Pasaje</label>
+                                    <div class="input-group shadow-sm">
+                                        <span class="input-group-text bg-success-lt border-success-subtle text-success fw-bold">Gs.</span>
                                         {{ form.precio }}
                                     </div>
                                 </div>
@@ -173,7 +353,7 @@
     </div>
 
     <!-- Info del Viaje -->
-    <div class="col-lg-4">
+    <div class="col-lg-3">
         <div class="card">
             <div class="card-header">
                 <h4 class="card-title mb-0">Información del Viaje</h4>
@@ -200,6 +380,127 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Mapa de Asientos -->
+<div class="modal modal-blur fade" id="modal-mapa-asientos" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary-lt">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-grid-3x3-gap me-2"></i>
+                    Distribución de Asientos
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 mb-3">
+                    <i class="bi bi-info-circle me-1"></i> Seleccione un asiento disponible (verde). Los ocupados (rojo) o reservados (naranja) no pueden seleccionarse.
+                </div>
+
+                <div class="row g-4 justify-content-center">
+                    <!-- Piso 1 -->
+                    <div class="col-md-5">
+                        <h6 class="text-center text-muted mb-3 fw-bold text-uppercase small">Piso 1</h6>
+                        <div class="seat-selector-grid" id="grid-piso-1">
+                            <div class="bus-front">Frente / Chofer</div>
+                            <!-- Asientos se cargan aquí -->
+                        </div>
+                    </div>
+
+                    <!-- Piso 2 (si existe) -->
+                    <div class="col-md-5" id="col-piso-2" style="display: none;">
+                        <h6 class="text-center text-muted mb-3 fw-bold text-uppercase small">Piso 2</h6>
+                        <div class="seat-selector-grid" id="grid-piso-2">
+                            <div class="bus-front">Frente / Piso 2</div>
+                            <!-- Asientos se cargan aquí -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leyenda -->
+                <div class="mt-4 pt-3 border-top d-flex flex-wrap justify-content-center gap-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 rounded bg-success-lt border border-success" style="width: 20px; height: 20px;"></div>
+                        <span class="small">Disponible</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 rounded bg-danger-lt border border-danger" style="width: 20px; height: 20px;"></div>
+                        <span class="small">Ocupado (Vender si es necesario)</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 rounded bg-warning-lt border border-warning" style="width: 20px; height: 20px;"></div>
+                        <span class="small">Reservado (Bloqueado)</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 rounded bg-primary" style="width: 20px; height: 20px;"></div>
+                        <span class="small">Seleccionado</span>
+                    </div>
+                </div>
+                <div class="text-center mt-2">
+                    <small class="text-muted"><i class="bi bi-info-circle me-1"></i> Pase el mouse sobre un asiento ocupado para ver su destino.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="btn-confirmar-asiento" disabled>
+                    Confirmar Selección
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Cliente -->
+<div class="modal modal-blur fade" id="modal-nuevo-cliente" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary-lt">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Registrar Nuevo Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="form-nuevo-cliente">
+                <div class="modal-body">
+                    <div id="modal-cliente-alert" class="alert alert-danger d-none py-2 mb-3"></div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label required fw-bold">Cédula (Número) *</label>
+                            <input type="number" name="cedula" id="modal-cliente-cedula" class="form-control" placeholder="Ej: 4444444" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required fw-bold">Nombre *</label>
+                            <input type="text" name="nombre" id="modal-cliente-nombre" class="form-control" placeholder="Nombre" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required fw-bold">Apellido *</label>
+                            <input type="text" name="apellido" id="modal-cliente-apellido" class="form-control" placeholder="Apellido" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Teléfono</label>
+                            <input type="text" name="telefono" id="modal-cliente-telefono" class="form-control" placeholder="Número de teléfono">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Email</label>
+                            <input type="email" name="email" id="modal-cliente-email" class="form-control" placeholder="correo@ejemplo.com">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Dirección</label>
+                            <textarea name="direccion" id="modal-cliente-direccion" class="form-control" rows="2" placeholder="Dirección del cliente"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-guardar-cliente">
+                        <i class="bi bi-save me-1"></i> Guardar Cliente
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -314,6 +615,231 @@ $(document).ready(function() {
         // Notificación opcional
         if (typeof toastr !== 'undefined') {
             toastr.success(`Campos completados para ${data.nombre_completo}`);
+        }
+    });
+
+    // =========================================================================
+    // ACCIONES RÁPIDAS: CLIENTE OCASIONAL Y NUEVO CLIENTE (MODAL)
+    // =========================================================================
+    
+    // 1. Cliente Ocasional
+    $('#btn-cliente-ocasional').on('click', function(e) {
+        e.preventDefault();
+        
+        // Cargar datos de Cliente Ocasional
+        $('#id_cedula_pasajero').val('4444440');
+        $('#id_nombre_pasajero').val('Cliente');
+        $('#id_apellido_pasajero').val('Ocasional');
+        $('#id_telefono_pasajero').val('');
+        
+        // Limpiar autocomplete select2
+        $('#cliente-autocomplete').val(null).trigger('change');
+        
+        // Inyectar alerta de éxito en info-pasajero
+        $('#info-pasajero').html(`
+            <div class="alert alert-success py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong><i class="bi bi-check-circle me-1"></i> Persona encontrada</strong>
+                        <br>
+                        <span>Cliente Ocasional</span>
+                    </div>
+                    <span class="badge bg-success">4444440</span>
+                </div>
+            </div>
+        `);
+        
+        if (typeof toastr !== 'undefined') {
+            toastr.info('Campos completados para Cliente Ocasional');
+        }
+    });
+
+    // 2. Registro de Nuevo Cliente vía Modal
+    const modalNuevoCliente = new bootstrap.Modal(document.getElementById('modal-nuevo-cliente'));
+    
+    $('#form-nuevo-cliente').on('submit', function(e) {
+        e.preventDefault();
+        
+        const $alert = $('#modal-cliente-alert');
+        $alert.addClass('d-none').text('');
+        
+        const postData = {
+            cedula: $('#modal-cliente-cedula').val(),
+            nombre: $('#modal-cliente-nombre').val(),
+            apellido: $('#modal-cliente-apellido').val(),
+            telefono: $('#modal-cliente-telefono').val(),
+            email: $('#modal-cliente-email').val(),
+            direccion: $('#modal-cliente-direccion').val(),
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        };
+        
+        $.ajax({
+            url: '{% url "operations:api_crear_cliente" %}',
+            type: 'POST',
+            data: postData,
+            success: function(response) {
+                if (response.success) {
+                    const client = response.cliente;
+                    
+                    // Autocompletar el formulario principal con los datos del nuevo cliente
+                    $('#id_cedula_pasajero').val(client.cedula);
+                    $('#id_nombre_pasajero').val(client.nombre);
+                    $('#id_apellido_pasajero').val(client.apellido);
+                    $('#id_telefono_pasajero').val(client.telefono);
+                    
+                    // Inyectar alerta de éxito
+                    $('#info-pasajero').html(`
+                        <div class="alert alert-success py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong><i class="bi bi-check-circle me-1"></i> Persona registrada</strong>
+                                    <br>
+                                    <span>${client.nombre_completo}</span>
+                                </div>
+                                <span class="badge bg-success">${client.cedula}</span>
+                            </div>
+                        </div>
+                    `);
+                    
+                    // Cerrar el modal y limpiar el formulario del modal
+                    modalNuevoCliente.hide();
+                    $('#form-nuevo-cliente')[0].reset();
+                    
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(`Cliente ${client.nombre_completo} registrado e importado.`);
+                    }
+                } else {
+                    $alert.removeClass('d-none').text(response.error || 'Error al guardar el cliente.');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error al registrar el cliente.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                $alert.removeClass('d-none').text(errorMsg);
+            }
+        });
+    });
+
+    // =========================================================================
+    // MAPA DE ASIENTOS (MODAL)
+    // =========================================================================
+    const modalMapa = new bootstrap.Modal(document.getElementById('modal-mapa-asientos'));
+    const $gridPiso1 = $('#grid-piso-1');
+    const $gridPiso2 = $('#grid-piso-2');
+    const $colPiso2 = $('#col-piso-2');
+    const $btnConfirmar = $('#btn-confirmar-asiento');
+    const $asientoDisplay = $('#asiento-display');
+    const $idAsiento = $('#id_asiento');
+    let asientoSeleccionadoId = null;
+
+    // Abrir mapa al hacer clic en el contenedor (evitar múltiples triggers)
+    $('#btn-trigger-mapa').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const origen = $paradaOrigen.val();
+        const destino = $paradaDestino.val();
+
+        if (!origen || !destino) {
+            alert('Debe seleccionar primero Origen y Destino para ver la disponibilidad.');
+            return;
+        }
+
+        // Cargar asientos
+        $gridPiso1.find('.seat-item').remove();
+        $gridPiso2.find('.seat-item').remove();
+        $colPiso2.hide();
+        $btnConfirmar.prop('disabled', true);
+        
+        fetch(`/operations/api/asientos-segmento/{{ viaje.pk }}/?origen=${origen}&destino=${destino}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                let tienePiso2 = false;
+                const asientosProcesados = new Set();
+                
+                data.asientos.forEach(asiento => {
+                    // Evitar duplicados por ID
+                    if (asientosProcesados.has(asiento.id)) return;
+                    asientosProcesados.add(asiento.id);
+
+                    const $grid = asiento.piso === 2 ? $gridPiso2 : $gridPiso1;
+                    if (asiento.piso === 2) tienePiso2 = true;
+
+                    let statusClass = 'seat-available';
+                    let icon = 'bi-person-check';
+                    let disabled = false;
+                    let tooltip = `Asiento ${asiento.numero} - Libre`;
+
+                    if (!asiento.disponible) {
+                        // Determinar si es reservado u ocupado
+                        const esReservado = asiento.ocupaciones && asiento.ocupaciones.some(oc => oc.estado === 'reservado');
+                        
+                        if (esReservado) {
+                            statusClass = 'seat-reserved';
+                            icon = 'bi-person-clock';
+                            disabled = true;
+                            tooltip = `Asiento ${asiento.numero} - RESERVADO (Bloqueado)`;
+                        } else {
+                            statusClass = 'seat-overbookable';
+                            icon = 'bi-person-x-fill';
+                            disabled = false; // Permitir al ayudante
+                            
+                            if (asiento.ocupaciones && asiento.ocupaciones.length > 0) {
+                                const oc = asiento.ocupaciones[0];
+                                tooltip = `Ocupado por ${oc.pasajero} hasta ${oc.hasta}`;
+                            }
+                        }
+                    }
+
+                    // Check if it's currently selected in the dropdown
+                    const currentSelected = $idAsiento.val();
+                    if (currentSelected == asiento.id) {
+                        statusClass += ' seat-selected';
+                        asientoSeleccionadoId = asiento.id;
+                        $btnConfirmar.prop('disabled', false);
+                    }
+
+                    const $seat = $(`
+                        <div class="seat-item ${statusClass}" data-id="${asiento.id}" data-num="${asiento.numero}" title="${tooltip}" data-bs-toggle="tooltip">
+                            <i class="bi ${icon}"></i>
+                            <span class="seat-num">${asiento.numero}</span>
+                        </div>
+                    `);
+
+                    if (!disabled) {
+                        $seat.on('click', function() {
+                            $('.seat-item').removeClass('seat-selected');
+                            $(this).addClass('seat-selected');
+                            asientoSeleccionadoId = asiento.id;
+                            $btnConfirmar.prop('disabled', false);
+                        });
+                    }
+
+                    $grid.append($seat);
+                });
+
+                if (tienePiso2) $colPiso2.show();
+                modalMapa.show();
+            });
+    });
+
+    $btnConfirmar.on('click', function() {
+        if (asientoSeleccionadoId) {
+            const $selectedSeat = $('.seat-item.seat-selected');
+            const seatNum = $selectedSeat.data('num');
+            
+            $idAsiento.val(asientoSeleccionadoId).trigger('change');
+            $asientoDisplay.val('Asiento ' + seatNum);
+            $asientoDisplay.addClass('is-valid');
+            
+            modalMapa.hide();
         }
     });
 });

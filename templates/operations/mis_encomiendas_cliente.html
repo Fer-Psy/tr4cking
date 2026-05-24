@@ -1,0 +1,131 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Mis Encomiendas - TR4CKING{% endblock %}
+{% block title_content %}Mi Historial de Encomiendas{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+    <!-- Resumen -->
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="avatar avatar-lg bg-blue-lt me-3">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">Hola, {{ persona.nombre }}</h3>
+                        <p class="text-muted mb-0">Aquí puedes ver el estado y detalle de todos tus envíos y paquetes a recibir.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Listado Detallado</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Código / Fecha</th>
+                            <th>Relación</th>
+                            <th>Origen / Destino</th>
+                            <th>Estado</th>
+                            <th>Monto</th>
+                            <th class="text-end">Seguimiento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for enc in encomiendas %}
+                        <tr>
+                            <td>
+                                <div><strong>{{ enc.codigo }}</strong></div>
+                                <small class="text-muted">{{ enc.fecha_registro|date:"d/m/Y H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if enc.remitente == persona %}
+                                    <span class="badge bg-blue-lt">Tú Envías</span>
+                                    <div class="small mt-1 text-muted">Para: {{ enc.destinatario.nombre_completo }}</div>
+                                {% else %}
+                                    <span class="badge bg-purple-lt">Tú Recibes</span>
+                                    <div class="small mt-1 text-muted">De: {{ enc.remitente.nombre_completo }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted">{{ enc.parada_origen.nombre }}</span>
+                                    <i class="bi bi-arrow-right text-muted small"></i>
+                                    <span>{{ enc.parada_destino.nombre }}</span>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    {{ enc.get_tipo_display }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if enc.estado == 'entregado' %}bg-green
+                                    {% elif enc.estado == 'en_transito' %}bg-azure
+                                    {% elif enc.estado == 'en_destino' %}bg-purple
+                                    {% elif enc.estado == 'registrado' %}bg-yellow
+                                    {% else %}bg-red{% endif %}">
+                                    {{ enc.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>Gs. {{ enc.precio|floatformat:0 }}</strong>
+                            </td>
+                            <td class="text-end">
+                                {% if enc.viaje and enc.estado != 'entregado' and enc.estado != 'cancelado' %}
+                                <a href="{% url 'operations:rastreo_publico' %}?viaje_id={{ enc.viaje.id }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-geo-alt me-1"></i> Rastrear
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">No disponible</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-box-seam h1 opacity-25"></i>
+                                <p class="mb-0">Aún no tienes registros de encomiendas.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+            <div class="card-footer d-flex justify-content-center">
+                <ul class="pagination mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

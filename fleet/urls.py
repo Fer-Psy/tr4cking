@@ -29,6 +29,8 @@ urlpatterns = [
     path('buses/<int:pk>/', views.BusDetailView.as_view(), name='bus_detail'),
     path('buses/<int:pk>/editar/', views.BusUpdateView.as_view(), name='bus_update'),
     path('buses/<int:pk>/eliminar/', views.BusDeleteView.as_view(), name='bus_delete'),
+    path('buses/<int:pk>/dar-de-baja/', views.BusDarDeBajaView.as_view(), name='bus_dar_de_baja'),
+    path('buses/<int:pk>/activar/', views.BusActivarView.as_view(), name='bus_activar'),
     
     # Asientos
     path('buses/<int:bus_pk>/asientos/', views.AsientoListView.as_view(), name='asiento_list'),

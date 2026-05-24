@@ -1,0 +1,47 @@
+{% load custom_filters %}
+<!-- SITUACIÓN DIARIA: Pasajes + Encomiendas -->
+<div class="row mb-4 no-print">
+<div class="col-md-6">
+<div class="card stat-card mb-3"><div class="card-header bg-blue-lt"><h3 class="card-title"><i class="bi bi-ticket-perforated me-2"></i>Resumen Pasajes</h3></div>
+<div class="card-body">
+{% for estado, data in pasaje_estados.items %}<div class="d-flex justify-content-between align-items-center mb-2"><span>{{ estado }}</span><div><span class="badge bg-blue-lt me-2">{{ data.count }}</span><span class="text-green fw-bold">Gs. {{ data.total|floatformat:0 }}</span></div></div>{% empty %}<p class="text-muted text-center mb-0">Sin datos</p>{% endfor %}
+</div></div>
+<div class="card"><div class="card-body"><div style="height:220px"><canvas id="chartSitPasaje"></canvas></div></div></div>
+</div>
+<div class="col-md-6">
+<div class="card stat-card mb-3"><div class="card-header bg-yellow-lt"><h3 class="card-title"><i class="bi bi-box-seam me-2"></i>Resumen Encomiendas</h3></div>
+<div class="card-body">
+{% for estado, data in enc_estados_sit.items %}<div class="d-flex justify-content-between align-items-center mb-2"><span>{{ estado }}</span><div><span class="badge bg-yellow-lt me-2">{{ data.count }}</span><span class="text-green fw-bold">Gs. {{ data.total|floatformat:0 }}</span></div></div>{% empty %}<p class="text-muted text-center mb-0">Sin datos</p>{% endfor %}
+</div></div>
+<div class="card"><div class="card-body"><div style="height:220px"><canvas id="chartSitEnc"></canvas></div></div></div>
+</div></div>
+
+<!-- Tablas detalle -->
+<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-ticket-perforated me-2"></i>Detalle de Pasajes</h3></div>
+<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped">
+<thead><tr><th>Código</th><th>Fecha</th><th>Pasajero</th><th>Ruta</th><th>Asiento</th><th>Vendedor</th><th class="text-end">Precio</th><th>Estado</th></tr></thead>
+<tbody>{% for p in pasajes_situacion %}
+<tr><td>{{ p.codigo }}</td><td>{{ p.fecha_venta|date:"d/m H:i" }}</td><td>{{ p.pasajero.nombre_completo }}</td><td>{{ p.parada_origen.nombre }} → {{ p.parada_destino.nombre }}</td><td class="text-center">{{ p.asiento.numero_asiento }}</td><td>{% if p.vendedor and not p.vendedor.persona.es_cliente %}{{ p.vendedor.username }}{% elif not p.vendedor %}—{% endif %}</td><td class="text-end">Gs. {{ p.precio|floatformat:0 }}</td>
+<td><span class="badge {% if p.estado == 'vendido' %}bg-success{% elif p.estado == 'reservado' %}bg-info{% elif p.estado == 'abordado' %}bg-primary{% elif p.estado == 'cancelado' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.get_estado_display }}</span></td></tr>
+{% empty %}<tr><td colspan="8" class="text-center text-muted py-3">Sin pasajes</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-box-seam me-2"></i>Detalle de Encomiendas</h3></div>
+<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped">
+<thead><tr><th>Código</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Registrador</th><th class="text-end">Precio</th><th>Estado</th></tr></thead>
+<tbody>{% for e in encomiendas_situacion %}
+<tr><td>{{ e.codigo }}</td><td>{{ e.fecha_registro|date:"d/m H:i" }}</td><td>{{ e.remitente.nombre_completo }}</td><td>{{ e.destinatario.nombre_completo }}</td><td>{{ e.parada_destino.nombre }}</td><td>{{ e.registrador.username|default:"—" }}</td><td class="text-end">Gs. {{ e.precio|floatformat:0 }}</td>
+<td><span class="badge {% if e.estado == 'entregado' %}bg-success{% elif e.estado == 'en_transito' %}bg-primary{% elif e.estado == 'en_destino' %}bg-cyan{% elif e.estado == 'cancelado' %}bg-danger{% else %}bg-info{% endif %}">{{ e.get_estado_display }}</span></td></tr>
+{% empty %}<tr><td colspan="8" class="text-center text-muted py-3">Sin encomiendas</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<script>
+(function initSitCharts(){
+  if(typeof Chart==='undefined'){setTimeout(initSitCharts,100);return;}
+  var colors=['#206bc4','#0ca678','#f76707','#d6336c','#ae3ec9','#f59f00'];
+  var ctx1=document.getElementById('chartSitPasaje');
+  if(ctx1){new Chart(ctx1,{type:'doughnut',data:{labels:{{ chart_sit_pasaje_labels|safe }},datasets:[{data:{{ chart_sit_pasaje_data|safe }},backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});}
+  var ctx2=document.getElementById('chartSitEnc');
+  if(ctx2){new Chart(ctx2,{type:'doughnut',data:{labels:{{ chart_sit_enc_labels|safe }},datasets:[{data:{{ chart_sit_enc_data|safe }},backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});}
+})();
+</script>

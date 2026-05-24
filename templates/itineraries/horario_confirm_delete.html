@@ -2,13 +2,21 @@
 
 {% block title %}Eliminar Horario - TR4CKING{% endblock %}
 
-{% block breadcrumb %}
-<span class="separator">/</span>
-<a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a>
-<span class="separator">/</span>
-<a href="{% url 'itineraries:itinerario_detail' object.itinerario.pk %}">{{ object.itinerario.nombre }}</a>
-<span class="separator">/</span>
-<span class="current">Eliminar Horario</span>
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Itinerarios
+                </div>
+                <h2 class="page-title">
+                    Eliminar Horario
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}

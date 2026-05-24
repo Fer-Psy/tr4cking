@@ -109,10 +109,20 @@
                     modalEmpresaSelect.disabled = false;
                 }
             }
+
+            // Abrir el modal de parada programáticamente
+            let modalPar = bootstrap.Modal.getInstance(modalParEl);
+            if (!modalPar) {
+                modalPar = new bootstrap.Modal(modalParEl);
+            }
+            modalPar.show();
         }
         
         if (e.target.closest('.btn-open-localidad-modal')) {
-            const modalLoc = new bootstrap.Modal(modalLocEl);
+            let modalLoc = bootstrap.Modal.getInstance(modalLocEl);
+            if (!modalLoc) {
+                modalLoc = new bootstrap.Modal(modalLocEl);
+            }
             modalLoc.show();
         }
     });
@@ -278,6 +288,12 @@
 
     // Fix para scroll en modales anidados
     modalLocEl.addEventListener('hidden.bs.modal', function () {
+        if (document.querySelectorAll('.modal.show').length > 0) {
+            document.body.classList.add('modal-open');
+        }
+    });
+
+    modalParEl.addEventListener('hidden.bs.modal', function () {
         if (document.querySelectorAll('.modal.show').length > 0) {
             document.body.classList.add('modal-open');
         }

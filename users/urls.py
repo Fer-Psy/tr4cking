@@ -13,6 +13,8 @@ urlpatterns = [
     path('personas/<int:pk>/', views.PersonaDetailView.as_view(), name='persona_detail'),
     path('personas/<int:pk>/editar/', views.PersonaUpdateView.as_view(), name='persona_update'),
     path('personas/<int:pk>/eliminar/', views.PersonaDeleteView.as_view(), name='persona_delete'),
+    path('personas/<int:pk>/dar-de-baja/', views.PersonaDarDeBajaView.as_view(), name='persona_dar_de_baja'),
+    path('personas/<int:pk>/activar/', views.PersonaActivarView.as_view(), name='persona_activar'),
     
     # Localidades
     path('localidades/', views.LocalidadListView.as_view(), name='localidad_list'),

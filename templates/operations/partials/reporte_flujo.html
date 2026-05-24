@@ -1,0 +1,51 @@
+{% load custom_filters %}
+<!-- FLUJO DE INGRESOS -->
+<div class="row row-deck row-cards mb-4 no-print">
+<div class="col-sm-6 col-lg-3">
+<div class="card stat-card"><div class="card-body">
+<div class="d-flex align-items-center mb-2"><div class="stat-icon bg-blue-lt text-blue"><i class="bi bi-bus-front"></i></div><div class="ms-3"><div class="subheader">Viajes</div><div class="h1 mb-0">{{ total_viajes }}</div></div></div>
+</div></div></div>
+<div class="col-sm-6 col-lg-3">
+<div class="card stat-card"><div class="card-body">
+<div class="d-flex align-items-center mb-2"><div class="stat-icon bg-cyan-lt text-cyan"><i class="bi bi-ticket-perforated"></i></div><div class="ms-3"><div class="subheader">Pasajes Vendidos</div><div class="h1 mb-0">{{ total_pasajes }}</div></div></div>
+</div></div></div>
+<div class="col-sm-6 col-lg-3">
+<div class="card stat-card"><div class="card-body">
+<div class="d-flex align-items-center mb-2"><div class="stat-icon bg-yellow-lt text-yellow"><i class="bi bi-box-seam"></i></div><div class="ms-3"><div class="subheader">Encomiendas</div><div class="h1 mb-0">{{ total_encomiendas }}</div></div></div>
+</div></div></div>
+<div class="col-sm-6 col-lg-3">
+<div class="card stat-card" style="background:linear-gradient(135deg,#0ca678,#20c997)"><div class="card-body">
+<div class="d-flex align-items-center mb-2"><div class="stat-icon bg-white text-green"><i class="bi bi-currency-dollar"></i></div><div class="ms-3"><div class="subheader text-white-50">Ingresos Totales</div><div class="h1 mb-0 text-white">Gs. {{ total_ingresos|floatformat:0 }}</div></div></div>
+</div></div></div>
+</div>
+
+<div class="row mb-4 no-print">
+<div class="col-md-6"><div class="card stat-card"><div class="card-header"><h3 class="card-title"><i class="bi bi-ticket-perforated me-2 text-blue"></i>Ingresos por Pasajes</h3></div><div class="card-body"><div class="h2 text-green mb-1">Gs. {{ ingresos_pasajes|floatformat:0 }}</div><p class="text-muted mb-0">{{ total_pasajes }} pasajes vendidos</p></div></div></div>
+<div class="col-md-6"><div class="card stat-card"><div class="card-header"><h3 class="card-title"><i class="bi bi-box-seam me-2 text-yellow"></i>Ingresos por Encomiendas</h3></div><div class="card-body"><div class="h2 text-green mb-1">Gs. {{ ingresos_encomiendas|floatformat:0 }}</div><p class="text-muted mb-0">{{ total_encomiendas }} encomiendas</p></div></div></div>
+</div>
+
+<!-- Gráfico -->
+<div class="card mb-4 no-print"><div class="card-header"><h3 class="card-title"><i class="bi bi-bar-chart me-2"></i>Ingresos por Día</h3></div>
+<div class="card-body"><div class="chart-container"><canvas id="chartFlujo"></canvas></div></div></div>
+
+<!-- Tabla de Viajes -->
+<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-bus-front me-2"></i>Viajes del Período</h3></div>
+<div class="table-responsive"><table class="table table-vcenter card-table table-striped">
+<thead><tr><th>ID</th><th>Fecha</th><th>Itinerario</th><th>Bus</th><th>Chofer</th><th class="text-center">Pasajes</th><th class="text-center">Ocupación</th><th>Estado</th></tr></thead>
+<tbody>
+{% for viaje in viajes %}
+<tr><td>#{{ viaje.pk }}</td><td>{{ viaje.fecha_viaje|date:"d/m/Y" }}</td><td>{{ viaje.itinerario.nombre }}</td><td>{{ viaje.bus.placa }}</td><td>{{ viaje.chofer.nombre_completo }}</td>
+<td class="text-center">{{ viaje.pasajes.count }}</td>
+<td class="text-center"><div class="d-flex align-items-center justify-content-center gap-2"><div class="progress" style="width:60px;height:6px"><div class="progress-bar {% if viaje.porcentaje_ocupacion > 75 %}bg-danger{% elif viaje.porcentaje_ocupacion > 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ viaje.porcentaje_ocupacion }}%"></div></div><small>{{ viaje.porcentaje_ocupacion }}%</small></div></td>
+<td><span class="badge {% if viaje.estado == 'completado' %}bg-success{% elif viaje.estado == 'en_curso' %}bg-primary{% elif viaje.estado == 'programado' %}bg-info{% else %}bg-danger{% endif %}">{{ viaje.get_estado_display }}</span></td></tr>
+{% empty %}<tr><td colspan="8" class="text-center py-4 text-muted">No hubo viajes en este período</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<script>
+(function initFlujoChart(){
+  if(typeof Chart==='undefined'){setTimeout(initFlujoChart,100);return;}
+  var ctx=document.getElementById('chartFlujo');
+  if(!ctx)return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ chart_flujo_labels|safe }},datasets:[{label:'Pasajes',data:{{ chart_flujo_pasajes|safe }},backgroundColor:'rgba(32,107,196,0.7)',borderRadius:6},{label:'Encomiendas',data:{{ chart_flujo_encomiendas|safe }},backgroundColor:'rgba(247,103,7,0.7)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return 'Gs. '+v.toLocaleString()}}}}}});
+})();
+</script>

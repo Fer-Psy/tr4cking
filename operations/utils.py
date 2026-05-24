@@ -3,6 +3,65 @@ Utilidades para gestión de asientos por segmento.
 Lógica core del sistema de ocupación de asientos.
 """
 from django.db.models import Q
+import unicodedata
+
+
+def normalize_search(text):
+    """
+    Limpia texto para búsqueda: quita acentos, minúsculas y términos comunes.
+    """
+    if not text: return ""
+    # Quitar acentos (NFD normalize)
+    text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
+    # Quitar términos comunes de paradas
+    return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
+
+
+def get_similar_paradas_ids(parada_obj, base_id=None):
+    """
+    Retorna una lista de IDs de paradas que representan la misma ubicación física
+    basándose en nombre y localidad, ignorando empresa y acentos.
+    """
+    if not parada_obj: 
+        return [int(base_id)] if base_id else []
+    
+    from fleet.models import Parada
+    
+    norm = normalize_search(parada_obj.nombre)
+    loc_norm = normalize_search(parada_obj.localidad.nombre if parada_obj.localidad else '')
+    
+    matched_ids = []
+    if base_id:
+        try:
+            matched_ids.append(int(base_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Filtrar paradas en la misma localidad para reducir el set de búsqueda
+    queryset = Parada.objects.all()
+    if parada_obj.localidad:
+        queryset = queryset.filter(localidad=parada_obj.localidad)
+    
+    for db_p in queryset.select_related('localidad'):
+        if base_id and str(db_p.id) == str(base_id):
+            continue
+            
+        db_norm = normalize_search(db_p.nombre)
+        db_loc_norm = normalize_search(db_p.localidad.nombre if db_p.localidad else '')
+        
+        match = False
+        if norm and norm == db_norm:
+            match = True
+        elif loc_norm and norm and (norm in db_loc_norm or db_loc_norm in norm):
+            # Fallback por si el nombre de la parada es solo el nombre de la localidad
+            match = True
+            
+        if match:
+            matched_ids.append(db_p.id)
+            
+    return list(set(matched_ids))
+
+
 
 
 def limpiar_reservas_expiradas():
@@ -138,24 +197,31 @@ def obtener_mapa_ocupacion(viaje):
 def obtener_orden_parada(viaje, parada):
     """
     Obtiene el orden de una parada en el itinerario del viaje.
-    
-    Args:
-        viaje: Instancia de Viaje
-        parada: Instancia de Parada
-    
-    Returns:
-        int: Orden de la parada, o None si no se encuentra
+    Si la parada exacta no está en el itinerario, busca paradas similares
+    (mismo nombre/localidad) que sí estén en él.
     """
     from itineraries.models import DetalleItinerario
     
-    try:
-        detalle = DetalleItinerario.objects.get(
-            itinerario=viaje.itinerario,
-            parada=parada,
-        )
+    # 1. Intento exacto
+    detalle = DetalleItinerario.objects.filter(
+        itinerario=viaje.itinerario,
+        parada=parada,
+    ).first()
+    
+    if detalle:
         return detalle.orden
-    except DetalleItinerario.DoesNotExist:
-        return None
+        
+    # 2. Intento por paradas similares (mismo nombre/localidad)
+    similar_ids = get_similar_paradas_ids(parada, parada.id)
+    detalle_similar = DetalleItinerario.objects.filter(
+        itinerario=viaje.itinerario,
+        parada_id__in=similar_ids
+    ).first()
+    
+    if detalle_similar:
+        return detalle_similar.orden
+        
+    return None
 
 
 def contar_asientos_disponibles_tramo(viaje, orden_origen, orden_destino):

@@ -38,7 +38,7 @@ class PersonaForm(forms.ModelForm):
         model = Persona
         fields = [
             'cedula', 'nombre', 'apellido', 'telefono', 'email', 
-            'direccion', 'latitud', 'longitud', 'empresa', 'es_empleado', 'es_chofer', 'es_ayudante', 'es_cliente', 'user'
+            'direccion', 'latitud', 'longitud', 'empresa', 'es_empleado', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user'
         ]
         widgets = {
             'cedula': forms.NumberInput(attrs={'placeholder': 'Ej: 4567890'}),
@@ -51,19 +51,23 @@ class PersonaForm(forms.ModelForm):
             'longitud': forms.TextInput(attrs={'placeholder': 'Longitud', 'readonly': 'readonly'}),
         }
     
-    def __init__(self, *args, user_is_admin=False, **kwargs):
+    def __init__(self, *args, user_is_admin=False, user_is_agente=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.user_is_admin = user_is_admin
+        self.user_is_agente = user_is_agente
         
         # Ocultar roles administrativos si no es admin
         if not self.user_is_admin:
             # Los roles se ocultan del formulario
-            for field in ['es_empleado', 'es_chofer', 'es_ayudante', 'empresa']:
+            for field in ['es_empleado', 'es_chofer', 'es_ayudante', 'es_agente', 'empresa']:
                 if field in self.fields:
                     self.fields[field].disabled = True
                     self.fields[field].required = False
-                    # Podríamos eliminarlos, pero mejor marcar como deshabilitados
-                    # para que no se envíen o se ignoren.
+                    
+        # Para el Agente, forzar que solo pueda ver/crear cliente
+        if self.user_is_agente and 'es_cliente' in self.fields:
+            self.fields['es_cliente'].initial = True
+            self.fields['es_cliente'].disabled = True
 
         # Mostrar usuarios con formato legible y ordenados
         self.fields['user'].queryset = User.objects.all().order_by('username')
@@ -83,9 +87,10 @@ class PersonaForm(forms.ModelForm):
         if self.user_is_admin:
             roles_layout_admin = [
                 Row(
-                    Column(Div('es_empleado', css_class='form-check form-switch'), css_class='col-md-4'),
-                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-4'),
-                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-4'),
+                    Column(Div('es_empleado', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_agente', css_class='form-check form-switch'), css_class='col-md-3'),
                 )
             ]
         else:
@@ -147,6 +152,13 @@ class PersonaForm(forms.ModelForm):
         username = self.cleaned_data.get('username')
         password = self.cleaned_data.get('password')
         linked_user = self.cleaned_data.get('user')
+
+        if self.user_is_agente:
+            persona.es_cliente = True
+            persona.es_empleado = False
+            persona.es_chofer = False
+            persona.es_ayudante = False
+            persona.es_agente = False
 
         if self.user_is_admin:
             if username:

@@ -19,12 +19,6 @@ class ItinerarioForm(forms.ModelForm):
         label="Parada de Origen (Opcional)",
         help_text="Se creará automáticamente con Orden 1."
     )
-    parada_destino = forms.ModelChoiceField(
-        queryset=Parada.objects.all(),
-        required=False,
-        label="Parada de Destino (Opcional)",
-        help_text="Se creará automáticamente como parada final."
-    )
 
     class Meta:
         model = Itinerario
@@ -50,11 +44,9 @@ class ItinerarioForm(forms.ModelForm):
         # Mejorar visualización de paradas
         paradas_qs = Parada.objects.all().select_related('localidad').order_by('localidad__nombre', 'nombre')
         self.fields['parada_origen'].queryset = paradas_qs
-        self.fields['parada_destino'].queryset = paradas_qs
         
         label_func = lambda obj: f"{obj.localidad.nombre}: {obj.nombre}"
         self.fields['parada_origen'].label_from_instance = label_func
-        self.fields['parada_destino'].label_from_instance = label_func
 
         self.helper = FormHelper()
         self.helper.form_tag = False
@@ -75,18 +67,10 @@ class ItinerarioForm(forms.ModelForm):
                     Column(
                         Div(
                             Field('parada_origen', wrapper_class='flex-grow-1 mb-0'),
-                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
+                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
                             css_class='d-flex align-items-start'
                         ),
-                        css_class='col-md-6'
-                    ),
-                    Column(
-                        Div(
-                            Field('parada_destino', wrapper_class='flex-grow-1 mb-0'),
-                            HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
-                            css_class='d-flex align-items-start'
-                        ),
-                        css_class='col-md-6'
+                        css_class='col-md-12'
                     ),
                 ),
             ),
@@ -110,7 +94,7 @@ class ItinerarioForm(forms.ModelForm):
                     Column(
                         Div(
                             HTML('<label class="form-label fw-semibold">Horarios de salida</label>'),
-                             HTML('<button type="button" class="btn btn-outline-primary btn-sm btn-icon ms-2" data-bs-toggle="modal" data-bs-target="#modalHorario" title="Nuevo Horario"><i class="bi bi-plus-lg"></i></button>'),
+                             HTML('<button type="button" class="btn btn-outline-primary btn-sm btn-icon ms-2" data-bs-target="#modalHorario" title="Nuevo Horario"><i class="bi bi-plus-lg"></i></button>'),
                             css_class='d-flex align-items-center'
                         ),
                         Field('horarios', label_class='d-none', css_id='id_horarios_container'),
@@ -162,7 +146,7 @@ class DetalleItinerarioForm(forms.ModelForm):
                 Column(
                     Div(
                         Field('parada', wrapper_class='flex-grow-1 mb-0'),
-                        HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-toggle="modal" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
+                        HTML('<button type="button" class="btn btn-outline-primary btn-icon ms-2" style="margin-top: 28px;" data-bs-target="#modalParada" title="Nueva Parada"><i class="bi bi-plus-lg"></i></button>'),
                         css_class='d-flex align-items-start'
                     ),
                     css_class='col-md-6'

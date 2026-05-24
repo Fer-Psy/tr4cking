@@ -1,216 +1,336 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load custom_filters %}
+{% load static %}
 
-{% block title %}Reporte Diario - TR4CKING{% endblock %}
-{% block title_content %}Reporte Diario de Operaciones{% endblock %}
+{% block title %}Centro de Reportes - TR4CKING{% endblock %}
+{% block title_content %}Centro de Reportes{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+.report-tabs .nav-link{font-weight:500;color:#667;border:none;padding:.75rem 1.25rem;border-radius:8px 8px 0 0;transition:all .2s}
+.report-tabs .nav-link.active{background:linear-gradient(135deg,#206bc4,#4dabf7);color:#fff;box-shadow:0 2px 8px rgba(32,107,196,.3)}
+.report-tabs .nav-link:not(.active):hover{background:#f1f5f9;color:#206bc4}
+.stat-card{border:none;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.06);transition:transform .2s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.stat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem}
+.chart-container{position:relative;height:300px}
+
+/* ===== PRINT HEADER / FOOTER ===== */
+.print-header,.print-footer{display:none}
+
+/* Estilos globales de cabecera y pie para impresión y PDF */
+.print-header {
+  align-items:stretch;
+  border-bottom:3px solid #000;
+  margin-bottom:20px;
+  break-after:avoid;
+}
+.print-header-logo {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:10px 0;
+  border-radius:4px 0 0 4px;
+}
+.print-header-logo-text {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: #000 !important;
+  text-transform: uppercase;
+}
+.print-header-logo-text span { color: #000 !important; }
+.print-header-center {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:8px 16px;
+  border-left:3px solid #000;
+}
+.print-header-title {
+  font-size:1.25rem;
+  font-weight:700;
+  color:#000 !important;
+  letter-spacing:0.5px;
+  margin-bottom:2px;
+}
+.print-header-subtitle { font-size:0.7rem; color:#000 !important; }
+.print-header-info {
+  text-align:right;
+  font-size:0.75rem;
+  color:#000 !important;
+  line-height:1.6;
+  padding:8px 0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.print-header-info strong { color:#000 !important; }
+
+.print-footer {
+  border-top:2px solid #000;
+  padding:6px 20px;
+  font-size:0.7rem;
+  color:#000 !important;
+  background:transparent;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* Espacio para el footer fijo en impresión normal */
+.print-body-content { padding-bottom:50px; }
+
+
+@media print {
+  /* Ocultar elementos de navegación */
+  .no-print,
+  .page-header,
+  .navbar,
+  .navbar-expand-md,
+  .footer,
+  aside,
+  .navbar-vertical{display:none!important}
+
+  /* Reset de márgenes del body */
+  body{background:#fff!important;margin:0;padding:0}
+  .page-wrapper{margin:0;padding:0}
+  .page-body{margin:0!important;padding:0 15px!important}
+  .container-xl{max-width:100%!important;padding:0!important}
+
+  /* Activar cabecera en browser print */
+  .print-header { display:flex!important; }
+
+  /* Tarjetas sin sombra en impresión */
+  .card,.stat-card{box-shadow:none!important;border:1px solid #000!important;break-inside:avoid}
+  .card-header{background:transparent!important}
+
+  /* Tablas compactas */
+  .table{font-size:0.8rem!important}
+  .table th,.table td{padding:4px 8px!important; border-color:#000!important}
+  .badge{border:1px solid #000!important; color:#000!important; print-color-adjust:exact;-webkit-print-color-adjust:exact}
+
+  /* Forzar blanco y negro, sin fondos */
+  *, *::before, *::after {
+    color: #000 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: #000 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    print-color-adjust: economy !important;
+    -webkit-print-color-adjust: economy !important;
+  }
+
+  /* Ocultar gráficos, tarjetas de estadísticas y contenedores vacíos o secundarios */
+  .chart-container, canvas, .chart, .stat-card,
+  .row-deck, 
+  .card:has(canvas), 
+  .card:has(.chart-container), 
+  .col-md-4:has(.card) {
+    display: none !important;
+  }
+
+  /* Expandir las columnas que contienen las tablas para que usen todo el ancho de la hoja */
+  .col-md-8, .col-lg-8, .col-xl-9, .col-12 {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  /* Paginación automática */
+  @page{
+    size: A4 landscape;
+    margin: 5mm;
+  }
+
+  /* Salto de página antes de tablas grandes */
+  .table-responsive{overflow:visible!important;max-height:none!important}
+
+  /* Contador de páginas (comentado para evitar colisiones con pie nativo) */
+  /* body{counter-reset:page-number} */
+}
+
+/* Clases para forzar el mismo estilo B/N al exportar a PDF (html2pdf) */
+body.exporting-pdf *, body.exporting-pdf *::before, body.exporting-pdf *::after {
+  color: #000 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: #000 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* Activar cabecera y pie para PDF sin fixed position para que no se superpongan */
+body.exporting-pdf .print-header { display: flex !important; }
+body.exporting-pdf .print-footer { 
+  display: flex !important; 
+  position: static !important; 
+  margin-top: 30px;
+}
+body.exporting-pdf .no-print { display: none !important; }
+
+body.exporting-pdf .chart-container, body.exporting-pdf canvas, body.exporting-pdf .chart, body.exporting-pdf .stat-card,
+body.exporting-pdf .row-deck,
+body.exporting-pdf .card:has(canvas),
+body.exporting-pdf .card:has(.chart-container),
+body.exporting-pdf .col-md-4:has(.card) {
+  display: none !important;
+}
+
+body.exporting-pdf .col-md-8, body.exporting-pdf .col-lg-8, body.exporting-pdf .col-xl-9, body.exporting-pdf .col-12 {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 100% !important;
+}
+
+body.exporting-pdf .table-responsive { max-height: none !important; overflow: visible !important; }
+body.exporting-pdf .card { box-shadow: none !important; border: 1px solid #000 !important; break-inside: avoid; }
+body.exporting-pdf .card-header { background: transparent !important; }
+</style>
+{% endblock %}
 
 {% block content %}
-<!-- Selector de fecha -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">Fecha del Reporte</label>
-                <input type="date" name="fecha" class="form-control" value="{{ fecha|date:'Y-m-d' }}">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-search me-1"></i> Ver Reporte
-                </button>
-            </div>
-            <div class="col-md-auto">
-                <a href="?fecha={{ fecha|date:'Y-m-d' }}" class="btn btn-outline-secondary"
-                    onclick="window.print(); return false;">
-                    <i class="bi bi-printer me-1"></i> Imprimir
-                </a>
-            </div>
-        </form>
+
+<!-- ===== CABECERA DE IMPRESIÓN (solo visible al imprimir) ===== -->
+<div class="print-header">
+  <div class="print-header-logo">
+    <div class="print-header-logo-text">TR<span>4</span>CKING</div>
+  </div>
+  <div class="print-header-center">
+    <div class="print-header-title">
+      {% if tab == 'flujo' %}Reporte: Flujo de Ingresos
+      {% elif tab == 'caja' %}Reporte: Cierres de Caja
+      {% elif tab == 'encomiendas' %}Reporte: Encomiendas
+      {% elif tab == 'situacion' %}Reporte: Situación Diaria
+      {% elif tab == 'comisiones' %}Reporte: Comisiones Mensuales
+      {% elif tab == 'ventas' %}Reporte: Ventas
+      {% else %}Reporte General
+      {% endif %}
     </div>
+    <div class="print-header-subtitle">Sistema de Gestión de Transporte — TR4CKING</div>
+  </div>
+  <div class="print-header-info">
+    <div><strong>Período:</strong> {{ fecha_desde|date:"d/m/Y" }}{% if fecha_desde != fecha_hasta %} al {{ fecha_hasta|date:"d/m/Y" }}{% endif %}</div>
+    <div><strong>Empresa:</strong> {% if empresa_seleccionada %}{{ empresa_seleccionada.nombre }}{% else %}Todas{% endif %}</div>
+    <div><strong>Generado:</strong> {% now "d/m/Y H:i" %}</div>
+    <div><strong>Usuario:</strong> {{ request.user.get_full_name|default:request.user.username }}</div>
+  </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <h3>
-            <i class="bi bi-calendar3 me-2"></i>
-            {{ fecha|date:"l, d F Y" }}
-        </h3>
-    </div>
+<!-- ===== PIE DE IMPRESIÓN (fijo en cada página) ===== -->
+<div class="print-footer">
+  <span>TR4CKING — {% if tab == 'flujo' %}Flujo de Ingresos{% elif tab == 'caja' %}Cierres de Caja{% elif tab == 'encomiendas' %}Encomiendas{% elif tab == 'situacion' %}Situación Diaria{% elif tab == 'comisiones' %}Comisiones{% elif tab == 'ventas' %}Ventas{% endif %} · {{ fecha_desde|date:"d/m/Y" }}{% if fecha_desde != fecha_hasta %} — {{ fecha_hasta|date:"d/m/Y" }}{% endif %}</span>
+  <span>Impreso: {% now "d/m/Y H:i" %}</span>
+  <!-- El counter de página se agrega via CSS ::after -->
 </div>
 
-<!-- Resumen del día -->
-<div class="row row-deck row-cards mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="subheader">Viajes</div>
-                </div>
-                <div class="h1 mb-0">{{ total_viajes }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="subheader">Pasajes Vendidos</div>
-                </div>
-                <div class="h1 mb-0">{{ total_pasajes }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="subheader">Encomiendas</div>
-                </div>
-                <div class="h1 mb-0">{{ total_encomiendas }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card bg-green-lt">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="subheader">Ingresos Totales</div>
-                </div>
-                <div class="h1 mb-0 text-green">Gs. {{ total_ingresos|floatformat:0 }}</div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- ===== CONTENIDO PRINCIPAL ===== -->
+<div class="print-body-content">
 
-<!-- Detalle de ingresos -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Ingresos por Pasajes</h3>
-            </div>
-            <div class="card-body">
-                <div class="h2 text-green mb-0">Gs. {{ ingresos_pasajes|floatformat:0 }}</div>
-                <p class="text-muted mb-0">{{ total_pasajes }} pasajes vendidos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Ingresos por Encomiendas</h3>
-            </div>
-            <div class="card-body">
-                <div class="h2 text-green mb-0">Gs. {{ ingresos_encomiendas|floatformat:0 }}</div>
-                <p class="text-muted mb-0">{{ total_encomiendas }} encomiendas</p>
-            </div>
-        </div>
-    </div>
+<!-- Filtros de fecha + empresa -->
+<div class="card mb-3 no-print">
+<div class="card-body py-3">
+<form method="get" class="row g-2 align-items-end" id="reportForm">
+<input type="hidden" name="tab" value="{{ tab }}">
+<div class="col-md-2">
+<label class="form-label fw-semibold">Fecha Desde</label>
+<input type="date" name="desde" class="form-control" value="{{ fecha_desde|date:'Y-m-d' }}">
 </div>
-
-<!-- Viajes del día -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="bi bi-bus-front me-2"></i>
-            Viajes del Día
-        </h3>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Itinerario</th>
-                    <th>Bus</th>
-                    <th>Chofer</th>
-                    <th class="text-center">Pasajes</th>
-                    <th class="text-center">Ocupación</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for viaje in viajes %}
-                <tr>
-                    <td>#{{ viaje.pk }}</td>
-                    <td>{{ viaje.itinerario.nombre }}</td>
-                    <td>{{ viaje.bus.placa }}</td>
-                    <td>{{ viaje.chofer.nombre_completo }}</td>
-                    <td class="text-center">{{ viaje.pasajes.count }}</td>
-                    <td class="text-center">
-                        <div class="progress" style="width: 80px; height: 6px;">
-                            <div class="progress-bar" style="width: {{ viaje.porcentaje_ocupacion }}%"></div>
-                        </div>
-                        <small>{{ viaje.porcentaje_ocupacion }}%</small>
-                    </td>
-                    <td>
-                        <span class="badge 
-                            {% if viaje.estado == 'completado' %}bg-success
-                            {% elif viaje.estado == 'en_curso' %}bg-primary
-                            {% elif viaje.estado == 'programado' %}bg-info
-                            {% else %}bg-danger{% endif %}">
-                            {{ viaje.get_estado_display }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">
-                        No hubo viajes este día
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="col-md-2">
+<label class="form-label fw-semibold">Fecha Hasta</label>
+<input type="date" name="hasta" class="form-control" value="{{ fecha_hasta|date:'Y-m-d' }}">
 </div>
-
-<!-- Sesiones de caja -->
-{% if sesiones_caja %}
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="bi bi-cash-stack me-2"></i>
-            Sesiones de Caja
-        </h3>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-            <thead>
-                <tr>
-                    <th>Cajero</th>
-                    <th>Apertura</th>
-                    <th>Cierre</th>
-                    <th class="text-end">M. Apertura</th>
-                    <th class="text-end">Ingresos</th>
-                    <th class="text-end">Egresos</th>
-                    <th class="text-end">M. Cierre</th>
-                    <th class="text-center">Diferencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ses in sesiones_caja %}
-                <tr>
-                    <td>{{ ses.cajero.get_full_name|default:ses.cajero.username }}</td>
-                    <td>{{ ses.fecha_apertura|time:"H:i" }}</td>
-                    <td>{{ ses.fecha_cierre|time:"H:i"|default:"-" }}</td>
-                    <td class="text-end">Gs. {{ ses.monto_apertura|floatformat:0 }}</td>
-                    <td class="text-end text-green">Gs. {{ ses.total_ingresos|floatformat:0 }}</td>
-                    <td class="text-end text-red">Gs. {{ ses.total_egresos|floatformat:0 }}</td>
-                    <td class="text-end">Gs. {{ ses.monto_cierre_real|floatformat:0|default:"-" }}</td>
-                    <td class="text-center">
-                        {% if ses.estado == 'cerrada' %}
-                        <span
-                            class="badge {% if ses.diferencia == 0 %}bg-success{% elif ses.diferencia > 0 %}bg-warning{% else %}bg-danger{% endif %}">
-                            Gs. {{ ses.diferencia|floatformat:0 }}
-                        </span>
-                        {% else %}
-                        <span class="badge bg-info">Abierta</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+<div class="col-md-2">
+<label class="form-label fw-semibold">Empresa</label>
+<select name="empresa" class="form-select" {% if not es_admin and es_personal and not request.user.persona.es_agente %}disabled{% endif %}>
+{% if es_admin or request.user.persona.es_agente %}<option value="">Todas las empresas</option>{% endif %}
+{% for emp in empresas_disponibles %}
+<option value="{{ emp.pk }}" {% if empresa_filter == emp.pk|stringformat:"d" %}selected{% endif %}>{{ emp.nombre }}</option>
+{% endfor %}
+</select>
+{% if not es_admin and es_personal and not request.user.persona.es_agente %}
+<input type="hidden" name="empresa" value="{{ empresa_filter }}">
 {% endif %}
+</div>
+<div class="col-md-auto">
+<button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Consultar</button>
+</div>
+<div class="col-md-auto">
+<button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+</div>
+<div class="col-md-auto">
+<button type="button" class="btn btn-outline-danger" onclick="exportPDF()"><i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF</button>
+</div>
+</form>
+</div>
+</div>
+
+<!-- Tabs de navegación -->
+<ul class="nav nav-tabs report-tabs mb-4 no-print">
+<li class="nav-item"><a class="nav-link {% if tab == 'flujo' %}active{% endif %}" href="?tab=flujo&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-graph-up me-1"></i>Flujo de Ingresos</a></li>
+<li class="nav-item"><a class="nav-link {% if tab == 'caja' %}active{% endif %}" href="?tab=caja&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-cash-stack me-1"></i>Cierres de Caja</a></li>
+<li class="nav-item"><a class="nav-link {% if tab == 'encomiendas' %}active{% endif %}" href="?tab=encomiendas&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-box-seam me-1"></i>Encomiendas</a></li>
+<li class="nav-item"><a class="nav-link {% if tab == 'situacion' %}active{% endif %}" href="?tab=situacion&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-clipboard2-data me-1"></i>Situación Diaria</a></li>
+{% if es_admin %}
+<li class="nav-item"><a class="nav-link {% if tab == 'comisiones' %}active{% endif %}" href="?tab=comisiones&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-percent me-1"></i>Comisiones</a></li>
+{% endif %}
+<li class="nav-item"><a class="nav-link {% if tab == 'ventas' %}active{% endif %}" href="?tab=ventas&desde={{ fecha_desde|date:'Y-m-d' }}&hasta={{ fecha_hasta|date:'Y-m-d' }}&empresa={{ empresa_filter }}"><i class="bi bi-cart3 me-1"></i>Ventas</a></li>
+</ul>
+
+<div class="mb-3 d-flex align-items-center gap-3 no-print">
+<h4 class="mb-0"><i class="bi bi-calendar3 me-2"></i>{{ fecha_desde|date:"d/m/Y" }}{% if fecha_desde != fecha_hasta %} — {{ fecha_hasta|date:"d/m/Y" }}{% endif %}</h4>
+{% if not es_admin and es_personal and not request.user.persona.es_agente and empresa_seleccionada %}
+<span class="badge bg-blue fs-6"><i class="bi bi-building me-1"></i>{{ empresa_seleccionada.nombre }}</span>
+{% endif %}
+{% if es_personal and not es_admin %}
+<span class="badge bg-cyan fs-6"><i class="bi bi-person-badge me-1"></i>Mis movimientos: {{ request.user.persona.nombre_completo }}</span>
+{% endif %}
+</div>
+
+{% if tab == 'flujo' %}
+{% include 'operations/partials/reporte_flujo.html' %}
+{% elif tab == 'caja' %}
+{% include 'operations/partials/reporte_caja.html' %}
+{% elif tab == 'encomiendas' %}
+{% include 'operations/partials/reporte_encomiendas.html' %}
+{% elif tab == 'situacion' %}
+{% include 'operations/partials/reporte_situacion.html' %}
+{% elif tab == 'comisiones' %}
+{% include 'operations/partials/reporte_comisiones.html' %}
+{% elif tab == 'ventas' %}
+{% include 'operations/partials/reporte_ventas.html' %}
+{% endif %}
+
+</div><!-- /print-body-content -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function exportPDF(){
+  // Mostrar header/footer para el PDF
+  var ph=document.querySelector('.print-header');
+  var pf=document.querySelector('.print-footer');
+  
+  // Agregar clase para modo B/N y ocultar graficos
+  document.body.classList.add('exporting-pdf');
+
+  var el=document.querySelector('.page-body');
+  var opt={
+    margin: [5, 5, 5, 5],
+    filename: 'reporte_{{tab}}_{{fecha_desde|date:"Y-m-d"}}.pdf',
+    image: {type:'jpeg',quality:0.98},
+    html2canvas: {scale:2,useCORS:true,logging:false},
+    jsPDF: {unit:'mm',format:'a4',orientation:'landscape'},
+    pagebreak: {mode:['avoid-all','css','legacy']}
+  };
+
+  html2pdf().set(opt).from(el).save().then(function(){
+    document.body.classList.remove('exporting-pdf');
+  });
+}
+</script>
 {% endblock %}

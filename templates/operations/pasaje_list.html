@@ -1,7 +1,52 @@
 {% extends 'layouts/base_tabler.html' %}
 
 {% block title %}Pasajes - TR4CKING{% endblock %}
-{% block title_content %}Gestión de Pasajes{% endblock %}
+
+{% block page_header %}
+<style>
+.btn-premium-action {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    padding: 0.75rem 1.75rem !important;
+    border-radius: 8px !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.btn-premium-action:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5) !important;
+    background: linear-gradient(135deg, #34d399, #047857) !important;
+    color: #ffffff !important;
+}
+.btn-premium-action:active {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+}
+.btn-premium-action i {
+    font-size: 1.35rem !important;
+}
+</style>
+<div class="row align-items-center">
+    <div class="col">
+        <h2 class="page-title">
+            Gestión de Pasajes
+        </h2>
+    </div>
+    {% if request.user.is_superuser or request.user.persona.es_agente %}
+    <div class="col-auto ms-auto">
+        <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-premium-action">
+            <i class="bi bi-ticket-perforated-fill"></i> Venta de Pasajes
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
 
 {% block content %}
 <!-- Filtros -->
@@ -23,7 +68,7 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Buscar</label>
-                <input type="text" name="search" class="form-control" placeholder="Código, cédula, nombre..."
+                <input type="text" name="search" class="form-control" placeholder="Código, cédula, vendedor..."
                     value="{{ search }}">
             </div>
             <div class="col-md-2">
@@ -47,6 +92,7 @@
                     <th>Tramo</th>
                     <th>Asiento</th>
                     <th>Precio</th>
+                    <th>Vendedor</th>
                     <th>Estado</th>
                     <th class="text-end">Acciones</th>
                 </tr>
@@ -72,6 +118,15 @@
                     </td>
                     <td>Gs. {{ pasaje.precio|floatformat:0 }}</td>
                     <td>
+                        <span class="text-muted small">
+                            {% if pasaje.vendedor and not pasaje.vendedor.persona.es_cliente %}
+                                {{ pasaje.vendedor.username }}
+                            {% elif not pasaje.vendedor %}
+                                Sistema
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
                         <span class="badge 
                             {% if pasaje.estado == 'vendido' %}bg-green
                             {% elif pasaje.estado == 'reservado' %}bg-azure
@@ -86,7 +141,7 @@
                                 class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            {% if pasaje.estado in 'vendido,reservado' %}
+                            {% if pasaje.estado == 'reservado' %}
                             <a href="{% url 'operations:pasaje_cancelar' pasaje.pk %}"
                                 class="btn btn-sm btn-outline-danger">
                                 <i class="bi bi-x-circle"></i>

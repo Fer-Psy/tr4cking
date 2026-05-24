@@ -54,6 +54,7 @@
                         {{ form.motivo }}
                     </div>
 
+                    {% if pasaje.estado != 'reservado' %}
                     <div class="mb-4">
                         <div class="form-check">
                             {{ form.devolver_dinero }}
@@ -62,6 +63,12 @@
                             </label>
                         </div>
                     </div>
+                    {% else %}
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Este pasaje se encuentra en estado <strong>Reservado</strong>. Al cancelarlo no se registrará ninguna devolución de dinero porque el cliente aún no ha realizado el pago.
+                    </div>
+                    {% endif %}
 
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'operations:pasaje_detail' pasaje.pk %}" class="btn btn-outline-secondary">

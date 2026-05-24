@@ -2,10 +2,12 @@
 Views for fleet app.
 """
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from base.mixins import AdminOnlyMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy, reverse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.db.models.deletion import ProtectedError
@@ -19,7 +21,7 @@ from .forms import EmpresaForm, ParadaForm, BusForm, AsientoForm
 # EMPRESA VIEWS
 # =============================================================================
 
-class EmpresaListView(LoginRequiredMixin, ListView):
+class EmpresaListView(AdminOnlyMixin, ListView):
     """Lista de empresas."""
     model = Empresa
     template_name = 'fleet/empresa_list.html'
@@ -47,14 +49,14 @@ class EmpresaListView(LoginRequiredMixin, ListView):
         return context
 
 
-class EmpresaDetailView(LoginRequiredMixin, DetailView):
+class EmpresaDetailView(AdminOnlyMixin, DetailView):
     """Detalle de una empresa."""
     model = Empresa
     template_name = 'fleet/empresa_detail.html'
     context_object_name = 'empresa'
 
 
-class EmpresaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class EmpresaCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear una nueva empresa."""
     model = Empresa
     form_class = EmpresaForm
@@ -63,7 +65,7 @@ class EmpresaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     success_message = "Empresa %(nombre)s creada exitosamente."
 
 
-class EmpresaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class EmpresaUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar una empresa."""
     model = Empresa
     form_class = EmpresaForm
@@ -72,7 +74,7 @@ class EmpresaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     success_message = "Empresa %(nombre)s actualizada exitosamente."
 
 
-class EmpresaDeleteView(LoginRequiredMixin, DeleteView):
+class EmpresaDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar una empresa."""
     model = Empresa
     template_name = 'fleet/empresa_confirm_delete.html'
@@ -98,7 +100,7 @@ class EmpresaDeleteView(LoginRequiredMixin, DeleteView):
 # PARADA VIEWS
 # =============================================================================
 
-class ParadaListView(LoginRequiredMixin, ListView):
+class ParadaListView(AdminOnlyMixin, ListView):
     """Lista de paradas."""
     model = Parada
     template_name = 'fleet/parada_list.html'
@@ -149,14 +151,14 @@ class ParadaListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ParadaDetailView(LoginRequiredMixin, DetailView):
+class ParadaDetailView(AdminOnlyMixin, DetailView):
     """Detalle de una parada."""
     model = Parada
     template_name = 'fleet/parada_detail.html'
     context_object_name = 'parada'
 
 
-class ParadaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class ParadaCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear una nueva parada."""
     model = Parada
     form_class = ParadaForm
@@ -171,7 +173,7 @@ class ParadaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         return context
 
 
-class ParadaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class ParadaUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar una parada."""
     model = Parada
     form_class = ParadaForm
@@ -186,7 +188,7 @@ class ParadaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return context
 
 
-class ParadaDeleteView(LoginRequiredMixin, DeleteView):
+class ParadaDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar una parada."""
     model = Parada
     template_name = 'fleet/parada_confirm_delete.html'
@@ -212,7 +214,7 @@ class ParadaDeleteView(LoginRequiredMixin, DeleteView):
 # BUS VIEWS
 # =============================================================================
 
-class BusListView(LoginRequiredMixin, ListView):
+class BusListView(AdminOnlyMixin, ListView):
     """Lista de buses."""
     model = Bus
     template_name = 'fleet/bus_list.html'
@@ -252,14 +254,14 @@ class BusListView(LoginRequiredMixin, ListView):
         return context
 
 
-class BusDetailView(LoginRequiredMixin, DetailView):
+class BusDetailView(AdminOnlyMixin, DetailView):
     """Detalle de un bus."""
     model = Bus
     template_name = 'fleet/bus_detail.html'
     context_object_name = 'bus'
 
 
-class BusCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class BusCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear un nuevo bus con generación automática de asientos."""
     model = Bus
     form_class = BusForm
@@ -301,7 +303,7 @@ class BusCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         return response
 
 
-class BusUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class BusUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar un bus con opción de regenerar asientos."""
     model = Bus
     form_class = BusForm
@@ -380,7 +382,7 @@ class BusUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return response
 
 
-class BusDeleteView(LoginRequiredMixin, DeleteView):
+class BusDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar un bus."""
     model = Bus
     template_name = 'fleet/bus_confirm_delete.html'
@@ -390,23 +392,64 @@ class BusDeleteView(LoginRequiredMixin, DeleteView):
         try:
             return super().post(request, *args, **kwargs)
         except ProtectedError:
-            messages.error(
-                request, 
-                f"No se puede eliminar el bus '{self.get_object().placa}' porque tiene registros relacionados "
-                "que están protegidos (ej. viajes realizados)."
-            )
-            return self.get(request, *args, **kwargs)
+            self.object = self.get_object()
+            if request.user.is_superuser or request.user.is_staff:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar el bus '{self.object.placa}' porque tiene registros relacionados "
+                    "que están protegidos (ej. viajes realizados). "
+                    "Como administrador, puedes dar de baja este bus para inactivarlo del sistema."
+                )
+                context = self.get_context_data(object=self.object, show_deactivate=True)
+                return self.render_to_response(context)
+            else:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar el bus '{self.object.placa}' porque tiene registros relacionados "
+                    "que están protegidos (ej. viajes realizados)."
+                )
+                return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
         messages.success(self.request, f"Bus {self.object.placa} eliminado exitosamente.")
         return super().form_valid(form)
 
 
+class BusDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Dar de baja a un bus."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        bus = get_object_or_404(Bus, pk=pk)
+        bus.estado = 'inactivo'
+        bus.save()
+            
+        messages.success(request, f"Bus '{bus.placa}' ha sido dado de baja exitosamente.")
+        return redirect('fleet:bus_list')
+
+
+class BusActivarView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Reactivar un bus dado de baja."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        bus = get_object_or_404(Bus, pk=pk)
+        bus.estado = 'activo'
+        bus.save()
+            
+        messages.success(request, f"Bus '{bus.placa}' ha sido reactivado exitosamente.")
+        return redirect('fleet:bus_list')
+
+
 # =============================================================================
 # ASIENTO VIEWS
 # =============================================================================
 
-class AsientoListView(LoginRequiredMixin, ListView):
+class AsientoListView(AdminOnlyMixin, ListView):
     """Lista de asientos de un bus."""
     model = Asiento
     template_name = 'fleet/asiento_list.html'
@@ -422,7 +465,7 @@ class AsientoListView(LoginRequiredMixin, ListView):
         return context
 
 
-class AsientoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class AsientoCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear un nuevo asiento."""
     model = Asiento
     form_class = AsientoForm
@@ -448,7 +491,7 @@ class AsientoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         return context
 
 
-class AsientoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class AsientoUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar un asiento."""
     model = Asiento
     form_class = AsientoForm
@@ -469,7 +512,7 @@ class AsientoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return context
 
 
-class AsientoDeleteView(LoginRequiredMixin, DeleteView):
+class AsientoDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar un asiento."""
     model = Asiento
     template_name = 'fleet/asiento_confirm_delete.html'
@@ -493,7 +536,7 @@ class AsientoDeleteView(LoginRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-class ParadaCreateAjaxView(LoginRequiredMixin, CreateView):
+class ParadaCreateAjaxView(AdminOnlyMixin, CreateView):
     """Crear una nueva parada vía AJAX."""
     model = Parada
     form_class = ParadaForm

@@ -211,10 +211,19 @@
                             <span id="viaje-estado-badge" class="badge {% if viaje_activo.estado == 'en_curso' %}bg-success{% else %}bg-blue-lt{% endif %} mt-1">{{ viaje_activo.get_estado_display }}</span>
                         </div>
                     </div>
-                    {% if viaje_activo.estado == 'programado' %}
-                    <div class="mt-3">
+                    {% if viaje_activo.estado == 'programado' or viaje_activo.estado == 'en_curso' %}
+                    <div class="mt-3 d-flex flex-column gap-2">
+                        {% if viaje_activo.estado == 'programado' %}
                         <button id="btn-iniciar-viaje" class="btn btn-warning w-100 btn-action shadow-sm py-2" onclick="iniciarViaje({{ viaje_activo.pk }})">
                             <i class="bi bi-play-circle-fill fs-2"></i> INICIAR VIAJE
+                        </button>
+                        {% endif %}
+                        <button id="btn-toggle-reservas" 
+                                class="btn {% if viaje_activo.reservas_bloqueadas %}btn-danger{% else %}btn-outline-danger{% endif %} w-100 btn-action shadow-sm py-2" 
+                                onclick="toggleReservas({{ viaje_activo.pk }})"
+                                {% if not viaje_activo.reservas_bloqueadas and viaje_activo.asientos_disponibles > 0 %}disabled title="Solo se puede bloquear si el bus está lleno (0 asientos)"{% endif %}>
+                            <i id="reservas-icon" class="bi {% if viaje_activo.reservas_bloqueadas %}bi-lock-fill{% else %}bi-unlock{% endif %} fs-2"></i> 
+                            <span id="reservas-text">{% if viaje_activo.reservas_bloqueadas %}DESBLOQUEAR RESERVAS{% else %}BLOQUEAR RESERVAS (BUS LLENO){% endif %}</span>
                         </button>
                     </div>
                     {% endif %}
@@ -241,13 +250,88 @@
                             <div class="fs-2 fw-bold">Gs. {{ total_caja|default:0|floatformat:0 }}</div>
                             <div class="text-muted small">Efectivo en manos</div>
                         </div>
-                        <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-primary btn-sm">Ver Detalle</a>
+                        <div class="d-flex flex-column gap-2">
+                            <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-primary btn-sm w-100">Ver Movimientos</a>
+                            <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-secondary btn-sm w-100">Mis Facturas Emitidas</a>
+                        </div>
                     </div>
                     {% else %}
                     <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary w-100 btn-action">
                         <i class="bi bi-cash-stack"></i> Abrir Caja
                     </a>
                     {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mi Cronograma (Compacto y Desplegable) -->
+    <div class="row row-cards mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 overflow-hidden">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center cursor-pointer" 
+                     data-bs-toggle="collapse" data-bs-target="#collapseCronograma" aria-expanded="false" style="cursor: pointer;">
+                    <h3 class="card-title fw-bold text-primary mb-0">
+                        <i class="bi bi-calendar3 me-2"></i> Mi Cronograma de Viajes (Próximos días)
+                    </h3>
+                    <div class="card-actions">
+                        <span class="badge bg-primary-lt me-2">{{ proximos_viajes|length }} viajes</span>
+                        <i class="bi bi-chevron-down text-muted"></i>
+                    </div>
+                </div>
+                <div id="collapseCronograma" class="collapse">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table table-hover mb-0">
+                            <thead>
+                                <tr class="bg-light">
+                                    <th>Fecha</th>
+                                    <th>Hora</th>
+                                    <th>Itinerario / Ruta</th>
+                                    <th>Empresa</th>
+                                    <th>Bus</th>
+                                    <th>Chofer</th>
+                                    <th class="w-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in proximos_viajes %}
+                                <tr>
+                                    <td class="fw-bold text-nowrap">
+                                        {{ v.fecha_viaje|date:"d/m/Y" }}
+                                        <div class="small text-muted">{{ v.fecha_viaje|date:"l" }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary-lt">{{ v.horario.hora_salida|time:"H:i" }} hs</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">{{ v.itinerario.nombre }}</div>
+                                        <div class="small text-muted">{{ v.parada_origen }} → {{ v.parada_destino }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="text-uppercase small fw-bold text-azure">{{ v.empresa.nombre }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ v.bus.placa }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="small">{{ v.chofer.nombre_completo }}</div>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'operations:viaje_detail' v.pk %}" class="btn btn-sm btn-ghost-primary">
+                                            Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted italic">
+                                        No tienes otros viajes programados.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -333,12 +417,13 @@
     <div class="row row-cards">
         <!-- Venta y Pasajes -->
         <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
+            <div class="card h-100">
+                <div class="card-header bg-primary-lt">
                     <h3 class="card-title fw-bold">Venta de Pasajes y Facturación</h3>
                 </div>
                 <div class="card-body">
                     {% if viaje_activo %}
+                    {% if sesion_caja %}
                     <div class="row g-3">
                         <div class="col-sm-6">
                             <a href="{% url 'operations:pasaje_venta' viaje_activo.pk %}" class="card card-link card-stacked mb-2 p-3 text-center border-2 border-primary-lt">
@@ -348,25 +433,42 @@
                             </a>
                         </div>
                         <div class="col-sm-6">
-                            <a href="{% url 'operations:factura_create' %}?cliente={{ cliente_ocasional.cedula }}" class="card card-link card-stacked mb-2 p-3 text-center border-2 border-info-lt">
+                            <a href="{% url 'operations:pasaje_venta' viaje_activo.pk %}?cliente={{ cliente_ocasional.cedula }}" class="card card-link card-stacked mb-2 p-3 text-center border-2 border-info-lt">
                                 <div class="mb-2"><i class="bi bi-person-circle fs-1 text-info"></i></div>
                                 <div class="fw-bold">Cliente Ocasional</div>
                                 <small class="text-muted">Facturar sin datos fiscales</small>
                             </a>
                         </div>
                     </div>
+                    {% else %}
+                    <div class="alert alert-warning border-2 shadow-sm">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-exclamation-triangle-fill fs-2 me-3"></i>
+                            <div>
+                                <h4 class="alert-title fw-bold">Caja Cerrada</h4>
+                                <div class="text-muted">Debes <strong>abrir tu caja</strong> para poder realizar ventas y facturar pasajes.</div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{% url 'operations:caja_abrir' %}" class="btn btn-warning w-100">
+                                <i class="bi bi-cash-stack me-2"></i> Abrir Caja Ahora
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <div class="mt-4">
                         <h4 class="subheader mb-3">Ventas Recientes Hoy</h4>
                         <div class="table-responsive">
-                            <table class="table table-vcenter table-nowrap">
+                            <table class="table table-vcenter">
                                 <thead>
                                     <tr>
                                         <th>Pasajero</th>
-                                        <th>Asiento</th>
+                                        <th>Ruta (O → D)</th>
+                                        <th class="text-center">Asi.</th>
                                         <th>Estado</th>
-                                        <th>Monto</th>
-                                        <th></th>
+                                        <th class="text-end">Monto</th>
+                                        <th class="w-1"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -377,6 +479,13 @@
                                             <div class="text-muted small">CI: {{ pasaje.pasajero.cedula }}</div>
                                         </td>
                                         <td>
+                                            <div class="small">
+                                                <span class="text-primary fw-bold">{{ pasaje.parada_origen.nombre }}</span>
+                                                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                                <span class="text-success fw-bold">{{ pasaje.parada_destino.nombre }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
                                             <span class="badge bg-purple-lt">{{ pasaje.asiento.numero_asiento }}</span>
                                         </td>
                                         <td>
@@ -384,7 +493,7 @@
                                                 {{ pasaje.get_estado_display }}
                                             </span>
                                         </td>
-                                        <td class="fw-bold text-nowrap">Gs. {{ pasaje.precio|floatformat:0 }}</td>
+                                        <td class="fw-bold text-nowrap text-end">Gs. {{ pasaje.precio|floatformat:0 }}</td>
                                         <td class="text-end text-nowrap">
                                             <div class="btn-list flex-nowrap justify-content-end">
                                                 {% if pasaje.estado != 'abordado' %}
@@ -421,7 +530,7 @@
 
         <!-- Encomiendas -->
         <div class="col-lg-4">
-            <div class="card" style="min-height: 400px;">
+            <div class="card h-100">
                 <div class="card-header bg-primary-lt">
                     <h3 class="card-title fw-bold">Gestión de Encomiendas</h3>
                 </div>
@@ -434,7 +543,13 @@
                         <div class="encomienda-item p-2 shadow-sm mb-3">
                             <div class="d-flex justify-content-between align-items-start small mb-1">
                                 <span class="badge bg-secondary-lt fw-bold">{{ enc.codigo }}</span>
-                                <span class="badge bg-info-lt text-uppercase">{{ enc.get_estado_display }}</span>
+                                <span class="badge 
+                                    {% if enc.estado == 'registrado' %}bg-warning-lt
+                                    {% elif enc.estado == 'en_transito' %}bg-info-lt
+                                    {% elif enc.estado == 'en_destino' %}bg-success-lt
+                                    {% else %}bg-secondary-lt{% endif %} text-uppercase">
+                                    {{ enc.get_estado_display }}
+                                </span>
                             </div>
                             <div class="fw-bold mb-1">{{ enc.descripcion|truncatechars:30 }}</div>
                             <div class="text-muted small">
@@ -463,11 +578,7 @@
                         {% endfor %}
                     </div>
                 </div>
-                {% if viaje_activo %}
-                <div class="card-footer bg-transparent border-0 text-center py-3">
-                    <a href="{% url 'operations:viaje_detail' viaje_activo.pk %}" class="small">Ver manifiesto completo</a>
-                </div>
-                {% endif %}
+
             </div>
         </div>
     </div>
@@ -526,6 +637,54 @@
             console.error(err);
             alert('Error de conexión al iniciar viaje');
             btn.disabled = false;
+        });
+    }
+
+    function toggleReservas(viajeId) {
+        const btn = document.getElementById('btn-toggle-reservas');
+        const isBlocked = btn.classList.contains('btn-danger');
+        const newStatus = !isBlocked;
+        const msg = newStatus 
+            ? '¿Bloquear reservas? Ningún cliente ni administrador podrá reservar. La facturación directa seguirá permitida.' 
+            : '¿Desbloquear reservas? Permitirá nuevas reservas nuevamente.';
+            
+        if (!confirm(msg)) return;
+        
+        btn.disabled = true;
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+
+        fetch(`/operations/viajes/${viajeId}/toggle-reservas/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ bloquear: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            if (data.ok) {
+                if (data.bloqueadas) {
+                    btn.classList.remove('btn-outline-danger');
+                    btn.classList.add('btn-danger');
+                    btn.innerHTML = '<i id="reservas-icon" class="bi bi-lock-fill fs-2"></i> <span id="reservas-text">DESBLOQUEAR RESERVAS</span>';
+                } else {
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-outline-danger');
+                    btn.innerHTML = '<i id="reservas-icon" class="bi bi-unlock fs-2"></i> <span id="reservas-text">BLOQUEAR RESERVAS (BUS LLENO)</span>';
+                }
+            } else {
+                alert('Error: ' + data.error);
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión');
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
         });
     }
 

@@ -39,7 +39,7 @@
 <select id="id_chofer" name="chofer" class="form-select" hx-swap-oob="true">
     <option value="">---------</option>
     {% for c in choferes %}
-        <option value="{{ c.cedula }}" {% if c.cedula == chofer_pred_cedula %}selected{% endif %}>
+        <option value="{{ c.cedula|stringformat:'s' }}" {% if c.cedula == chofer_pred_cedula %}selected{% endif %}>
             {{ c.apellido }}, {{ c.nombre }} ({{ c.cedula }})
             {% if c.cedula == chofer_pred_cedula %}(Asignado){% endif %}
         </option>
@@ -52,7 +52,7 @@
 
 <select id="id_ayudantes" name="ayudantes" class="form-select select2-multiple" multiple hx-swap-oob="true">
     {% for a in ayudantes %}
-        <option value="{{ a.cedula }}" {% if a.cedula == ayudante_pred_cedula %}selected{% endif %}>
+        <option value="{{ a.cedula|stringformat:'s' }}" {% if a.cedula == ayudante_pred_cedula %}selected{% endif %}>
             {{ a.apellido }}, {{ a.nombre }}
             {% if a.cedula == ayudante_pred_cedula %}(Asignado){% endif %}
         </option>

@@ -85,6 +85,11 @@ class Viaje(models.Model):
         default='programado',
         verbose_name="Estado"
     )
+    reservas_bloqueadas = models.BooleanField(
+        default=False,
+        verbose_name="Reservas Bloqueadas",
+        help_text="Bloquear la posibilidad de reservar asientos (indicando que el bus está lleno)"
+    )
     observaciones = models.TextField(
         blank=True, null=True,
         verbose_name="Observaciones"
@@ -130,7 +135,7 @@ class Viaje(models.Model):
     def asientos_disponibles(self):
         """Retorna la cantidad de asientos no ocupados en NINGÚN segmento (ocupación máxima)."""
         vendidos = self.pasajes.filter(
-            estado__in=['vendido', 'reservado']
+            estado__in=['vendido', 'reservado', 'abordado']
         ).values('asiento_id').distinct().count()
         return self.bus.capacidad_asientos - vendidos
 
@@ -138,11 +143,22 @@ class Viaje(models.Model):
     def porcentaje_ocupacion(self):
         """Retorna el porcentaje de ocupación del bus (asientos usados en al menos un segmento)."""
         vendidos = self.pasajes.filter(
-            estado__in=['vendido', 'reservado']
+            estado__in=['vendido', 'reservado', 'abordado']
         ).values('asiento_id').distinct().count()
         if self.bus.capacidad_asientos > 0:
             return round((vendidos / self.bus.capacidad_asientos) * 100, 1)
         return 0
+
+    @property
+    def empresa_operadora(self):
+        """Retorna la empresa efectiva que opera este viaje."""
+        if self.empresa:
+            return self.empresa
+        if self.bus and self.bus.empresa:
+            return self.bus.empresa
+        if self.itinerario and self.itinerario.empresa:
+            return self.itinerario.empresa
+        return None
 
 
 class TrackingViaje(models.Model):
@@ -374,7 +390,7 @@ class Pasaje(models.Model):
     class Meta:
         verbose_name = "Pasaje"
         verbose_name_plural = "Pasajes"
-        ordering = ['-fecha_venta']
+        ordering = ['-id']
         # Ya NO se usa unique_together = ['viaje', 'asiento']
         # La validación se hace por segmentos solapados (programáticamente)
 
@@ -427,7 +443,7 @@ class Encomienda(models.Model):
     ESTADO_CHOICES = [
         ('registrado', 'Registrado'),
         ('en_transito', 'En Tránsito'),
-        ('en_destino', 'En Destino'),
+        ('en_destino', 'Entregada en Destino'),
         ('entregado', 'Entregado'),
         ('devuelto', 'Devuelto'),
         ('cancelado', 'Cancelado'),
@@ -472,7 +488,7 @@ class Encomienda(models.Model):
     tipo = models.CharField(
         max_length=20,
         choices=TIPO_CHOICES,
-        default='paquete',
+        default='sobre',
         verbose_name="Tipo de encomienda"
     )
     descripcion = models.TextField(
@@ -512,6 +528,14 @@ class Encomienda(models.Model):
     fecha_entrega = models.DateTimeField(
         null=True, blank=True,
         verbose_name="Fecha de entrega"
+    )
+    fecha_en_transito = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Fecha en tránsito"
+    )
+    fecha_en_destino = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Fecha en destino"
     )
     receptor_nombre = models.CharField(
         max_length=100,
@@ -929,6 +953,26 @@ class SesionCaja(models.Model):
             self.total_egresos
         )
         return self.monto_cierre_esperado
+
+    @property
+    def duracion_sesion(self):
+        """Retorna la duración de la sesión en formato legible."""
+        if not self.fecha_apertura:
+            return "-"
+            
+        if not self.fecha_cierre:
+            # Si está abierta, calcular desde apertura hasta ahora
+            delta = timezone.now() - self.fecha_apertura
+        else:
+            delta = self.fecha_cierre - self.fecha_apertura
+        
+        total_segundos = int(delta.total_seconds())
+        horas = total_segundos // 3600
+        minutos = (total_segundos % 3600) // 60
+        
+        if delta.days > 0:
+            return f"{delta.days}d {horas}h {minutos}m"
+        return f"{horas}h {minutos}m"
 
     def cerrar(self, monto_real, observaciones=''):
         """Cierra la sesión de caja."""

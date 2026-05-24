@@ -1,12 +1,23 @@
 {% extends 'layouts/base_tabler.html' %}
+{% load custom_filters %}
 
 {% block title %}Eliminar Precio - TR4CKING{% endblock %}
 
-{% block breadcrumb %}
-<span class="separator">/</span>
-<a href="{% url 'itineraries:precio_list' %}">Precios</a>
-<span class="separator">/</span>
-<span class="current">Eliminar</span>
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Matriz de Precios
+                </div>
+                <h2 class="page-title">
+                    Eliminar Precio
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -26,7 +37,7 @@
                 <p class="text-secondary mb-4">
                     Estás a punto de eliminar el precio del tramo
                     <strong>{{ object.origen.nombre }} → {{ object.destino.nombre }}</strong>
-                    (Gs. {{ object.precio|floatformat:0 }}).
+                    (Gs. {{ object.precio|format_gs }}).
                 </p>
 
                 <form method="post">

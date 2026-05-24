@@ -98,6 +98,23 @@ class Itinerario(models.Model):
         return self.detalles.order_by('orden').first()
 
     @property
+    def ultima_parada(self):
+        """Retorna el último DetalleItinerario (parada de destino) si existe."""
+        return self.detalles.order_by('orden').last()
+
+    @property
+    def parada_origen(self):
+        """Retorna el nombre de la parada de inicio."""
+        p = self.primera_parada
+        return p.parada.nombre if p else 'N/A'
+
+    @property
+    def parada_destino(self):
+        """Retorna el nombre de la parada final."""
+        p = self.ultima_parada
+        return p.parada.nombre if p else 'N/A'
+
+    @property
     def nombre_origen(self):
         if self.nombre.startswith('Asunción'):
             return 'Asunción'

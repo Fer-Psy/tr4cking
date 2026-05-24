@@ -1,8 +1,10 @@
 """
 Views for users app.
 """
+from django.views import View
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
+from base.mixins import AdminOnlyMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
@@ -28,11 +30,19 @@ class PersonaListView(LoginRequiredMixin, ListView):
     paginate_by = 15
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        # Filtro de estado (activo/inactivo/todos)
+        estado = self.request.GET.get('estado', 'activos')
         
-        # Filtro de seguridad: Ayudantes y Choferes solo pueden ver clientes
+        if estado == 'inactivos':
+            queryset = super().get_queryset().filter(activo=False)
+        elif estado == 'todos':
+            queryset = super().get_queryset()
+        else:  # default 'activos'
+            queryset = super().get_queryset().filter(activo=True)
+        
+        # Filtro de seguridad: Ayudantes, Choferes y Agentes solo pueden ver clientes
         user_persona = getattr(self.request.user, 'persona', None)
-        if user_persona and (user_persona.es_chofer or user_persona.es_ayudante):
+        if user_persona and (user_persona.es_chofer or user_persona.es_ayudante or user_persona.es_agente):
             queryset = queryset.filter(es_cliente=True)
         
         # Search filter
@@ -62,6 +72,7 @@ class PersonaListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['search'] = self.request.GET.get('search', '')
         context['rol'] = self.request.GET.get('rol', '')
+        context['estado'] = self.request.GET.get('estado', 'activos')
         return context
 
 
@@ -83,8 +94,9 @@ class PersonaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user_is_admin'] = self.request.user.is_superuser or self.request.user.is_staff
+        persona = getattr(self.request.user, 'persona', None)
+        kwargs['user_is_agente'] = persona.es_agente if persona else False
         return kwargs
-
 
 class PersonaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     """Editar una persona existente."""
@@ -97,6 +109,8 @@ class PersonaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user_is_admin'] = self.request.user.is_superuser or self.request.user.is_staff
+        persona = getattr(self.request.user, 'persona', None)
+        kwargs['user_is_agente'] = persona.es_agente if persona else False
         return kwargs
     
     def get_initial(self):
@@ -117,23 +131,74 @@ class PersonaDeleteView(LoginRequiredMixin, DeleteView):
         try:
             return super().post(request, *args, **kwargs)
         except ProtectedError:
-            messages.error(
-                request, 
-                f"No se puede eliminar a '{self.get_object().nombre_completo}' porque tiene registros "
-                "relacionados que están protegidos (ej. ventas o asignaciones)."
-            )
-            return self.get(request, *args, **kwargs)
+            self.object = self.get_object()
+            if request.user.is_superuser or request.user.is_staff:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar a '{self.object.nombre_completo}' porque tiene registros "
+                    "relacionados que están protegidos (ej. ventas o asignaciones). "
+                    "Como administrador, puedes dar de baja a esta persona para inactivarla del sistema."
+                )
+                context = self.get_context_data(object=self.object, show_deactivate=True)
+                return self.render_to_response(context)
+            else:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar a '{self.object.nombre_completo}' porque tiene registros "
+                    "relacionados que están protegidos (ej. ventas o asignaciones)."
+                )
+                return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
         messages.success(self.request, f"Persona {self.object.nombre_completo} eliminada exitosamente.")
         return super().form_valid(form)
 
 
+class PersonaDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Dar de baja a una persona."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        persona = get_object_or_404(Persona, pk=pk)
+        persona.activo = False
+        persona.save()
+        
+        # Desactivar el usuario correspondiente si existe
+        if persona.user:
+            persona.user.is_active = False
+            persona.user.save()
+            
+        messages.success(request, f"Persona '{persona.nombre_completo}' ha sido dada de baja exitosamente.")
+        return redirect('users:persona_list')
+
+
+class PersonaActivarView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Reactivar a una persona dada de baja."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        persona = get_object_or_404(Persona, pk=pk)
+        persona.activo = True
+        persona.save()
+        
+        # Reactivar el usuario correspondiente si existe
+        if persona.user:
+            persona.user.is_active = True
+            persona.user.save()
+            
+        messages.success(request, f"Persona '{persona.nombre_completo}' ha sido reactivada exitosamente.")
+        return redirect('users:persona_list')
+
+
 # =============================================================================
 # LOCALIDAD VIEWS
 # =============================================================================
 
-class LocalidadListView(LoginRequiredMixin, ListView):
+class LocalidadListView(AdminOnlyMixin, ListView):
     """Lista de localidades."""
     model = Localidad
     template_name = 'users/localidad_list.html'
@@ -156,14 +221,14 @@ class LocalidadListView(LoginRequiredMixin, ListView):
         return context
 
 
-class LocalidadDetailView(LoginRequiredMixin, DetailView):
+class LocalidadDetailView(AdminOnlyMixin, DetailView):
     """Detalle de una localidad."""
     model = Localidad
     template_name = 'users/localidad_detail.html'
     context_object_name = 'localidad'
 
 
-class LocalidadCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class LocalidadCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear una nueva localidad."""
     model = Localidad
     form_class = LocalidadForm
@@ -172,7 +237,7 @@ class LocalidadCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     success_message = "Localidad %(nombre)s creada exitosamente."
 
 
-class LocalidadUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class LocalidadUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar una localidad existente."""
     model = Localidad
     form_class = LocalidadForm
@@ -181,7 +246,7 @@ class LocalidadUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     success_message = "Localidad %(nombre)s actualizada exitosamente."
 
 
-class LocalidadDeleteView(LoginRequiredMixin, DeleteView):
+class LocalidadDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar una localidad."""
     model = Localidad
     template_name = 'users/localidad_confirm_delete.html'
@@ -203,7 +268,7 @@ class LocalidadDeleteView(LoginRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-class LocalidadCreateAjaxView(LoginRequiredMixin, CreateView):
+class LocalidadCreateAjaxView(AdminOnlyMixin, CreateView):
     """Crear una nueva localidad vía AJAX."""
     model = Localidad
     form_class = LocalidadForm
@@ -289,7 +354,9 @@ class DashboardClienteView(LoginRequiredMixin, TemplateView):
         from operations.models import Pasaje, Encomienda, Viaje
         
         context['pasajes_recientes'] = Pasaje.objects.filter(pasajero=persona).order_by('-fecha_venta')[:5]
-        context['encomiendas_recientes'] = Encomienda.objects.filter(remitente=persona).order_by('-fecha_registro')[:5]
+        context['encomiendas_recientes'] = Encomienda.objects.filter(
+            Q(remitente=persona) | Q(destinatario=persona)
+        ).select_related('parada_origen', 'parada_destino', 'destinatario', 'remitente').order_by('-fecha_registro')[:10]
         
         ahora = timezone.now()
         hoy = ahora.date()

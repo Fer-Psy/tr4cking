@@ -72,8 +72,7 @@
                         </h6>
                         <p class="mb-1 text-muted">{{ inc.descripcion|truncatechars:120 }}</p>
                         <small class="text-muted">
-                            <i class="bi bi-person me-1"></i>{{
-                            inc.reportador.get_full_name|default:inc.reportador.username }}
+                            <i class="bi bi-person me-1"></i>{{ inc.reportador.get_full_name|default:inc.reportador.username }}
                             <i class="bi bi-clock ms-2 me-1"></i>{{ inc.fecha_reporte|date:"d/m/Y H:i" }}
                         </small>
                     </div>

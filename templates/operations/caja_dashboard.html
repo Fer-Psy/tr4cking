@@ -3,7 +3,218 @@
 {% block title %}Caja - TR4CKING{% endblock %}
 {% block title_content %}Gestión de Caja{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== PRINT STYLES ===== */
+.print-report { display: none; }
+
+@media print {
+    .no-print,
+    .page-header,
+    .navbar,
+    .navbar-expand-md,
+    .footer,
+    aside,
+    .navbar-vertical { display: none !important; }
+
+    body { background: #fff !important; margin: 0; padding: 0; font-size: 11px; }
+    .page-wrapper { margin: 0; padding: 0; }
+    .page-body { margin: 0 !important; padding: 0 10px !important; }
+    .container-xl { max-width: 100% !important; padding: 0 !important; }
+
+    .screen-content { display: none !important; }
+    .print-report { display: block !important; }
+
+    .print-report-header {
+        text-align: center;
+        border-bottom: 3px solid #206bc4;
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+    }
+    .print-report-header .brand {
+        font-size: 1.6rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        text-transform: uppercase;
+    }
+    .print-report-header .brand span { color: #206bc4; }
+    .print-report-header h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #206bc4;
+        margin: 6px 0 4px;
+    }
+    .print-report-header .meta {
+        font-size: 0.75rem;
+        color: #666;
+    }
+
+    .print-summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .print-summary-box {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 8px 12px;
+        text-align: center;
+    }
+    .print-summary-box .label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+    .print-summary-box .value { font-size: 1rem; font-weight: 700; }
+    .print-summary-box.green .value { color: #2fb344; }
+    .print-summary-box.red .value { color: #d63939; }
+    .print-summary-box.blue .value { color: #206bc4; }
+
+    .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+        margin-bottom: 16px;
+    }
+    .print-table th {
+        background: #f1f5f9;
+        border: 1px solid #ddd;
+        padding: 5px 8px;
+        font-weight: 600;
+        text-align: left;
+    }
+    .print-table td {
+        border: 1px solid #ddd;
+        padding: 4px 8px;
+        vertical-align: top;
+    }
+    .print-table .text-end { text-align: right; }
+    .print-table .text-green { color: #2fb344; }
+    .print-table .text-red { color: #d63939; }
+    .print-table .detail-sub {
+        font-size: 0.65rem;
+        color: #777;
+        padding-left: 12px;
+    }
+
+    .print-footer-report {
+        border-top: 2px solid #206bc4;
+        margin-top: 20px;
+        padding-top: 8px;
+        font-size: 0.7rem;
+        color: #888;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 12mm 10mm 15mm 10mm;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
+
+<!-- ===== PRINTABLE REPORT (hidden on screen, visible on print) ===== -->
+{% if sesion_abierta %}
+<div class="print-report">
+    <div class="print-report-header">
+        <div class="brand">TR<span>4</span>CKING</div>
+        <h2>Informe de Caja — Ingresos y Egresos</h2>
+        <div class="meta">
+            <strong>Cajero:</strong> {{ sesion.cajero.persona.nombre_completo|default:sesion.cajero.username }}
+            &nbsp;&bull;&nbsp;
+            <strong>Apertura:</strong> {{ sesion.fecha_apertura|date:"d/m/Y H:i" }}
+            {% if sesion.fecha_cierre %}
+            &nbsp;&bull;&nbsp;
+            <strong>Cierre:</strong> {{ sesion.fecha_cierre|date:"d/m/Y H:i" }}
+            {% else %}
+            &nbsp;&bull;&nbsp;
+            <strong>Estado:</strong> En curso
+            {% endif %}
+            &nbsp;&bull;&nbsp;
+            <strong>Generado:</strong> {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+
+    <!-- Summary boxes -->
+    <div class="print-summary-grid">
+        <div class="print-summary-box">
+            <div class="label">Monto Apertura</div>
+            <div class="value">Gs. {{ sesion.monto_apertura|floatformat:0 }}</div>
+        </div>
+        <div class="print-summary-box green">
+            <div class="label">Total Ingresos</div>
+            <div class="value">Gs. {{ sesion.total_ingresos|floatformat:0 }}</div>
+        </div>
+        <div class="print-summary-box red">
+            <div class="label">Total Egresos</div>
+            <div class="value">Gs. {{ sesion.total_egresos|floatformat:0 }}</div>
+        </div>
+        <div class="print-summary-box blue">
+            <div class="label">Total en Caja</div>
+            <div class="value">Gs. {{ total_actual|floatformat:0 }}</div>
+        </div>
+    </div>
+
+    <!-- Detailed movements table -->
+    <h3 style="font-size:0.85rem; font-weight:700; margin-bottom:8px;">Detalle de Movimientos</h3>
+    <table class="print-table">
+        <thead>
+            <tr>
+                <th style="width:60px">#</th>
+                <th style="width:65px">Hora</th>
+                <th style="width:80px">Tipo</th>
+                <th>Concepto</th>
+                <th>Detalle</th>
+                <th style="width:110px" class="text-end">Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in todos_movimientos %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ mov.fecha|time:"H:i" }}</td>
+                <td class="{% if mov.tipo == 'ingreso' %}text-green{% else %}text-red{% endif %}">
+                    {% if mov.tipo == 'ingreso' %}▼ Ingreso{% else %}▲ Egreso{% endif %}
+                </td>
+                <td>{{ mov.get_concepto_display }}</td>
+                <td>
+                    {{ mov.descripcion }}
+                    {% if mov.items_detalle %}
+                    {% for item in mov.items_detalle %}
+                    <div class="detail-sub">
+                        {% if item.tipo == 'Pasaje' %}
+                        🎫 {{ item.info }} — As: {{ item.asiento }} — Pax: {{ item.pasajero }}
+                        {% else %}
+                        📦 {{ item.info }} — Rem: {{ item.remitente }}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </td>
+                <td class="text-end {% if mov.tipo == 'ingreso' %}text-green{% else %}text-red{% endif %}">
+                    <strong>{% if mov.tipo == 'egreso' %}-{% endif %}Gs. {{ mov.monto|floatformat:0 }}</strong>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align:center; padding:20px; color:#999;">Sin movimientos registrados</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="print-footer-report">
+        <span>TR4CKING — Informe de Caja</span>
+        <span>{{ sesion.cajero.persona.nombre_completo|default:sesion.cajero.username }}</span>
+        <span>Impreso: {% now "d/m/Y H:i" %}</span>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ===== SCREEN CONTENT ===== -->
+<div class="screen-content">
 {% if sesion_abierta %}
 <!-- Caja Abierta -->
 <div class="row">
@@ -45,10 +256,13 @@
                     <span class="h3 text-green mb-0">Gs. {{ total_actual|floatformat:0 }}</span>
                 </div>
             </div>
-            <div class="card-footer">
-                <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-danger w-100">
+            <div class="card-footer d-flex gap-2">
+                <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-danger flex-fill">
                     <i class="bi bi-lock me-1"></i> Cerrar Caja
                 </a>
+                <button type="button" class="btn btn-outline-secondary flex-fill" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Imprimir Informe
+                </button>
             </div>
         </div>
 
@@ -68,8 +282,8 @@
     <div class="col-lg-8">
         <!-- Últimos Movimientos -->
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">
                     <i class="bi bi-clock-history me-2"></i>
                     Últimos Movimientos
                 </h3>
@@ -182,10 +396,16 @@
                     class="list-group-item list-group-item-action">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <strong>{{ ses.fecha_apertura|date:"d/m/Y" }}</strong>
-                            <br>
-                            <small class="text-muted">{{ ses.fecha_apertura|time:"H:i" }} - {{
-                                ses.fecha_cierre|time:"H:i"|default:"En curso" }}</small>
+                            <div class="fw-bold">{{ ses.fecha_apertura|date:"d/m/Y" }}</div>
+                            <div class="small text-muted">
+                                <i class="bi bi-person me-1"></i>
+                                {{ ses.cajero.persona.nombre_completo|default:ses.cajero.get_full_name|default:ses.cajero.username }}
+                            </div>
+                            <div class="small text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ ses.fecha_apertura|time:"H:i" }} - {{ ses.fecha_cierre|time:"H:i"|default:"En curso" }}
+                                <span class="ms-2">({{ ses.duracion_sesion }})</span>
+                            </div>
                         </div>
                         <div class="text-end">
                             {% if ses.estado == 'cerrada' %}
@@ -196,11 +416,15 @@
                                 {% else %}-Gs. {{ ses.diferencia|floatformat:0|slice:"1:" }}
                                 {% endif %}
                             </span>
+                            <div class="small mt-1">
+                                <strong>Gs. {{ ses.monto_cierre_real|floatformat:0 }}</strong>
+                            </div>
                             {% else %}
                             <span class="badge bg-azure">Abierta</span>
+                            <div class="small mt-1 text-azure">
+                                <strong>Gs. {{ ses.calcular_cierre|floatformat:0 }}</strong>
+                            </div>
                             {% endif %}
-                            <br>
-                            <small>Gs. {{ ses.monto_cierre_real|floatformat:0|default:"-" }}</small>
                         </div>
                     </div>
                 </a>
@@ -211,4 +435,6 @@
     </div>
 </div>
 {% endif %}
+</div><!-- /screen-content -->
+
 {% endblock %}

@@ -35,20 +35,21 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body border-bottom py-3">
-                <form method="get" class="d-flex flex-column flex-md-row gap-2 align-items-center">
-                    <div class="text-secondary">
-                        Mostrar
-                        <div class="d-inline-block mx-2">
-                            <input type="text" name="search" class="form-control form-control-sm" value="{{ search }}" size="25" placeholder="Nombre o RUC...">
+                <form method="get" class="row g-2 align-items-center">
+                    <div class="col-12 col-md-9 col-lg-10">
+                        <div class="input-icon">
+                            <span class="input-icon-addon">
+                                <i class="bi bi-search text-muted"></i>
+                            </span>
+                            <input type="text" name="search" class="form-control" value="{{ search }}" placeholder="Buscar empresas por nombre o RUC..." aria-label="Buscar empresas">
                         </div>
                     </div>
-                    
-                    <div class="d-flex align-items-center gap-2 mt-2 mt-md-0 ms-md-auto">
-                        <button type="submit" class="btn btn-secondary btn-sm">
-                            Buscar
+                    <div class="col-12 col-md-3 col-lg-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search me-1"></i> Buscar
                         </button>
                         {% if search %}
-                        <a href="{% url 'fleet:empresa_list' %}" class="btn btn-ghost-danger btn-sm" title="Limpiar">
+                        <a href="{% url 'fleet:empresa_list' %}" class="btn btn-outline-secondary btn-icon" title="Limpiar búsqueda" data-bs-toggle="tooltip">
                             <i class="bi bi-x-lg"></i>
                         </a>
                         {% endif %}
@@ -126,7 +127,7 @@
                     {% if page_obj.has_previous %}
                     <li class="page-item">
                         <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" tabindex="-1">
-                            <i class="bi bi-chevron-left"></i> prev
+                            <i class="bi bi-chevron-left"></i> ant
                         </a>
                     </li>
                     {% endif %}
@@ -142,7 +143,7 @@
                     {% if page_obj.has_next %}
                     <li class="page-item">
                         <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">
-                            next <i class="bi bi-chevron-right"></i>
+                            sgte <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
                     {% endif %}

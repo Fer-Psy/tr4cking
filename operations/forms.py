@@ -104,10 +104,12 @@ class ViajeForm(forms.ModelForm):
                     empresa_id=emp_id
                 ).order_by('placa')
                 self.fields['chofer'].queryset = Persona.objects.filter(
-                    empresa_id=emp_id, es_chofer=True
+                    Q(es_chofer=True) | Q(es_empleado=True),
+                    empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
                 self.fields['ayudantes'].queryset = Persona.objects.filter(
-                    empresa_id=emp_id, es_ayudante=True
+                    Q(es_ayudante=True) | Q(es_empleado=True),
+                    empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
             except (ValueError, TypeError):
                 pass
@@ -129,10 +131,12 @@ class ViajeForm(forms.ModelForm):
                         empresa=itinerario_obj.empresa
                     ).order_by('placa')
                     self.fields['chofer'].queryset = Persona.objects.filter(
-                        empresa=itinerario_obj.empresa, es_chofer=True
+                        Q(es_chofer=True) | Q(es_empleado=True),
+                        empresa=itinerario_obj.empresa
                     ).order_by('apellido', 'nombre')
                     self.fields['ayudantes'].queryset = Persona.objects.filter(
-                        empresa=itinerario_obj.empresa, es_ayudante=True
+                        Q(es_ayudante=True) | Q(es_empleado=True),
+                        empresa=itinerario_obj.empresa
                     ).order_by('apellido', 'nombre')
             except (ValueError, TypeError, Itinerario.DoesNotExist):
                 pass
@@ -373,7 +377,8 @@ class PasajeVentaForm(forms.ModelForm):
             }),
         }
 
-    def __init__(self, *args, viaje=None, **kwargs):
+    def __init__(self, *args, viaje=None, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
         
         if viaje:
@@ -419,16 +424,46 @@ class PasajeVentaForm(forms.ModelForm):
             
             # Verificar disponibilidad del asiento en el tramo
             from .utils import asiento_disponible_en_tramo
+            
+            # Si el usuario es ayudante o chofer, tiene permisos para "vender sobre ocupado"
+            # (ej. pasajeros parados o re-asignación manual), pero NUNCA puede tocar una RESERVA.
+            es_personal_bus = self.user and (self.user.is_superuser or (hasattr(self.user, 'persona') and (self.user.persona.es_ayudante or self.user.persona.es_chofer)))
+            
             if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
-                raise ValidationError(
-                    f"El asiento {asiento.numero_asiento} no está disponible en el tramo "
-                    f"{origen.nombre} → {destino.nombre}. Otro pasajero lo tiene reservado "
-                    f"en parte de ese recorrido."
+                # Verificar si el conflicto es con una RESERVA hecha por sistema/clientes
+                conflictos_reserva = Pasaje.objects.filter(
+                    viaje=viaje,
+                    asiento=asiento,
+                    estado='reservado',
+                    orden_origen__lt=orden_destino,
+                    orden_destino__gt=orden_origen,
                 )
+                
+                if conflictos_reserva.exists():
+                    raise ValidationError(
+                        f"El asiento {asiento.numero_asiento} tiene una RESERVA ACTIVA en este tramo. "
+                        "No puede ser facturado por el ayudante."
+                    )
+                elif not es_personal_bus:
+                    # Si no es ayudante/chofer, aplicamos restricción estricta de ocupación
+                    raise ValidationError(
+                        f"El asiento {asiento.numero_asiento} ya está ocupado en parte de este recorrido."
+                    )
+                # Si es ayudante y el conflicto es solo con vendidos/abordados, permitimos continuar
             
             # Guardar los órdenes para uso posterior en la vista
             cleaned_data['orden_origen'] = orden_origen
             cleaned_data['orden_destino'] = orden_destino
+            
+            # Normalizar paradas para que coincidan con el itinerario del viaje
+            # Esto evita guardar IDs de paradas de "Guaireña" en viajes de "Ybyturuzu" (o viceversa)
+            from itineraries.models import DetalleItinerario
+            detalle_o = DetalleItinerario.objects.filter(itinerario=viaje.itinerario, orden=orden_origen).first()
+            detalle_d = DetalleItinerario.objects.filter(itinerario=viaje.itinerario, orden=orden_destino).first()
+            if detalle_o:
+                cleaned_data['parada_origen'] = detalle_o.parada
+            if detalle_d:
+                cleaned_data['parada_destino'] = detalle_d.parada
         
         return cleaned_data
 
@@ -554,7 +589,7 @@ class EncomiendaForm(forms.ModelForm):
             }),
         }
 
-    def __init__(self, *args, viaje=None, **kwargs):
+    def __init__(self, *args, viaje=None, empresa=None, **kwargs):
         super().__init__(*args, **kwargs)
         
         if viaje:
@@ -570,17 +605,31 @@ class EncomiendaForm(forms.ModelForm):
         else:
             # Si es creación directa, mostrar selector de viajes con info del bus
             from django.utils import timezone
-            hoy = timezone.now().date()
+            from django.db.models import Q
             
-            # Mostrar solo viajes programados o en curso de hoy en adelante
+            ahora = timezone.localtime(timezone.now())
+            hoy = ahora.date()
+            hora_actual = ahora.time()
+            
+            # Mostrar solo viajes programados o en curso de hoy en adelante,
+            # excluyendo los de hoy que ya pasaron su hora de salida
             viajes_disponibles = Viaje.objects.filter(
-                fecha_viaje__gte=hoy,
+                Q(fecha_viaje__gt=hoy) |
+                (
+                    Q(fecha_viaje=hoy) &
+                    (Q(horario__isnull=True) | Q(horario__hora_salida__gte=hora_actual))
+                ),
                 estado__in=['programado', 'en_curso']
             ).select_related(
-                'itinerario', 'bus'
+                'itinerario', 'bus', 'horario'
             ).prefetch_related(
                 'itinerario__detalles'
             ).order_by('fecha_viaje', 'itinerario__nombre')
+            
+            if empresa:
+                viajes_disponibles = viajes_disponibles.filter(
+                    Q(empresa=empresa) | Q(bus__empresa=empresa)
+                )
             
             self.fields['viaje'].queryset = viajes_disponibles
             
@@ -605,6 +654,37 @@ class EncomiendaForm(forms.ModelForm):
                 field.widget.attrs['class'] = 'form-select' if isinstance(
                     field, forms.ModelChoiceField
                 ) else 'form-control'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        viaje = cleaned_data.get('viaje')
+        origen = cleaned_data.get('parada_origen')
+        destino = cleaned_data.get('parada_destino')
+        
+        if origen and destino and origen == destino:
+            raise ValidationError("El origen y destino no pueden ser iguales.")
+            
+        if viaje and origen and destino:
+            from .utils import obtener_orden_parada
+            orden_origen = obtener_orden_parada(viaje, origen)
+            orden_destino = obtener_orden_parada(viaje, destino)
+            
+            if orden_origen is None or orden_destino is None:
+                raise ValidationError("Las paradas seleccionadas no pertenecen a este itinerario.")
+            
+            if orden_origen >= orden_destino:
+                raise ValidationError("La parada de origen debe ser anterior a la de destino.")
+            
+            # Normalizar paradas para que coincidan con el itinerario del viaje
+            from itineraries.models import DetalleItinerario
+            detalle_o = DetalleItinerario.objects.filter(itinerario=viaje.itinerario, orden=orden_origen).first()
+            detalle_d = DetalleItinerario.objects.filter(itinerario=viaje.itinerario, orden=orden_destino).first()
+            if detalle_o:
+                cleaned_data['parada_origen'] = detalle_o.parada
+            if detalle_d:
+                cleaned_data['parada_destino'] = detalle_d.parada
+                
+        return cleaned_data
 
 
 class EncomiendaEntregaForm(forms.Form):
@@ -723,7 +803,12 @@ class FacturaForm(forms.ModelForm):
         }
 
     def __init__(self, *args, cliente=None, pasaje=None, encomienda=None, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
+        
+        # Forzar condición a contado y bloquear el campo
+        self.fields['condicion'].initial = 'contado'
+        self.fields['condicion'].disabled = True
         
         # Solo timbrados activos y vigentes
         hoy = timezone.now().date()
@@ -759,12 +844,12 @@ class FacturaForm(forms.ModelForm):
         if pasaje:
             self.fields['pasajes'].queryset = Pasaje.objects.filter(pk=pasaje.pk)
             self.fields['pasajes'].initial = [pasaje]
-            if pasaje.viaje and pasaje.viaje.empresa:
-                item_empresa = pasaje.viaje.empresa
+            if pasaje.viaje:
+                item_empresa = pasaje.viaje.empresa_operadora
         elif cliente_cedula:
             self.fields['pasajes'].queryset = Pasaje.objects.filter(
                 Q(pasajero__cedula=cliente_cedula) | Q(cliente__cedula=cliente_cedula),
-                estado__in=['vendido', 'reservado']
+                estado__in=['vendido', 'reservado', 'abordado']
             ).exclude(
                 detalles_factura__factura__estado='emitida'
             ).select_related('viaje', 'asiento')
@@ -777,8 +862,8 @@ class FacturaForm(forms.ModelForm):
         elif encomienda:
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(pk=encomienda.pk)
             self.fields['encomiendas'].initial = [encomienda]
-            if encomienda.viaje and encomienda.viaje.empresa:
-                item_empresa = encomienda.viaje.empresa
+            if encomienda.viaje:
+                item_empresa = encomienda.viaje.empresa_operadora
         elif cliente_cedula:
             self.fields['encomiendas'].queryset = Encomienda.objects.filter(
                 remitente__cedula=cliente_cedula,
@@ -806,10 +891,36 @@ class FacturaForm(forms.ModelForm):
         pasajes = cleaned_data.get('pasajes', [])
         encomiendas = cleaned_data.get('encomiendas', [])
         
+        # Validar que el usuario tenga caja abierta
+        if self.user:
+            from .models import SesionCaja
+            if not SesionCaja.objects.filter(cajero=self.user, estado='abierta').exists():
+                raise ValidationError(
+                    "No puede facturar porque no tiene una sesión de caja abierta."
+                )
+        
         if not pasajes and not encomiendas:
             raise ValidationError(
                 "Debe seleccionar al menos un pasaje o encomienda para facturar."
             )
+            
+        # Validar que todos los items pertenezcan a la misma empresa y que el timbrado corresponda
+        empresas = set()
+        for p in pasajes:
+            if p.viaje and p.viaje.empresa_operadora:
+                empresas.add(p.viaje.empresa_operadora)
+        for e in encomiendas:
+            if e.viaje and e.viaje.empresa_operadora:
+                empresas.add(e.viaje.empresa_operadora)
+                
+        if len(empresas) > 1:
+            raise ValidationError("No se pueden facturar ítems de distintas empresas en la misma factura.")
+            
+        timbrado = cleaned_data.get('timbrado')
+        if timbrado and empresas:
+            empresa_items = empresas.pop()
+            if timbrado.empresa != empresa_items:
+                raise ValidationError(f"El timbrado seleccionado ({timbrado.empresa.nombre}) no corresponde a la empresa de los ítems ({empresa_items.nombre}).")
         
         return cleaned_data
 

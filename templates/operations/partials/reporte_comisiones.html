@@ -1,0 +1,192 @@
+{% load custom_filters %}
+<!-- COMISIONES MENSUALES -->
+
+<!-- Campo editable de comisión (solo admin) -->
+{% if es_admin %}
+<div class="card mb-3 no-print">
+<div class="card-body py-3">
+<form method="get" class="row g-2 align-items-end">
+<input type="hidden" name="tab" value="comisiones">
+<input type="hidden" name="desde" value="{{ fecha_desde|date:'Y-m-d' }}">
+<input type="hidden" name="hasta" value="{{ fecha_hasta|date:'Y-m-d' }}">
+<input type="hidden" name="empresa" value="{{ empresa_filter }}">
+<div class="col-md-3">
+<label class="form-label fw-semibold"><i class="bi bi-currency-dollar me-1"></i>Valor Comisión por Boleta (Gs.)</label>
+<div class="input-group">
+<span class="input-group-text">Gs.</span>
+<input type="number" name="comision_valor" class="form-control fw-bold" value="{{ comision_por_boleta }}" min="0" step="500">
+</div>
+</div>
+<div class="col-md-auto">
+<button type="submit" class="btn btn-primary"><i class="bi bi-calculator me-1"></i>Recalcular</button>
+</div>
+<div class="col-md">
+<div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Modifique el valor y presione <strong>Recalcular</strong> para actualizar las comisiones. Solo comisionan usuarios con rol <strong>Empleado</strong> o <strong>Ayudante</strong>.</div>
+</div>
+</form>
+</div>
+</div>
+{% endif %}
+
+<div class="alert alert-info mb-3" style="font-size:0.85rem">
+<i class="bi bi-info-circle me-2"></i>Comisiones calculadas para el mes de <strong>{{ mes_inicio|date:"F Y" }}</strong>.
+Tarifa aplicada: <strong>Gs. {{ comision_por_boleta|floatformat:0 }}</strong> por cada boleta de pasaje vendida.
+Solo comisionan roles: Empleado y Ayudante.
+{% if empresa_seleccionada %}<br><i class="bi bi-building me-1"></i>Filtrado por empresa: <strong>{{ empresa_seleccionada.nombre }}</strong>{% endif %}
+</div>
+
+<!-- KPIs -->
+<div class="row row-deck mb-4">
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body text-center"><div class="stat-icon bg-purple-lt text-purple mx-auto mb-2"><i class="bi bi-people"></i></div><div class="h1 mb-0">{{ comisiones|length }}</div><div class="text-muted">Vendedores</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body text-center"><div class="stat-icon bg-blue-lt text-blue mx-auto mb-2"><i class="bi bi-ticket-perforated"></i></div><div class="h1 mb-0">{{ total_boletas_mes }}</div><div class="text-muted">Boletas Vendidas</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body text-center"><div class="stat-icon bg-cyan-lt text-cyan mx-auto mb-2"><i class="bi bi-cash"></i></div><div class="h2 mb-0 text-green">Gs. {{ total_vendido_mes|floatformat:0 }}</div><div class="text-muted">Total Vendido</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card" style="background:linear-gradient(135deg,#ae3ec9,#d6336c)"><div class="card-body text-center"><div class="stat-icon bg-white text-purple mx-auto mb-2"><i class="bi bi-percent"></i></div><div class="h2 mb-0 text-white">Gs. {{ total_comisiones|floatformat:0 }}</div><div class="text-muted text-white-50">Total Comisiones</div></div></div></div>
+</div>
+
+<!-- Gráfico horizontal de barras (escala para muchos vendedores) -->
+<div class="card mb-4">
+<div class="card-header"><h3 class="card-title"><i class="bi bi-bar-chart-horizontal me-2"></i>Comisiones por Vendedor</h3></div>
+<div class="card-body">
+<div id="chartComWrapper" style="position:relative;width:100%">
+<canvas id="chartCom"></canvas>
+</div>
+</div>
+</div>
+
+<!-- Tabla detallada con scroll -->
+<div class="card mb-4">
+<div class="card-header d-flex justify-content-between align-items-center">
+<h3 class="card-title mb-0"><i class="bi bi-table me-2"></i>Detalle de Comisiones por Vendedor</h3>
+<span class="badge bg-purple-lt">{{ comisiones|length }} vendedores</span>
+</div>
+<div class="table-responsive" style="max-height:500px;overflow-y:auto">
+<table class="table table-vcenter card-table table-striped table-hover">
+<thead class="sticky-top bg-white" style="z-index:1">
+<tr>
+<th style="width:40px">#</th>
+<th>Vendedor</th>
+<th>Usuario</th>
+<th class="text-center">Boletas</th>
+<th class="text-end">Total Vendido</th>
+<th class="text-end">Comisión (Gs.)</th>
+<th style="width:180px">Participación</th>
+</tr>
+</thead>
+<tbody>
+{% for c in comisiones %}
+<tr>
+<td class="text-muted">{{ forloop.counter }}</td>
+<td><strong>{{ c.usuario }}</strong></td>
+<td><span class="text-muted">@{{ c.username }}</span></td>
+<td class="text-center"><span class="badge bg-blue-lt">{{ c.boletas }}</span></td>
+<td class="text-end">Gs. {{ c.total_vendido|floatformat:0 }}</td>
+<td class="text-end fw-bold text-green">Gs. {{ c.comision|floatformat:0 }}</td>
+<td>
+{% if total_boletas_mes > 0 %}
+{% widthratio c.boletas total_boletas_mes 100 as pct %}
+<div class="d-flex align-items-center gap-2">
+<div class="progress flex-grow-1" style="height:8px">
+<div class="progress-bar bg-purple" style="width:{% widthratio c.boletas total_boletas_mes 100 %}%"></div>
+</div>
+<small class="text-muted" style="min-width:35px">{% widthratio c.boletas total_boletas_mes 100 %}%</small>
+</div>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-inbox display-6 d-block mb-2"></i>No hay comisiones para este mes</td></tr>
+{% endfor %}
+</tbody>
+{% if comisiones %}
+<tfoot class="table-light sticky-bottom">
+<tr class="fw-bold">
+<th></th>
+<th>TOTAL</th>
+<th></th>
+<th class="text-center">{{ total_boletas_mes }}</th>
+<th class="text-end">Gs. {{ total_vendido_mes|floatformat:0 }}</th>
+<th class="text-end h5 text-green mb-0">Gs. {{ total_comisiones|floatformat:0 }}</th>
+<th></th>
+</tr>
+</tfoot>
+{% endif %}
+</table>
+</div>
+</div>
+
+<script>
+(function initComChart(){
+  if(typeof Chart==='undefined'){setTimeout(initComChart,100);return;}
+  var ctx=document.getElementById('chartCom');
+  if(!ctx)return;
+  var labels={{ chart_com_labels|safe }};
+  var comData={{ chart_com_data|safe }};
+  var bolData={{ chart_com_boletas|safe }};
+  if(!labels||labels.length===0)return;
+
+  // Altura dinámica: 50px por vendedor, mínimo 250px
+  var chartH=Math.max(250, labels.length*50);
+  document.getElementById('chartComWrapper').style.height=chartH+'px';
+
+  // Colores individuales
+  var palette=['#ae3ec9','#206bc4','#0ca678','#f76707','#d6336c','#f59f00','#4dabf7','#2fb344','#e64980','#7950f2','#15aabf','#fab005'];
+  var bgColors=labels.map(function(_,i){return palette[i%palette.length];});
+  var bgColorsLight=bgColors.map(function(c){return c+'33';});
+
+  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:labels,
+      datasets:[
+        {
+          label:'Comisión (Gs.)',
+          data:comData,
+          backgroundColor:bgColors.map(function(c){return c+'cc';}),
+          borderColor:bgColors,
+          borderWidth:2,
+          borderRadius:6,
+          borderSkipped:false
+        },
+        {
+          label:'Boletas Vendidas',
+          data:bolData,
+          backgroundColor:bgColorsLight,
+          borderColor:bgColors,
+          borderWidth:1,
+          borderRadius:6,
+          borderDash:[4,4],
+          borderSkipped:false
+        }
+      ]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top',labels:{usePointStyle:true,padding:15}},
+        tooltip:{
+          callbacks:{
+            label:function(c){
+              if(c.datasetIndex===0)return ' Comisión: Gs. '+c.raw.toLocaleString();
+              return ' Boletas: '+c.raw;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          beginAtZero:true,
+          position:'top',
+          grid:{color:'rgba(0,0,0,0.04)'},
+          ticks:{callback:function(v){return 'Gs. '+v.toLocaleString();}}
+        },
+        y:{
+          grid:{display:false},
+          ticks:{font:{size:13,weight:'bold'}}
+        }
+      }
+    }
+  });
+})();
+</script>

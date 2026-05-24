@@ -18,6 +18,16 @@
                         <div class="col-md-12">
                             <label class="form-label">Viaje *</label>
                             {{ encomienda_form.viaje }}
+                            <script>
+                                window.viajesEmpresas = {
+                                    {% for v in encomienda_form.viaje.queryset %}
+                                        "{{ v.id }}": {
+                                            "empresa": "{{ v.empresa_id|default:'' }}",
+                                            "bus_empresa": "{{ v.bus.empresa_id|default:'' }}"
+                                        },
+                                    {% endfor %}
+                                };
+                            </script>
                         </div>
                         
                         <div class="col-md-6">

@@ -19,10 +19,12 @@
         transition: all 0.3s ease;
         overflow: hidden;
         margin-bottom: 1rem;
+        cursor: pointer;
     }
-    .viaje-card-public:hover {
+    .viaje-card-public:hover, .viaje-card-public.active {
         transform: translateY(-4px);
         box-shadow: 0 12px 30px rgba(32, 107, 196, 0.15);
+        border: 2px solid var(--tblr-primary) !important;
     }
     .eta-badge {
         background: #f1f5f9;
@@ -49,8 +51,20 @@
         box-shadow: 0 0 20px rgba(32, 107, 196, 0.5);
         border: 3px solid white;
         position: relative;
+        animation: pulse-public 2s infinite;
     }
     .bus-marker-inner i { color: white; font-size: 1.2rem; }
+    .bus-marker-inner.no-gps {
+        background: #6c757d;
+        box-shadow: 0 0 20px rgba(108,117,125,0.4);
+        animation: none;
+    }
+
+    @keyframes pulse-public {
+        0% { box-shadow: 0 0 0 0 rgba(32,107,196,0.4); }
+        70% { box-shadow: 0 0 0 15px rgba(32,107,196,0); }
+        100% { box-shadow: 0 0 0 0 rgba(32,107,196,0); }
+    }
     
     .bus-badge {
         position: absolute;
@@ -68,6 +82,9 @@
         justify-content: center;
         border: 2px solid white;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .bus-badge.sin-gps {
+        background: #d63939;
     }
 
     .popup-public-header {
@@ -105,6 +122,52 @@
         transition: background 0.2s;
     }
     .btn-reserve-map:hover { background: #248a35; color: white; }
+
+    .gps-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+    .gps-status-badge.on {
+        background: rgba(47, 179, 68, 0.15);
+        color: #2fb344;
+    }
+    .gps-status-badge.off {
+        background: rgba(214, 57, 57, 0.15);
+        color: #d63939;
+    }
+    .gps-dot-mini {
+        width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+    }
+    .gps-dot-mini.on { background: #2fb344; animation: blink 1.5s infinite; }
+    .gps-dot-mini.off { background: #d63939; }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    .stat-pulse {
+        display: inline-block;
+        width: 8px; height: 8px; border-radius: 50%; background: #2fb344;
+        animation: blink 1.5s infinite;
+    }
+
+    .parada-dot {
+        width: 12px; height: 12px;
+        background: #e74c3c;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .no-viajes-msg {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
 </style>
 {% endblock %}
 
@@ -117,7 +180,7 @@
         </div>
         <div class="col-md-4 text-md-end">
             <span class="badge bg-green-lt p-2 px-3">
-                <span class="stat-pulse me-2"></span> Actualizando cada 30 seg
+                <span class="stat-pulse me-2"></span> Actualizando cada 10 seg
             </span>
         </div>
     </div>
@@ -131,39 +194,10 @@
         <!-- Lista de Viajes Activos -->
         <div class="col-lg-4">
             <div id="lista-viajes-publicos" style="max-height: calc(100vh - 220px); overflow-y: auto;">
-                {% for viaje in viajes_en_curso %}
-                <div class="card viaje-card-public" id="card-viaje-{{ viaje.pk }}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <h3 class="h4 mb-0 fw-bold">{{ viaje.itinerario.nombre }}</h3>
-                                <div class="text-muted small">{{ viaje.empresa.nombre }}</div>
-                            </div>
-                            <span class="badge bg-blue-lt">En Camino</span>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <div class="text-muted small mb-1"><i class="bi bi-geo-alt me-1"></i>Próxima Parada:</div>
-                            <div class="fw-bold" id="next-stop-{{ viaje.pk }}">Cargando...</div>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="eta-badge" id="eta-{{ viaje.pk }}">
-                                <i class="bi bi-clock"></i> <span>-- min</span>
-                            </div>
-                            <div id="reserve-btn-container-{{ viaje.pk }}">
-                                <!-- Botón condicional -->
-                            </div>
-                        </div>
-                    </div>
+                <div class="text-center text-muted py-5" id="lista-loading">
+                    <i class="bi bi-arrow-repeat" style="font-size: 2rem; opacity: 0.3; animation: spin 1s linear infinite;"></i>
+                    <p class="mt-2 mb-0">Cargando viajes...</p>
                 </div>
-                {% empty %}
-                <div class="card p-5 text-center text-muted">
-                    <i class="bi bi-bus-front fs-1 opacity-25"></i>
-                    <p class="mt-3">No hay viajes en ruta en este momento.</p>
-                    <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-primary btn-sm">Ver programación</a>
-                </div>
-                {% endfor %}
             </div>
         </div>
     </div>
@@ -173,6 +207,9 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function() {
+    const REFRESH_INTERVAL = 10000; // 10 segundos
+
     const map = L.map('mapa-publico', {
         zoomControl: true,
         attributionControl: false
@@ -181,20 +218,90 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
     let markers = {};
+    let paradaMarkers = {};
+    let rutaLines = {};
+    let firstLoad = true;
+
+    const isStaff = "{{ request.user.is_superuser|yesno:'true,false' }}" === 'true' || 
+                    "{{ request.user.persona.es_empleado|yesno:'true,false' }}" === 'true' ||
+                    "{{ request.user.persona.es_agente|yesno:'true,false' }}" === 'true' ||
+                    "{{ request.user.persona.es_ayudante|yesno:'true,false' }}" === 'true';
+
+    const viajeIdFocus = "{{ viaje_id_focus|default:'' }}";
+    let hasFocused = false;
+
+    function crearIconoBus(tieneGps, asientosLibres) {
+        const extraClass = tieneGps ? '' : ' no-gps';
+        const badgeClass = tieneGps ? '' : ' sin-gps';
+        const badgeTitle = tieneGps ? 'Asientos disponibles' : 'Sin señal GPS';
+        return L.divIcon({
+            className: 'bus-marker-public',
+            html: `
+                <div class="bus-marker-inner${extraClass}">
+                    <i class="bi bi-bus-front-fill"></i>
+                    <div class="bus-badge${badgeClass}" title="${badgeTitle}">${asientosLibres}</div>
+                </div>`,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22],
+            popupAnchor: [0, -22]
+        });
+    }
+
+    function crearIconoParada() {
+        return L.divIcon({
+            className: 'bus-marker-public',
+            html: '<div class="parada-dot"></div>',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+        });
+    }
+
+    // Obtener coordenadas del bus (GPS real o primera parada como fallback)
+    function obtenerCoordenadas(v) {
+        if (v.ubicacion && v.ubicacion.lat && v.ubicacion.lng) {
+            return { lat: v.ubicacion.lat, lng: v.ubicacion.lng, esGps: true };
+        }
+        // Fallback: primera parada con coordenadas
+        if (v.paradas && v.paradas.length > 0) {
+            for (let p of v.paradas) {
+                if (p.lat && p.lng) {
+                    return { lat: p.lat, lng: p.lng, esGps: false };
+                }
+            }
+        }
+        return null;
+    }
 
     function getPopupContent(v) {
+        const tieneGps = v.ubicacion != null;
         let etaHtml = v.eta ? `<div class="mt-2 fw-bold text-primary"><i class="bi bi-hourglass-split me-1"></i>Llegada estimada: ${v.eta} min</div>` : '';
-        let reserveBtn = v.asientos_libres > 0 ? `<a href="/operations/reservar/${v.id}/" class="btn-reserve-map">Reservar Asiento</a>` : '<div class="alert alert-warning py-1 mt-2 mb-0 small text-center">Bus Lleno</div>';
+        let url = isStaff ? `/operations/viajes/${v.id}/vender-pasaje/` : `/operations/reservar/${v.id}/`;
+        let btnText = isStaff ? 'Vender Asiento' : 'Reservar Asiento';
+        let reserveBtn = v.asientos_libres > 0 ? `<a href="${url}" class="btn-reserve-map">${btnText}</a>` : '<div class="alert alert-warning py-1 mt-2 mb-0 small text-center">Bus Lleno</div>';
         
+        const gpsBadge = tieneGps
+            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
+            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Ubicación estimada</span>';
+
+        const velocidadHtml = tieneGps && v.ubicacion.velocidad
+            ? `<div class="small mb-1"><i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
+            : '';
+
         return `
             <div style="min-width: 250px;">
                 <div class="popup-public-header">
-                    <div class="fw-bold">${v.itinerario}</div>
-                    <small>${v.empresa}</small>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-bold">${v.itinerario}</div>
+                            <small>${v.empresa}</small>
+                        </div>
+                        ${gpsBadge}
+                    </div>
                 </div>
                 <div class="p-1">
                     <div class="small mb-1"><i class="bi bi-clock me-1"></i>Salida: ${v.hora_salida} hs</div>
                     <div class="small mb-1"><i class="bi bi-geo-alt me-1"></i>Próxima: ${v.proxima_parada || 'Confirmando...'}</div>
+                    ${velocidadHtml}
                     
                     <div class="popup-stats">
                         <div class="stat-item text-success">
@@ -212,74 +319,211 @@
                     </div>
 
                     ${etaHtml}
+                    ${!tieneGps ? '<div class="small text-warning text-center mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Posición aproximada</div>' : ''}
                     ${reserveBtn}
                 </div>
             </div>`;
+    }
+
+    // Generar card HTML del panel lateral
+    function crearCardViaje(v) {
+        const tieneGps = v.ubicacion != null;
+        const gpsBadge = tieneGps
+            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
+            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Estimado</span>';
+
+        let url = isStaff ? `/operations/viajes/${v.id}/vender-pasaje/` : `/operations/reservar/${v.id}/`;
+        let btnText = isStaff ? 'Vender' : 'Reservar';
+
+        const reserveHtml = v.asientos_libres > 0
+            ? `<a href="${url}" class="btn btn-success btn-sm rounded-pill">${btnText}</a>`
+            : `<span class="badge bg-secondary-lt">Completo</span>`;
+
+        return `
+        <div class="card viaje-card-public" id="card-viaje-${v.id}" onclick="centrarViaje(${v.id})">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h3 class="h4 mb-0 fw-bold">${v.itinerario}</h3>
+                        <div class="text-muted small">${v.empresa}</div>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-1">
+                        <span class="badge bg-blue-lt">En Camino</span>
+                        ${gpsBadge}
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="text-muted small mb-1"><i class="bi bi-geo-alt me-1"></i>Próxima Parada:</div>
+                    <div class="fw-bold">${v.proxima_parada || 'En trayecto'}</div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="eta-badge" ${!v.eta ? 'style="display:none;"' : ''}>
+                        <i class="bi bi-clock"></i> <span>${v.eta ? v.eta + ' min' : '--'}</span>
+                    </div>
+                    <div>${reserveHtml}</div>
+                </div>
+
+                ${tieneGps && v.ubicacion.velocidad ? `
+                <div class="mt-2 pt-2 border-top">
+                    <span class="text-muted" style="font-size: 0.7rem;">
+                        <i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h
+                    </span>
+                </div>` : ''}
+            </div>
+        </div>`;
     }
 
     function actualizar() {
         fetch("{% url 'operations:api_viajes_publico' %}")
             .then(r => r.json())
             .then(data => {
-                data.viajes.forEach(v => {
-                    // Actualizar UI lateral
-                    const nextStop = document.getElementById(`next-stop-${v.id}`);
-                    if (nextStop) nextStop.textContent = v.proxima_parada || 'En trayecto';
-                    
-                    const etaBox = document.getElementById(`eta-${v.id}`);
-                    if (etaBox) {
-                        etaBox.querySelector('span').textContent = v.eta ? `${v.eta} min` : '--';
-                        etaBox.style.display = v.eta ? 'inline-flex' : 'none';
-                    }
+                // Actualizar lista lateral dinámicamente
+                const listaEl = document.getElementById('lista-viajes-publicos');
+                if (data.viajes.length === 0) {
+                    listaEl.innerHTML = `
+                        <div class="card p-5 text-center text-muted no-viajes-msg">
+                            <i class="bi bi-bus-front fs-1 opacity-25"></i>
+                            <p class="mt-3">No hay viajes en ruta en este momento.</p>
+                            <a href="{% url 'operations:buscar_viajes' %}" class="btn btn-primary btn-sm">Ver programación</a>
+                        </div>`;
+                } else {
+                    const activeCard = document.querySelector('.viaje-card-public.active');
+                    const activeId = activeCard ? activeCard.id : null;
 
-                    const rbContainer = document.getElementById(`reserve-btn-container-${v.id}`);
-                    if (rbContainer) {
-                        rbContainer.innerHTML = v.asientos_libres > 0 
-                            ? `<a href="/operations/reservar/${v.id}/" class="btn btn-success btn-sm rounded-pill">Reservar</a>`
-                            : `<span class="badge bg-secondary-lt">Completo</span>`;
-                    }
+                    listaEl.innerHTML = data.viajes.map(v => crearCardViaje(v)).join('');
 
-                    if (v.ubicacion) {
-                        const latlng = [v.ubicacion.lat, v.ubicacion.lng];
-                        if (markers[v.id]) {
-                            markers[v.id].setLatLng(latlng).setPopupContent(getPopupContent(v));
-                            // Actualizar el número en el icono (badge)
-                            markers[v.id].setIcon(L.divIcon({
-                                className: 'bus-marker-public',
-                                html: `
-                                    <div class="bus-marker-inner">
-                                        <i class="bi bi-bus-front-fill"></i>
-                                        <div class="bus-badge" title="Asientos disponibles">${v.asientos_libres}</div>
-                                    </div>`,
-                                iconSize: [44, 44],
-                                iconAnchor: [22, 22],
-                                popupAnchor: [0, -22]
-                            }));
-                        } else {
-                            const marker = L.marker(latlng, {
-                                icon: L.divIcon({
-                                    className: 'bus-marker-public',
-                                    html: `
-                                        <div class="bus-marker-inner">
-                                            <i class="bi bi-bus-front-fill"></i>
-                                            <div class="bus-badge" title="Asientos disponibles">${v.asientos_libres}</div>
-                                        </div>`,
-                                    iconSize: [44, 44],
-                                    iconAnchor: [22, 22],
-                                    popupAnchor: [0, -22]
-                                })
-                            }).addTo(map).bindPopup(getPopupContent(v));
-                            markers[v.id] = marker;
-                            
-                            // Si es el primero, centrar
-                            if (Object.keys(markers).length === 1) map.setView(latlng, 12);
-                        }
+                    // Restaurar selección
+                    if (activeId) {
+                        const card = document.getElementById(activeId);
+                        if (card) card.classList.add('active');
+                    }
+                }
+
+                // Limpiar marcadores de viajes que ya no existen
+                Object.keys(markers).forEach(id => {
+                    if (!data.viajes.find(v => v.id == id)) {
+                        map.removeLayer(markers[id]);
+                        delete markers[id];
                     }
                 });
-            });
+                Object.keys(paradaMarkers).forEach(key => {
+                    const viajeId = key.split('-')[0];
+                    if (!data.viajes.find(v => v.id == viajeId)) {
+                        map.removeLayer(paradaMarkers[key]);
+                        delete paradaMarkers[key];
+                    }
+                });
+                Object.keys(rutaLines).forEach(id => {
+                    if (!data.viajes.find(v => v.id == id)) {
+                        map.removeLayer(rutaLines[id]);
+                        delete rutaLines[id];
+                    }
+                });
+
+                data.viajes.forEach((v, index) => {
+                    const coords = obtenerCoordenadas(v);
+                    const tieneGps = v.ubicacion != null;
+
+                    if (coords) {
+                        const latlng = [coords.lat, coords.lng];
+
+                        if (markers[v.id]) {
+                            // Mover marcador existente
+                            const old = markers[v.id].getLatLng();
+                            if (old.lat !== latlng[0] || old.lng !== latlng[1]) {
+                                markers[v.id].setLatLng(latlng);
+                            }
+                            markers[v.id].setIcon(crearIconoBus(tieneGps, v.asientos_libres));
+                            markers[v.id].setPopupContent(getPopupContent(v));
+                        } else {
+                            const marker = L.marker(latlng, {
+                                icon: crearIconoBus(tieneGps, v.asientos_libres),
+                                zIndexOffset: 1000,
+                            }).addTo(map).bindPopup(getPopupContent(v));
+                            markers[v.id] = marker;
+
+                            // Lógica de focus
+                            if (viajeIdFocus && v.id == viajeIdFocus && !hasFocused) {
+                                map.setView(latlng, 14);
+                                marker.openPopup();
+                                hasFocused = true;
+                                const card = document.getElementById(`card-viaje-${v.id}`);
+                                if (card) {
+                                    card.classList.add('active');
+                                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            } else if (firstLoad && index === 0 && !hasFocused) {
+                                // Auto-zoom al primer viaje
+                                const bounds = L.latLngBounds([latlng]);
+                                v.paradas.forEach(p => {
+                                    if (p.lat && p.lng) bounds.extend([p.lat, p.lng]);
+                                });
+                                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+                                hasFocused = true;
+                            }
+                        }
+                    }
+
+                    // Agregar paradas (siempre, independiente del GPS)
+                    const paradasConCoords = [];
+                    if (v.paradas) {
+                        v.paradas.forEach(p => {
+                            if (p.lat && p.lng) {
+                                paradasConCoords.push([p.lat, p.lng]);
+                                const key = `${v.id}-${p.orden}`;
+                                if (!paradaMarkers[key]) {
+                                    const pm = L.marker([p.lat, p.lng], {
+                                        icon: crearIconoParada(),
+                                    }).addTo(map).bindTooltip(p.nombre, {
+                                        permanent: false,
+                                        direction: 'top',
+                                        offset: [0, -8],
+                                    });
+                                    paradaMarkers[key] = pm;
+                                }
+                            }
+                        });
+                    }
+
+                    // Dibujar línea de ruta
+                    if (paradasConCoords.length >= 2) {
+                        if (rutaLines[v.id]) {
+                            rutaLines[v.id].setLatLngs(paradasConCoords);
+                        } else {
+                            rutaLines[v.id] = L.polyline(paradasConCoords, {
+                                color: tieneGps ? '#206bc4' : '#94a3b8',
+                                weight: 3,
+                                opacity: 0.5,
+                                dashArray: '8, 6',
+                            }).addTo(map);
+                        }
+                        rutaLines[v.id].setStyle({
+                            color: tieneGps ? '#206bc4' : '#94a3b8',
+                        });
+                    }
+                });
+
+                firstLoad = false;
+            })
+            .catch(err => console.error('Error al actualizar:', err));
     }
 
+    // Centrar mapa en un viaje
+    window.centrarViaje = function(viajeId) {
+        if (markers[viajeId]) {
+            map.setView(markers[viajeId].getLatLng(), 13, { animate: true });
+            markers[viajeId].openPopup();
+        }
+        document.querySelectorAll('.viaje-card-public').forEach(c => c.classList.remove('active'));
+        const card = document.getElementById(`card-viaje-${viajeId}`);
+        if (card) card.classList.add('active');
+    };
+
+    // Actualizar cada 10 segundos
     actualizar();
-    setInterval(actualizar, 30000);
+    setInterval(actualizar, REFRESH_INTERVAL);
+})();
 </script>
 {% endblock %}

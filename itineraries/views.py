@@ -2,7 +2,8 @@
 Views for itineraries app.
 """
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from base.mixins import AdminOnlyMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
@@ -19,7 +20,7 @@ from .forms import ItinerarioForm, DetalleItinerarioForm, PrecioForm, HorarioFor
 # ITINERARIO VIEWS
 # =============================================================================
 
-class ItinerarioListView(LoginRequiredMixin, ListView):
+class ItinerarioListView(AdminOnlyMixin, ListView):
     """Lista de itinerarios."""
     model = Itinerario
     template_name = 'itineraries/itinerario_list.html'
@@ -68,7 +69,7 @@ class ItinerarioListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ItinerarioDetailView(LoginRequiredMixin, DetailView):
+class ItinerarioDetailView(AdminOnlyMixin, DetailView):
     """Detalle de un itinerario."""
     model = Itinerario
     template_name = 'itineraries/itinerario_detail.html'
@@ -88,7 +89,7 @@ class ItinerarioDetailView(LoginRequiredMixin, DetailView):
 
 
 
-class ItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class ItinerarioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear un nuevo itinerario."""
     model = Itinerario
     form_class = ItinerarioForm
@@ -114,26 +115,12 @@ class ItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         
         # Crear paradas iniciales si se proporcionaron en el formulario
         parada_origen = form.cleaned_data.get('parada_origen')
-        parada_destino = form.cleaned_data.get('parada_destino')
         
         if parada_origen:
             DetalleItinerario.objects.get_or_create(
                 itinerario=self.object,
                 parada=parada_origen,
                 defaults={'orden': 1, 'minutos_desde_origen': 0}
-            )
-        
-        if parada_destino:
-            # Si hay origen, el destino es orden 2, si no, es orden 1
-            orden = 2 if parada_origen else 1
-            DetalleItinerario.objects.get_or_create(
-                itinerario=self.object,
-                parada=parada_destino,
-                defaults={
-                    'orden': orden, 
-                    'minutos_desde_origen': int(self.object.duracion_estimada_hs * 60) if self.object.duracion_estimada_hs else 0,
-                    'distancia_desde_origen_km': self.object.distancia_total_km
-                }
             )
 
         if self.request.headers.get('HX-Request'):
@@ -152,7 +139,7 @@ class ItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         return super().form_valid(form)
 
 
-class ItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class ItinerarioUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar un itinerario."""
     model = Itinerario
     form_class = ItinerarioForm
@@ -191,7 +178,7 @@ class ItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return super().form_valid(form)
 
 
-class ItinerarioDeleteView(LoginRequiredMixin, DeleteView):
+class ItinerarioDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar un itinerario."""
     model = Itinerario
     template_name = 'itineraries/itinerario_confirm_delete.html'
@@ -217,7 +204,7 @@ class ItinerarioDeleteView(LoginRequiredMixin, DeleteView):
 # DETALLE ITINERARIO VIEWS
 # =============================================================================
 
-class DetalleItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class DetalleItinerarioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Agregar una parada a un itinerario."""
     model = DetalleItinerario
     form_class = DetalleItinerarioForm
@@ -262,7 +249,7 @@ class DetalleItinerarioCreateView(LoginRequiredMixin, SuccessMessageMixin, Creat
         return context
 
 
-class DetalleItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class DetalleItinerarioUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar una parada de un itinerario."""
     model = DetalleItinerario
     form_class = DetalleItinerarioForm
@@ -302,7 +289,7 @@ class DetalleItinerarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, Updat
         return context
 
 
-class DetalleItinerarioDeleteView(LoginRequiredMixin, DeleteView):
+class DetalleItinerarioDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar una parada de un itinerario."""
     model = DetalleItinerario
     template_name = 'itineraries/detalle_confirm_delete.html'
@@ -329,7 +316,7 @@ class DetalleItinerarioDeleteView(LoginRequiredMixin, DeleteView):
 # PRECIO VIEWS
 # =============================================================================
 
-class PrecioListView(LoginRequiredMixin, ListView):
+class PrecioListView(AdminOnlyMixin, ListView):
     """Lista de precios."""
     model = Precio
     template_name = 'itineraries/precio_list.html'
@@ -340,7 +327,7 @@ class PrecioListView(LoginRequiredMixin, ListView):
         return super().get_queryset().select_related('origen', 'destino')
 
 
-class PrecioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class PrecioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Crear un nuevo precio."""
     model = Precio
     form_class = PrecioForm
@@ -349,7 +336,7 @@ class PrecioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     success_message = "Precio creado exitosamente."
 
 
-class PrecioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class PrecioUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar un precio."""
     model = Precio
     form_class = PrecioForm
@@ -358,7 +345,7 @@ class PrecioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     success_message = "Precio actualizado exitosamente."
 
 
-class PrecioDeleteView(LoginRequiredMixin, DeleteView):
+class PrecioDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar un precio."""
     model = Precio
     template_name = 'itineraries/precio_confirm_delete.html'
@@ -383,7 +370,7 @@ class PrecioDeleteView(LoginRequiredMixin, DeleteView):
 # HORARIO VIEWS
 # =============================================================================
 
-class HorarioListView(LoginRequiredMixin, ListView):
+class HorarioListView(AdminOnlyMixin, ListView):
     """Lista de todos los horarios agrupados/filtrables por itinerario."""
     model = Horario
     template_name = 'itineraries/horario_list.html'
@@ -407,7 +394,7 @@ class HorarioListView(LoginRequiredMixin, ListView):
         context['estado_filter'] = self.request.GET.get('estado', '')
         return context
 
-class HorarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class HorarioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
     """Agregar un horario a un itinerario."""
     model = Horario
     form_class = HorarioForm
@@ -418,7 +405,7 @@ class HorarioCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         return reverse('itineraries:horario_list')
 
 
-class HorarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class HorarioUpdateView(AdminOnlyMixin, SuccessMessageMixin, UpdateView):
     """Editar un horario existente."""
     model = Horario
     form_class = HorarioForm
@@ -429,7 +416,7 @@ class HorarioUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return reverse('itineraries:horario_list')
 
 
-class HorarioDeleteView(LoginRequiredMixin, DeleteView):
+class HorarioDeleteView(AdminOnlyMixin, DeleteView):
     """Eliminar un horario de un itinerario."""
     model = Horario
     template_name = 'itineraries/horario_confirm_delete.html'
@@ -452,7 +439,7 @@ class HorarioDeleteView(LoginRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-class HorarioCreateAjaxView(LoginRequiredMixin, CreateView):
+class HorarioCreateAjaxView(AdminOnlyMixin, CreateView):
     """Crear un nuevo horario vía AJAX."""
     model = Horario
     form_class = HorarioForm

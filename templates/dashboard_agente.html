@@ -1,0 +1,290 @@
+{% extends 'layouts/base_tabler.html' %}
+{% block title %}Dashboard Agente - TR4CKING{% endblock %}
+
+{% block title_content %}Dashboard Comercial{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row row-deck row-cards mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-primary text-white avatar">
+                            <i class="bi bi-receipt"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.facturas_hoy|default:0 }} Facturas
+                        </div>
+                        <div class="text-muted">
+                            Emitidas hoy
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar">
+                            <i class="bi bi-ticket-perforated"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.pasajes_hoy|default:0 }} Pasajes
+                        </div>
+                        <div class="text-muted">
+                            Vendidos hoy
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-yellow text-white avatar">
+                            <i class="bi bi-box-seam"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            {{ stats.encomiendas_hoy|default:0 }} Encomiendas
+                        </div>
+                        <div class="text-muted">
+                            Recibidas hoy
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        {% if stats.caja_abierta %}
+                        <span class="bg-green text-white avatar">
+                            <i class="bi bi-unlock"></i>
+                        </span>
+                        {% else %}
+                        <span class="bg-red text-white avatar">
+                            <i class="bi bi-lock"></i>
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">
+                            Estado de Caja
+                        </div>
+                        <div class="text-muted">
+                            {% if stats.caja_abierta %}Abierta{% else %}Cerrada{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row row-deck row-cards mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Acciones Rápidas</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <a href="{% url 'operations:pasaje_list' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-ticket d-block p-2 fs-2"></i>
+                            Vender Pasaje
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <a href="{% url 'operations:encomienda_create_direct' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-box d-block p-2 fs-2"></i>
+                            Recibir Encomienda
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <a href="{% url 'operations:factura_create' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-receipt-cutoff d-block p-2 fs-2"></i>
+                            Emitir Factura
+                        </a>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <a href="{% url 'operations:caja_dashboard' %}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="bi bi-cash-stack d-block p-2 fs-2"></i>
+                            Ver mi Caja
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row row-deck row-cards">
+    <!-- Viajes de Hoy -->
+    <div class="col-lg-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-bus-front-fill me-2 text-primary"></i>Viajes Programados (Hoy)
+                </h3>
+            </div>
+            {% if viajes_hoy %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Horario</th>
+                            <th>Itinerario</th>
+                            <th>Empresa</th>
+                            <th>Bus</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for viaje in viajes_hoy %}
+                        <tr>
+                            <td><span class="text-muted fw-bold">{{ viaje.horario.hora_salida|time:"H:i" }}</span></td>
+                            <td>{{ viaje.itinerario.nombre }}</td>
+                            <td><span class="text-muted">{{ viaje.empresa.nombre }}</span></td>
+                            <td>{{ viaje.bus.placa }}</td>
+                            <td>
+                                <a href="{% url 'operations:pasaje_venta' viaje.id %}" class="btn btn-sm btn-primary">
+                                    Vender Pasaje
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-bus-front h1 text-muted"></i>
+                    <p class="empty-title mt-2">No hay viajes programados para hoy</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimas Facturas -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-receipt me-2 text-green"></i>Últimas Facturas Emitidas
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:factura_list' %}" class="btn btn-sm btn-outline-success">Ver Todas</a>
+                </div>
+            </div>
+            {% if ultimas_facturas %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Cliente</th>
+                            <th>Total</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for factura in ultimas_facturas %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'operations:factura_detail' factura.pk %}" class="text-reset fw-bold">{{ factura.numero_factura }}</a>
+                            </td>
+                            <td>{{ factura.cliente.nombre_completo }}</td>
+                            <td>Gs. {{ factura.total|floatformat:0 }}</td>
+                            <td>
+                                {% if factura.estado == 'pagada' %}
+                                <span class="badge bg-green text-green-fg">Pagada</span>
+                                {% elif factura.estado == 'pendiente' %}
+                                <span class="badge bg-yellow text-yellow-fg">Pendiente</span>
+                                {% else %}
+                                <span class="badge bg-red text-red-fg">Anulada</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-receipt h1 text-muted"></i>
+                    <p class="empty-title mt-2">No has emitido facturas recientemente</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimos Pasajes -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-ticket-perforated me-2 text-purple"></i>Últimos Pasajes Vendidos
+                </h3>
+                <div class="card-actions">
+                    <a href="{% url 'operations:pasaje_list' %}" class="btn btn-sm btn-outline-purple">Ver Todos</a>
+                </div>
+            </div>
+            {% if ultimos_pasajes %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>Pasajero</th>
+                            <th>Viaje</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pasaje in ultimos_pasajes %}
+                        <tr>
+                            <td>
+                                <a href="{{ pasaje.get_absolute_url }}" class="text-reset fw-bold">{{ pasaje.pasajero.nombre_completo }}</a>
+                            </td>
+                            <td>{{ pasaje.viaje.itinerario.nombre }}</td>
+                            <td>{{ pasaje.fecha_venta|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty py-3">
+                    <i class="bi bi-ticket-perforated h1 text-muted"></i>
+                    <p class="empty-title mt-2">No has vendido pasajes recientemente</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

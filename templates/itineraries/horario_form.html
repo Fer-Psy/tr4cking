@@ -2,27 +2,24 @@
 
 {% block title %}Nuevo Horario {% if itinerario %}- {{ itinerario.nombre }} {% endif %}- TR4CKING{% endblock %}
 
-{% block title_content %}
-    {% if object %}Editar{% else %}Nuevo{% endif %} Horario
-{% endblock %}
-
-{% block breadcrumb %}
-<li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a></li>
-{% if itinerario %}
-<li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}">{{ itinerario.nombre }}</a></li>
-{% else %}
-<li class="breadcrumb-item"><a href="{% url 'itineraries:horario_list' %}">Horarios</a></li>
-{% endif %}
-<li class="breadcrumb-item active" aria-current="page">{% if object %}Editar{% else %}Nuevo{% endif %} Horario</li>
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    <a href="{% url 'itineraries:horario_list' %}" class="text-secondary">Gestión de Horarios</a>
+                </div>
+                <h2 class="page-title">
+                    {% if object %}Editar Horario{% else %}Nuevo Horario{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="page-title mb-1">Agregar Horario de Salida</h1>
-        <p class="page-subtitle mb-0 text-muted">Registre un nuevo horario de salida disponible</p>
-    </div>
-</div>
 
 <div class="card">
     <div class="card-body">

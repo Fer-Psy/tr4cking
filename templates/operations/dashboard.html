@@ -2,7 +2,6 @@
 {% load static %}
 
 {% block title %}Centro de Operaciones - TR4CKING{% endblock %}
-{% block title_content %}Centro de Operaciones{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -65,36 +64,96 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<!-- Header con estado de caja -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-                <h1 class="h2 mb-1">Centro de Operaciones</h1>
-                <p class="text-muted mb-0">
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Operaciones
+                </div>
+                <h2 class="page-title">
+                    Centro de Operaciones
+                </h2>
+                <div class="text-muted small mt-1">
                     <i class="bi bi-calendar3 me-1"></i>
                     {{ "now"|date:"l, d F Y" }}
-                </p>
+                </div>
             </div>
-            <div class="d-flex gap-2">
-                {% if caja_abierta %}
-                <span class="badge bg-green-lt fs-6 py-2 px-3">
-                    <i class="bi bi-cash-stack me-1"></i>
-                    Caja Abierta: Gs. {{ total_caja|floatformat:0|default:0 }}
-                </span>
-                <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-box-arrow-right me-1"></i> Cerrar Caja
-                </a>
-                {% else %}
-                <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary">
-                    <i class="bi bi-unlock me-1"></i> Abrir Caja
-                </a>
-                {% endif %}
+            <!-- Page title actions -->
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list d-flex align-items-center gap-2">
+                    {% if caja_abierta %}
+                    <span class="badge bg-green-lt fs-6 py-2 px-3">
+                        <i class="bi bi-cash-stack me-1"></i>
+                        Caja Abierta: Gs. {{ total_caja|floatformat:0|default:0 }}
+                    </span>
+                    <a href="{% url 'operations:caja_cerrar' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-box-arrow-right me-1"></i> Cerrar Caja
+                    </a>
+                    {% else %}
+                    <a href="{% url 'operations:caja_abrir' %}" class="btn btn-primary">
+                        <i class="bi bi-unlock me-1"></i> Abrir Caja
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Notificación de Viajes Asignados (Solo para Ayudantes) -->
+{% if es_ayudante and mis_viajes_asignados %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-primary-lt overflow-hidden">
+            <div class="card-body p-0">
+                <div class="d-flex">
+                    <div class="bg-primary p-3 d-flex align-items-center justify-content-center" style="width: 60px;">
+                        <i class="bi bi-calendar-check text-white h2 mb-0"></i>
+                    </div>
+                    <div class="p-3 flex-fill">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="mb-0 text-primary">Mis Viajes Asignados</h3>
+                            <span class="badge bg-primary text-white">{{ mis_viajes_asignados|length }} viaje(s) pendiente(s)</span>
+                        </div>
+                        <div class="row g-3">
+                            {% for viaje in mis_viajes_asignados %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="bg-white p-3 rounded-3 shadow-sm border-start border-primary border-3 h-100 position-relative">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="badge bg-primary-lt">{{ viaje.fecha_viaje|date:"d/m/Y" }}</span>
+                                        <span class="fw-bold text-primary">{{ viaje.horario.hora_salida|time:"H:i" }} hs</span>
+                                    </div>
+                                    <h4 class="mb-1 text-truncate" title="{{ viaje.itinerario.nombre }}">{{ viaje.itinerario.nombre }}</h4>
+                                    <div class="small text-muted mb-2">
+                                        <span class="text-uppercase fw-bold text-azure">{{ viaje.empresa.nombre }}</span>
+                                    </div>
+                                    <div class="row g-2 small mb-3">
+                                        <div class="col-6">
+                                            <i class="bi bi-bus-front me-1 text-primary"></i> <strong>Bus:</strong> {{ viaje.bus.placa }}
+                                        </div>
+                                        <div class="col-6 text-end">
+                                            <i class="bi bi-person-badge me-1 text-primary"></i> <strong>Chof:</strong> {{ viaje.chofer.nombre|slice:":1" }}. {{ viaje.chofer.apellido }}
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'operations:viaje_detail' viaje.pk %}" class="btn btn-sm btn-primary w-100 stretched-link">
+                                        Ver Detalle <i class="bi bi-arrow-right ms-1"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- KPIs principales -->
 <div class="row row-deck row-cards mb-4">
@@ -191,9 +250,7 @@
                 <h3 class="card-title">
                     <i class="bi bi-bell-fill text-warning me-2"></i>
                     Alertas
-                    {% if incidencias_abiertas > 0 %}
-                    <span class="badge bg-red ms-2">{{ incidencias_abiertas }}</span>
-                    {% endif %}
+
                 </h3>
             </div>
             <div class="card-body">
@@ -226,13 +283,7 @@
                 </div>
                 {% endif %}
 
-                {% if incidencias_abiertas > 0 %}
-                <div class="mt-3">
-                    <a href="{% url 'operations:incidencia_list' %}" class="btn btn-outline-warning w-100">
-                        Ver Incidencias
-                    </a>
-                </div>
-                {% endif %}
+
             </div>
         </div>
     </div>
@@ -255,7 +306,7 @@
                         </a>
                     </div>
                     <div class="col-6 col-md-3">
-                        <a href="{% url 'operations:viaje_list' %}" class="quick-action-btn btn btn-outline-green w-100 h-100">
+                        <a href="{% url 'operations:pasaje_list' %}" class="quick-action-btn btn btn-outline-green w-100 h-100">
                             <i class="bi bi-ticket"></i>
                             <span>Vender Pasaje</span>
                         </a>
@@ -266,12 +317,7 @@
                             <span>Encomiendas</span>
                         </a>
                     </div>
-                    <div class="col-6 col-md-3">
-                        <a href="{% url 'operations:incidencia_create' %}" class="quick-action-btn btn btn-outline-danger w-100 h-100">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <span>Reportar</span>
-                        </a>
-                    </div>
+
                     <div class="col-6 col-md-3">
                         <a href="{% url 'operations:caja_dashboard' %}" class="quick-action-btn btn btn-outline-azure w-100 h-100">
                             <i class="bi bi-cash-stack"></i>
@@ -291,7 +337,7 @@
                         </a>
                     </div>
                     <div class="col-6 col-md-3">
-                        <a href="{% url 'operations:tracking_publico' %}" class="quick-action-btn btn btn-outline-secondary w-100 h-100" target="_blank">
+                        <a href="{% url 'operations:rastreo_mapa' %}" class="quick-action-btn btn btn-outline-secondary w-100 h-100" target="_blank">
                             <i class="bi bi-geo-alt"></i>
                             <span>Tracking</span>
                         </a>

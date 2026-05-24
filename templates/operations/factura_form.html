@@ -219,6 +219,15 @@ $(document).ready(function() {
     const totalEl = document.getElementById('total');
     const proximoNumeroDisplay = document.getElementById('proximo-numero-display');
     const timbradoSelect = document.getElementById('id_timbrado');
+    
+    // Elementos del Modal Nueva Encomienda
+    const btnNuevaEncomienda = document.getElementById('btn-nueva-encomienda');
+    const modalNuevaEncomienda = new bootstrap.Modal(document.getElementById('modalNuevaEncomienda'));
+    const formNuevaEncomienda = document.getElementById('form-nueva-encomienda-quick');
+    const btnSaveEncomienda = document.getElementById('btn-save-encomienda-quick');
+    const quickRemitenteId = document.getElementById('quick-remitente-id');
+    const quickTipo = document.querySelector('#form-nueva-encomienda-quick [name="tipo"]');
+    const quickPrecio = document.querySelector('#form-nueva-encomienda-quick [name="precio"]');
 
     // =========================================================================
     // BUSCADOR DE CLIENTE (SELECT2)
@@ -272,7 +281,7 @@ $(document).ready(function() {
             </div>
         `;
         
-        fetch(`/operations/api/items-pendientes/?cedula=${encodeURIComponent(cedulaLimpia)}`)
+        fetch(`/operations/api/items-pendientes/?cedula=${encodeURIComponent(cedulaLimpia)}&empresa={{ empresa_id|default:'' }}`)
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
@@ -393,18 +402,69 @@ $(document).ready(function() {
         totalEl.textContent = 'Gs. ' + total.toLocaleString('es-PY');
         btnGenerar.disabled = count === 0;
 
-        // Auto-selección de Timbrado
+        // Bloqueo y auto-selección de Timbrado según la empresa de los ítems
         if (empresasSeleccionadas.size === 1) {
             const empresaId = Array.from(empresasSeleccionadas)[0];
+            let timbradoValido = false;
+            
             Array.from(timbradoSelect.options).forEach(opt => {
+                if (!opt.value) return; // omitir placeholder
+                
                 if (opt.dataset.empresa === empresaId) {
-                    if (!timbradoSelect.value) {
+                    opt.disabled = false;
+                    // Autoseleccionar si no está seleccionado uno válido
+                    if (timbradoSelect.options[timbradoSelect.selectedIndex]?.dataset?.empresa !== empresaId && !timbradoValido) {
                         timbradoSelect.value = opt.value;
                         $(timbradoSelect).trigger('change');
                     }
+                    timbradoValido = true;
+                } else {
+                    opt.disabled = true; // Bloquea los timbrados de otras empresas
                 }
             });
+        } else {
+            // Habilitar todas las opciones si hay 0 o más de 1 empresa seleccionada
+            Array.from(timbradoSelect.options).forEach(opt => {
+                opt.disabled = false;
+            });
         }
+        
+        // Validar que no se mezclen ítems de distintas empresas
+        if (empresasSeleccionadas.size > 1) {
+            btnGenerar.disabled = true;
+            if (typeof toastr !== 'undefined') {
+                toastr.warning('No se pueden facturar ítems de distintas empresas en la misma factura.');
+            }
+        }
+    }
+
+    // ===== FILTRAR VIAJES POR EMPRESA DEL TIMBRADO =====
+    function filtrarViajesPorTimbrado() {
+        const selectedOption = timbradoSelect.options[timbradoSelect.selectedIndex];
+        const empresaId = selectedOption ? selectedOption.dataset.empresa : null;
+        const viajeSelect = document.getElementById('id_viaje');
+        
+        if (!viajeSelect || !window.viajesEmpresas) return;
+        
+        Array.from(viajeSelect.options).forEach(opt => {
+            if (!opt.value) return; // Skip placeholder
+            
+            const viajeData = window.viajesEmpresas[opt.value];
+            if (!viajeData) return;
+            
+            // Si la empresa del timbrado coincide con la empresa del bus o no hay timbrado, mostrar
+            // Esto asegura "solo los buses de esa empresa"
+            if (!empresaId || viajeData.bus_empresa === empresaId || (viajeData.empresa === empresaId && !viajeData.bus_empresa)) {
+                opt.style.display = '';
+                opt.disabled = false;
+            } else {
+                opt.style.display = 'none';
+                opt.disabled = true;
+                if (opt.selected) {
+                    viajeSelect.value = ''; // Deseleccionar si se oculta
+                }
+            }
+        });
     }
 
     // ===== TIMBRADO - SIGUIENTE NÚMERO =====
@@ -421,6 +481,7 @@ $(document).ready(function() {
         } else {
             proximoNumeroDisplay.textContent = '---';
         }
+        filtrarViajesPorTimbrado();
     });
 
     if (timbradoSelect.value) $(timbradoSelect).trigger('change');
@@ -429,6 +490,98 @@ $(document).ready(function() {
     {% if cliente_cedula %}
     seleccionarCliente('{{ cliente_cedula }}');
     {% endif %}
+
+    // =========================================================================
+    // MODAL NUEVA ENCOMIENDA
+    // =========================================================================
+    
+    // Auto-precio para encomiendas según tipo
+    if (quickTipo && quickPrecio) {
+        function actualizarPrecioQuick() {
+            if (quickTipo.value === 'sobre') {
+                quickPrecio.value = 25000;
+            } else if (quickTipo.value === 'mediano') {
+                quickPrecio.value = 30000;
+            } else if (quickTipo.value === 'grande') {
+                quickPrecio.value = 40000;
+            }
+        }
+        quickTipo.addEventListener('change', actualizarPrecioQuick);
+        document.getElementById('modalNuevaEncomienda').addEventListener('show.bs.modal', actualizarPrecioQuick);
+    }
+
+    if (btnNuevaEncomienda) {
+        btnNuevaEncomienda.addEventListener('click', function() {
+            const cedula = cedulaHidden.value;
+            if (!cedula) {
+                alert('Por favor, seleccione un cliente primero. (Este cliente será el remitente de la encomienda)');
+                return;
+            }
+            
+            // Asignar el remitente al form de la encomienda
+            if (quickRemitenteId) {
+                quickRemitenteId.value = cedula;
+            }
+            
+            modalNuevaEncomienda.show();
+        });
+    }
+
+    if (btnSaveEncomienda) {
+        btnSaveEncomienda.addEventListener('click', function() {
+            if (!formNuevaEncomienda.checkValidity()) {
+                formNuevaEncomienda.reportValidity();
+                return;
+            }
+            
+            const formData = new FormData(formNuevaEncomienda);
+            
+            btnSaveEncomienda.disabled = true;
+            btnSaveEncomienda.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Guardando...';
+
+            fetch('{% url "operations:api_crear_encomienda_quick" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ok || data.success) {
+                    modalNuevaEncomienda.hide();
+                    formNuevaEncomienda.reset();
+                    
+                    // Recargar ítems del cliente para mostrar la nueva encomienda
+                    seleccionarCliente(cedulaHidden.value);
+                    
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Encomienda agregada exitosamente.');
+                    }
+                } else {
+                    let errorMsg = 'Error al guardar la encomienda.';
+                    if (data.error) {
+                        errorMsg = data.error;
+                        if (data.details) {
+                            for (let field in data.details) {
+                                errorMsg += '\n- ' + field + ': ' + data.details[field];
+                            }
+                        }
+                    }
+                    else if (data.errors) errorMsg = JSON.stringify(data.errors);
+                    alert(errorMsg);
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error de conexión o servidor al crear la encomienda.');
+            })
+            .finally(() => {
+                btnSaveEncomienda.disabled = false;
+                btnSaveEncomienda.innerHTML = '<i class="bi bi-save me-2"></i> Guardar y Agregar a Factura';
+            });
+        });
+    }
 });
 </script>
 {% endblock %}

@@ -105,7 +105,13 @@
                             </tr>
                             <tr>
                                 <th>Vendedor:</th>
-                                <td>{{ pasaje.vendedor.get_full_name|default:pasaje.vendedor.username }}</td>
+                                <td>
+                                    {% if pasaje.vendedor and not pasaje.vendedor.persona.es_cliente %}
+                                        {{ pasaje.vendedor.get_full_name|default:pasaje.vendedor.username }}
+                                    {% elif not pasaje.vendedor %}
+                                        Sistema
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr>
                                 <th>Fecha Venta:</th>
@@ -141,7 +147,7 @@
                         </a>
                         {% endif %}
 
-                        {% if pasaje.estado in 'vendido,reservado' %}
+                        {% if pasaje.estado == 'reservado' %}
                         <a href="{% url 'operations:pasaje_cancelar' pasaje.pk %}" class="btn btn-danger">
                             <i class="bi bi-x-circle me-1"></i> Cancelar Pasaje
                         </a>

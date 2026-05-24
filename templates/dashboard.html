@@ -92,88 +92,50 @@
     </div>
 </div>
 
-<!-- Quick Actions & System Info -->
+<!-- Quick Actions -->
 <div class="row row-deck row-cards mb-4">
-    <div class="col-lg-8">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">Acciones Rápidas</h3>
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'users:persona_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-person-plus-fill d-block p-2 fs-2"></i>
                             Nueva Persona
                         </a>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'fleet:bus_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-bus-front d-block p-2 fs-2"></i>
                             Nuevo Bus
                         </a>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'fleet:empresa_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-building-add d-block p-2 fs-2"></i>
                             Nueva Empresa
                         </a>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-map d-block p-2 fs-2"></i>
                             Nuevo Itinerario
                         </a>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'fleet:parada_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-sign-stop d-block p-2 fs-2"></i>
                             Nueva Parada
                         </a>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-2">
                         <a href="{% url 'users:localidad_create' %}" class="btn btn-outline-primary w-100 py-3">
                             <i class="bi bi-geo-alt d-block p-2 fs-2"></i>
                             Nueva Localidad
                         </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Información del Sistema</h3>
-            </div>
-            <div class="card-body">
-                <div class="datagrid">
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">Versión</div>
-                        <div class="datagrid-content">1.0.0</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">Django</div>
-                        <div class="datagrid-content">6.0.1</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">Base de Datos</div>
-                        <div class="datagrid-content">PostgreSQL</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">Usuario Actual</div>
-                        <div class="datagrid-content">{{ user.username }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">Rol</div>
-                        <div class="datagrid-content">
-                            {% if user.is_superuser %}
-                            <span class="status status-azure">Admin</span>
-                            {% else %}
-                            <span class="status status-green">Usuario</span>
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
             </div>

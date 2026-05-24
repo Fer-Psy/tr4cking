@@ -2,41 +2,49 @@
 
 {% block title %}{{ itinerario.nombre }} - TR4CKING{% endblock %}
 
-{% block breadcrumb %}
-<span class="separator">/</span>
-<a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a>
-<span class="separator">/</span>
-<span class="current">{{ itinerario.nombre }}</span>
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    <a href="{% url 'itineraries:itinerario_list' %}" class="text-secondary">Itinerarios</a>
+                </div>
+                <h2 class="page-title">
+                    {{ itinerario.nombre }}
+                </h2>
+                <div class="text-muted small mt-1">
+                    {% if itinerario.ruta %}Ruta {{ itinerario.ruta }} - {% endif %}
+                    {{ itinerario.dias_operacion_texto }}
+                </div>
+            </div>
+            <!-- Page title actions -->
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'itineraries:detalle_create' itinerario.pk %}" class="btn btn-outline-primary">
+                        <i class="bi bi-plus-lg me-1"></i>
+                        Agregar Parada
+                    </a>
+                    <a href="{% url 'itineraries:horario_create' itinerario.pk %}" class="btn btn-outline-success">
+                        <i class="bi bi-clock me-1"></i>
+                        Agregar Horario
+                    </a>
+                    <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}" class="btn btn-secondary">
+                        <i class="bi bi-pencil me-1"></i>
+                        Editar
+                    </a>
+                    <a href="{% url 'itineraries:itinerario_delete' itinerario.pk %}" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i>
+                        Eliminar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-    <div>
-        <h1 class="page-title mb-1">{{ itinerario.nombre }}</h1>
-        <p class="page-subtitle mb-0">
-            {% if itinerario.ruta %}Ruta {{ itinerario.ruta }} - {% endif %}
-            {{ itinerario.dias_operacion_texto }}
-        </p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{% url 'itineraries:detalle_create' itinerario.pk %}" class="btn btn-outline-primary">
-            <i class="bi bi-plus-lg me-2"></i>
-            Agregar Parada
-        </a>
-        <a href="{% url 'itineraries:horario_create' itinerario.pk %}" class="btn btn-outline-success">
-            <i class="bi bi-clock me-2"></i>
-            Agregar Horario
-        </a>
-        <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}" class="btn btn-secondary">
-            <i class="bi bi-pencil me-2"></i>
-            Editar
-        </a>
-        <a href="{% url 'itineraries:itinerario_delete' itinerario.pk %}" class="btn btn-danger">
-            <i class="bi bi-trash me-2"></i>
-            Eliminar
-        </a>
-    </div>
-</div>
 
 <!-- Stats -->
 <div class="row g-4 mb-4">

@@ -86,11 +86,14 @@
                 {% endif %}
             </div>
             <div class="sidebar-user-info">
-                <div class="sidebar-user-name">
+                <div class="sidebar-user-name d-flex align-items-center">
                     {% if user.first_name %}
                     {{ user.first_name }} {{ user.last_name }}
                     {% else %}
                     {{ user.username }}
+                    {% endif %}
+                    {% if user.is_superuser %}
+                    <span class="badge bg-red text-red-fg ms-2" style="font-size: 0.7rem;">Administrador</span>
                     {% endif %}
                 </div>
                 <div class="sidebar-user-role">

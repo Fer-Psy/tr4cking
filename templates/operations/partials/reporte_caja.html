@@ -1,0 +1,33 @@
+{% load custom_filters %}
+<!-- CIERRES DE CAJA -->
+{% if sesiones_caja %}
+<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-cash-stack me-2"></i>Sesiones de Caja</h3></div>
+<div class="table-responsive"><table class="table table-vcenter card-table table-striped">
+<thead><tr><th>Cajero</th><th>Apertura</th><th>Cierre</th><th>Duración</th><th class="text-end">M. Apertura</th><th class="text-end">Ingresos</th><th class="text-end">Egresos</th><th class="text-end">M. Cierre</th><th class="text-center">Diferencia</th><th>Estado</th></tr></thead>
+<tbody>{% for ses in sesiones_caja %}
+<tr><td><strong>{{ ses.cajero.get_full_name|default:ses.cajero.username }}</strong></td>
+<td>{{ ses.fecha_apertura|date:"d/m/Y H:i" }}</td>
+<td>{{ ses.fecha_cierre|date:"d/m/Y H:i"|default:"—" }}</td>
+<td>{{ ses.duracion_sesion }}</td>
+<td class="text-end">Gs. {{ ses.monto_apertura|floatformat:0 }}</td>
+<td class="text-end text-green fw-bold">Gs. {{ ses.total_ingresos|floatformat:0 }}</td>
+<td class="text-end text-red">Gs. {{ ses.total_egresos|floatformat:0 }}</td>
+<td class="text-end">{% if ses.monto_cierre_real %}Gs. {{ ses.monto_cierre_real|floatformat:0 }}{% else %}—{% endif %}</td>
+<td class="text-center">{% if ses.estado == 'cerrada' %}<span class="badge {% if ses.diferencia == 0 %}bg-success{% elif ses.diferencia > 0 %}bg-warning{% else %}bg-danger{% endif %}">Gs. {{ ses.diferencia|floatformat:0 }}</span>{% else %}<span class="badge bg-info">Abierta</span>{% endif %}</td>
+<td><span class="badge {% if ses.estado == 'cerrada' %}bg-success{% else %}bg-info{% endif %}">{{ ses.get_estado_display }}</span></td></tr>
+{% endfor %}</tbody></table></div></div>
+
+<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-bar-chart me-2"></i>Movimientos por Sesión</h3></div>
+<div class="card-body"><div class="chart-container"><canvas id="chartCaja"></canvas></div></div></div>
+
+<script>
+(function initCajaChart(){
+  if(typeof Chart==='undefined'){setTimeout(initCajaChart,100);return;}
+  var ctx=document.getElementById('chartCaja');
+  if(!ctx)return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ chart_caja_labels|safe }},datasets:[{label:'Apertura',data:{{ chart_caja_apertura|safe }},backgroundColor:'rgba(32,107,196,0.6)',borderRadius:4},{label:'Ingresos',data:{{ chart_caja_ingresos|safe }},backgroundColor:'rgba(47,179,68,0.6)',borderRadius:4},{label:'Egresos',data:{{ chart_caja_egresos|safe }},backgroundColor:'rgba(214,57,57,0.6)',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return 'Gs. '+v.toLocaleString()}}}}}});
+})();
+</script>
+{% else %}
+<div class="card"><div class="card-body text-center py-5"><i class="bi bi-inbox display-4 text-muted"></i><p class="text-muted mt-2">No hay sesiones de caja en el período seleccionado</p></div></div>
+{% endif %}

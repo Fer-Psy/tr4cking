@@ -1,0 +1,41 @@
+{% load custom_filters %}
+<!-- VENTAS POR DÍA -->
+<div class="row row-deck row-cards mb-4 no-print">
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="d-flex align-items-center"><div class="stat-icon bg-blue-lt text-blue"><i class="bi bi-ticket-perforated"></i></div><div class="ms-3"><div class="subheader">Total Pasajes</div><div class="d-flex align-items-baseline"><div class="h1 mb-0 me-2">{{ total_pasajes }}</div><span class="text-green">Gs. {{ ingresos_pasajes|floatformat:0 }}</span></div></div></div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="d-flex align-items-center"><div class="stat-icon bg-yellow-lt text-yellow"><i class="bi bi-box-seam"></i></div><div class="ms-3"><div class="subheader">Total Encomiendas</div><div class="d-flex align-items-baseline"><div class="h1 mb-0 me-2">{{ total_encomiendas }}</div><span class="text-green">Gs. {{ ingresos_encomiendas|floatformat:0 }}</span></div></div></div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="d-flex align-items-center"><div class="stat-icon bg-cyan-lt text-cyan"><i class="bi bi-receipt"></i></div><div class="ms-3"><div class="subheader">Facturas Emitidas</div><div class="h1 mb-0">{{ total_facturas }}</div></div></div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card stat-card" style="background:linear-gradient(135deg,#0ca678,#20c997)"><div class="card-body"><div class="d-flex align-items-center"><div class="stat-icon bg-white text-green"><i class="bi bi-currency-dollar"></i></div><div class="ms-3"><div class="subheader text-white-50">Ingresos Totales</div><div class="h1 mb-0 text-white">Gs. {{ total_ingresos|floatformat:0 }}</div></div></div></div></div></div>
+</div>
+
+<div class="card mb-4 no-print"><div class="card-header"><h3 class="card-title"><i class="bi bi-bar-chart me-2"></i>Ingresos por Día</h3></div>
+<div class="card-body"><div class="chart-container"><canvas id="chartVentas"></canvas></div></div></div>
+
+<div class="row mb-4">
+<div class="col-md-8">
+<div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-calendar3 me-2"></i>Ventas por Día</h3></div>
+<div class="table-responsive"><table class="table table-vcenter card-table table-striped">
+<thead><tr><th>Fecha</th><th class="text-center">Pasajes</th><th class="text-center">Encomiendas</th><th class="text-center">Facturas</th><th class="text-end">Ing. Pasajes</th><th class="text-end">Ing. Encomiendas</th><th class="text-end">Total</th></tr></thead>
+<tbody>{% for dia in ventas_por_dia %}
+<tr><td><strong>{{ dia.fecha|date:"d/m/Y" }}</strong> <span class="text-muted ms-1">{{ dia.fecha|date:"l" }}</span></td>
+<td class="text-center">{{ dia.pasajes }}</td><td class="text-center">{{ dia.encomiendas }}</td><td class="text-center">{{ dia.facturas }}</td>
+<td class="text-end">Gs. {{ dia.ingresos_pasajes|floatformat:0 }}</td><td class="text-end">Gs. {{ dia.ingresos_encomiendas|floatformat:0 }}</td>
+<td class="text-end h5 text-green">Gs. {{ dia.total|floatformat:0 }}</td></tr>
+{% empty %}<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas</td></tr>{% endfor %}
+</tbody>
+{% if ventas_por_dia %}<tfoot class="table-light"><tr><th>TOTAL</th><th class="text-center">{{ total_pasajes }}</th><th class="text-center">{{ total_encomiendas }}</th><th class="text-center">{{ total_facturas }}</th><th class="text-end">Gs. {{ ingresos_pasajes|floatformat:0 }}</th><th class="text-end">Gs. {{ ingresos_encomiendas|floatformat:0 }}</th><th class="text-end h4 text-green">Gs. {{ total_ingresos|floatformat:0 }}</th></tr></tfoot>{% endif %}
+</table></div></div>
+</div>
+<div class="col-md-4 no-print"><div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-pie-chart me-2"></i>Distribución</h3></div><div class="card-body">
+<div class="mb-3"><div class="d-flex justify-content-between mb-1"><span>Pasajes</span><span>{{ porcentaje_pasajes }}%</span></div><div class="progress" style="height:8px"><div class="progress-bar bg-azure" style="width:{{ porcentaje_pasajes }}%"></div></div></div>
+<div class="mb-3"><div class="d-flex justify-content-between mb-1"><span>Encomiendas</span><span>{{ porcentaje_encomiendas }}%</span></div><div class="progress" style="height:8px"><div class="progress-bar bg-yellow" style="width:{{ porcentaje_encomiendas }}%"></div></div></div>
+</div></div></div>
+</div>
+
+<script>
+(function initVentasChart(){
+  if(typeof Chart==='undefined'){setTimeout(initVentasChart,100);return;}
+  var ctx=document.getElementById('chartVentas');
+  if(!ctx)return;
+  new Chart(ctx,{type:'bar',data:{labels:{{ chart_ventas_labels|safe }},datasets:[{label:'Pasajes',data:{{ chart_ventas_pasajes|safe }},backgroundColor:'rgba(32,107,196,0.7)',borderRadius:6},{label:'Encomiendas',data:{{ chart_ventas_encomiendas|safe }},backgroundColor:'rgba(247,103,7,0.7)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{callback:function(v){return 'Gs. '+v.toLocaleString()}}}}}});
+})();
+</script>

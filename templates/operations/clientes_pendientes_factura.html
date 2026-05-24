@@ -33,45 +33,87 @@
     </div>
     {% endif %}
     <div class="col-md-3">
-        <div class="card">
-            <div class="card-body text-center">
-                {% if timbrado_vigente %}
-                <div class="h4 text-warning mb-2">{{ proximo_numero }}</div>
-                <div class="text-muted">Próximo Número</div>
-                {% else %}
-                <div class="h5 text-danger mb-2">Sin Timbrado</div>
-                <div class="text-muted">Configure un timbrado</div>
-                {% endif %}
+        <div class="card h-100">
+            <div class="card-body text-center d-flex flex-column justify-content-center p-2">
+                <div class="row g-0 w-100 mb-1">
+                    <div class="col-6 border-end">
+                        <div class="small fw-bold text-muted" style="font-size: 0.7rem;">Guaireña</div>
+                        {% if timbrado_vigente %}
+                        <div class="h5 text-warning mb-0" style="font-size: 1rem;">{{ proximo_numero }}</div>
+                        {% else %}
+                        <div class="small text-danger mb-0">N/A</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-6">
+                        <div class="small fw-bold text-muted" style="font-size: 0.7rem;">Ybyturuzu</div>
+                        {% if timbrado_ybyturuzu %}
+                        <div class="h5 text-success mb-0" style="font-size: 1rem;">{{ proximo_numero_ybyturuzu }}</div>
+                        {% else %}
+                        <div class="small text-danger mb-0">N/A</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-muted mt-auto" style="font-size: 0.8rem;">Próximos Números</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Info de Timbrado -->
-{% if timbrado_vigente %}
-<div class="alert alert-info d-flex align-items-center mb-4">
-    <i class="bi bi-info-circle me-2"></i>
-    <div>
-        <strong>Timbrado activo:</strong> {{ timbrado_vigente.numero }} 
-        ({{ timbrado_vigente.punto_expedicion }}) - 
-        Vigente hasta {{ timbrado_vigente.fecha_fin|date:"d/m/Y" }}
+<!-- Info de Timbrados en 2 columnas -->
+<div class="row g-2 mb-3">
+    <div class="col-md-6">
+        <!-- Info de Timbrado Guaireña -->
+        {% if timbrado_vigente %}
+        <div class="alert alert-info d-flex align-items-center mb-0 py-2">
+            <i class="bi bi-info-circle me-2"></i>
+            <div>
+                <strong>Timbrado Guaireña:</strong> {{ timbrado_vigente.numero }} 
+                ({{ timbrado_vigente.punto_expedicion }}) - 
+                Vigente hasta {{ timbrado_vigente.fecha_fin|date:"d/m/Y" }}
+            </div>
+        </div>
+        {% elif empresa_gua %}
+        <div class="alert alert-warning d-flex align-items-center mb-0 py-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <div>
+                <strong>¡Atención!</strong> No hay timbrado vigente configurado para <strong>Guaireña</strong>.
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-warning d-flex align-items-center mb-0 py-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <div>
+                <strong>¡Atención!</strong> No se encontró la empresa Guaireña.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-6">
+        <!-- Timbrado Ybyturuzu -->
+        {% if timbrado_ybyturuzu %}
+        <div class="alert alert-success d-flex align-items-center mb-0 py-2">
+            <i class="bi bi-check-circle me-2"></i>
+            <div>
+                <strong>Timbrado Ybyturuzu:</strong> {{ timbrado_ybyturuzu.numero }} 
+                ({{ timbrado_ybyturuzu.punto_expedicion }}) - 
+                Vigente hasta {{ timbrado_ybyturuzu.fecha_fin|date:"d/m/Y" }}
+            </div>
+        </div>
+        {% elif empresa_yby %}
+        <div class="alert alert-warning d-flex align-items-center mb-0 py-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <div>
+                <strong>¡Atención!</strong> No hay timbrado vigente configurado para <strong>Ybyturuzu</strong>.
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
-{% else %}
-<div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        <strong>¡Atención!</strong> No hay timbrado vigente configurado. Configure uno antes de facturar.
-    </div>
-    <a href="{% url 'operations:timbrado_create' %}" class="btn btn-warning">
-        <i class="bi bi-plus me-1"></i> Crear Timbrado
-    </a>
-</div>
-{% endif %}
  
 <!-- Buscador -->
-<div class="card mb-4">
-    <div class="card-body">
+<div class="card mb-3">
+    <div class="card-body py-2">
         <form method="get" class="row g-2 align-items-center">
             <div class="col">
                 <div class="input-group">
@@ -138,6 +180,9 @@
                             </div>
                             <div>
                                 <strong>{{ item.cliente.nombre_completo }}</strong>
+                                {% if item.empresa %}
+                                <br><small class="text-muted"><i class="bi bi-building me-1"></i>{{ item.empresa.nombre }}</small>
+                                {% endif %}
                             </div>
                         </div>
                     </td>
@@ -181,7 +226,7 @@
                     </td>
                     <td class="text-end">
                         <div class="btn-group">
-                            <a href="{% url 'operations:factura_create' %}?cliente={{ item.cliente.cedula }}" 
+                            <a href="{% url 'operations:factura_create' %}?cliente={{ item.cliente.cedula }}&empresa={{ item.empresa.pk|default:'' }}" 
                                class="btn btn-primary btn-sm"
                                {% if not timbrado_vigente %}disabled title="Configure un timbrado primero"{% endif %}>
                                 <i class="bi bi-receipt me-1"></i> Facturar
@@ -198,7 +243,7 @@
                 <!-- Detalle colapsable de items -->
                 <tr class="bg-light">
                     <td colspan="{% if request.user.persona.es_ayudante or request.user.persona.es_chofer %}6{% else %}8{% endif %}" class="p-0">
-                        <div class="collapse" id="detalle-{{ item.cliente.pk }}">
+                        <div class="collapse" id="detalle-{{ item.cliente.pk }}-{{ item.empresa.pk|default:'0' }}">
                             <div class="p-3">
                                 <div class="row">
                                     {% if item.pasajes %}
@@ -247,7 +292,7 @@
                         <button class="btn btn-sm btn-link w-100 text-muted" 
                                 type="button" 
                                 data-bs-toggle="collapse" 
-                                data-bs-target="#detalle-{{ item.cliente.pk }}">
+                                data-bs-target="#detalle-{{ item.cliente.pk }}-{{ item.empresa.pk|default:'0' }}">
                             <i class="bi bi-chevron-down"></i> Ver detalle
                         </button>
                     </td>

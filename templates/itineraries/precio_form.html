@@ -3,18 +3,24 @@
 
 {% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Precio - TR4CKING{% endblock %}
 
-{% block breadcrumb %}
-<span class="separator">/</span>
-<a href="{% url 'itineraries:precio_list' %}">Precios</a>
-<span class="separator">/</span>
-<span class="current">{% if object %}Editar{% else %}Nuevo{% endif %}</span>
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    <a href="{% url 'itineraries:precio_list' %}" class="text-secondary">Matriz de Precios</a>
+                </div>
+                <h2 class="page-title">
+                    {% if object %}Editar Precio{% else %}Nuevo Precio{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <h1 class="page-title">{% if object %}Editar Precio{% else %}Nuevo Precio{% endif %}</h1>
-    <p class="page-subtitle">Define el precio de un tramo origen-destino</p>
-</div>
 
 <div class="row">
     <div class="col-12 col-lg-8">

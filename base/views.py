@@ -7,7 +7,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from users.models import Persona
 from fleet.models import Empresa, Bus
 from itineraries.models import Itinerario
-from operations.models import Viaje
+from operations.models import Viaje, Factura, Pasaje, Encomienda, SesionCaja
+from django.utils import timezone
 
 
 from django.shortcuts import redirect
@@ -23,6 +24,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if persona:
             # Si es staff o superuser, ver el panel administrativo (default)
             if request.user.is_staff or request.user.is_superuser:
+                return super().get(request, *args, **kwargs)
+                
+            # Si es agente, usar un dashboard personalizado
+            if persona.es_agente:
+                self.template_name = 'dashboard_agente.html'
                 return super().get(request, *args, **kwargs)
             
             # Si es Ayudante o Chofer, redirigir a su panel operativo
@@ -40,7 +46,30 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Statistics
+        persona = getattr(self.request.user, 'persona', None)
+        
+        # Contexto específico para el Agente Comercial
+        if persona and persona.es_agente and not (self.request.user.is_staff or self.request.user.is_superuser):
+            hoy = timezone.now().date()
+            
+            context['stats'] = {
+                'facturas_hoy': Factura.objects.filter(fecha_emision__date=hoy).count(),
+                'pasajes_hoy': Pasaje.objects.filter(fecha_venta__date=hoy).count(),
+                'encomiendas_hoy': Encomienda.objects.filter(fecha_registro__date=hoy).count(),
+                'caja_abierta': SesionCaja.objects.filter(cajero=self.request.user, estado='abierta').exists(),
+            }
+            
+            context['ultimas_facturas'] = Factura.objects.order_by('-fecha_emision')[:5]
+            context['ultimos_pasajes'] = Pasaje.objects.select_related('viaje', 'pasajero').order_by('-fecha_venta')[:5]
+            context['ultimas_encomiendas'] = Encomienda.objects.select_related('viaje', 'remitente', 'destinatario').order_by('-fecha_registro')[:5]
+            
+            context['viajes_hoy'] = Viaje.objects.filter(fecha_viaje=hoy, estado='programado').select_related(
+                'itinerario', 'bus', 'horario', 'empresa'
+            ).order_by('horario__hora_salida')
+            
+            return context
+        
+        # Statistics (General para Admin)
         context['stats'] = {
             'personas': Persona.objects.count(),
             'buses': Bus.objects.filter(estado='activo').count(),

@@ -87,6 +87,8 @@ class Persona(models.Model):
     es_chofer = models.BooleanField(default=False, verbose_name="Es chofer")
     es_ayudante = models.BooleanField(default=False, verbose_name="Es ayudante de transporte")
     es_cliente = models.BooleanField(default=False, verbose_name="Es cliente")
+    es_agente = models.BooleanField(default=False, verbose_name="Es agente comercial")
+    activo = models.BooleanField(default=True, verbose_name="Activo")
 
 
     class Meta:

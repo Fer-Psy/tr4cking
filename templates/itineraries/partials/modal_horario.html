@@ -40,8 +40,21 @@
 
 <script>
 (function() {
-    // Delegated listener for the save button
+    // Delegated listener for click events (opening and saving)
     document.addEventListener('click', function(e) {
+        // Abrir modal programáticamente
+        const btnOpen = e.target.closest('[data-bs-target="#modalHorario"]');
+        if (btnOpen) {
+            const modalHorarioEl = document.getElementById('modalHorario');
+            let modalHorario = bootstrap.Modal.getInstance(modalHorarioEl);
+            if (!modalHorario) {
+                modalHorario = new bootstrap.Modal(modalHorarioEl);
+            }
+            modalHorario.show();
+            return;
+        }
+
+        // Guardar horario
         if (e.target && e.target.id === 'btnGuardarHorario') {
             const btnSaveHorario = e.target;
             const modalHorarioEl = document.getElementById('modalHorario');
@@ -110,6 +123,11 @@
             const errors = event.target.querySelector('#horarioErrors');
             if (form) form.reset();
             if (errors) errors.classList.add('d-none');
+            
+            // Fix para scroll en modales anidados
+            if (document.querySelectorAll('.modal.show').length > 0) {
+                document.body.classList.add('modal-open');
+            }
         }
     });
 })();

@@ -263,7 +263,7 @@
                         <thead class="sticky-top bg-white">
                             <tr>
                                 <th>Cédula</th>
-                                <th>Nombre</th>
+                                <th>Nombre y Apellido</th>
                                 <th>Teléfono</th>
                                 <th class="text-end">Acción</th>
                             </tr>
@@ -297,20 +297,22 @@ document.addEventListener('DOMContentLoaded', function() {
         viajeSelect.addEventListener('change', function() {
             const viajeId = this.value;
             if (viajeId) {
-                fetch(`/operations/viajes/${viajeId}/paradas/`)
+                const currentOrigen = paradaOrigen ? paradaOrigen.value : '';
+                const currentDestino = paradaDestino ? paradaDestino.value : '';
+                fetch(`/operations/viajes/${viajeId}/paradas/?origen=${currentOrigen}&destino=${currentDestino}`)
                     .then(response => response.json())
                     .then(data => {
-                        updateParadaOptions(paradaOrigen, data.paradas);
-                        updateParadaOptions(paradaDestino, data.paradas);
+                        updateParadaOptions(paradaOrigen, data.paradas, data.mapped_origen);
+                        updateParadaOptions(paradaDestino, data.paradas, data.mapped_destino);
                     })
                     .catch(error => console.log('Error cargando paradas:', error));
             }
         });
     }
     
-    function updateParadaOptions(select, paradas) {
+    function updateParadaOptions(select, paradas, mappedValue) {
         if (!select) return;
-        const currentValue = select.value;
+        const currentValue = mappedValue || select.value;
         select.innerHTML = '<option value="">---------</option>';
         paradas.forEach(parada => {
             const option = document.createElement('option');
@@ -417,12 +419,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             listaRemitentes.innerHTML = data.clientes.map(cliente => `
                                 <tr>
                                     <td><strong>${cliente.cedula}</strong></td>
-                                    <td>${cliente.nombre}</td>
+                                    <td>${cliente.nombre_completo}</td>
                                     <td>${cliente.telefono}</td>
                                     <td class="text-end">
                                         <button type="button" class="btn btn-sm btn-primary btn-seleccionar-remitente"
                                                 data-cedula="${cliente.cedula}"
-                                                data-nombre="${cliente.nombre}"
+                                                data-nombre="${cliente.nombre_completo}"
                                                 data-telefono="${cliente.telefono}"
                                                 data-direccion="${cliente.direccion}">
                                             <i class="bi bi-check-lg me-1"></i> Seleccionar
@@ -523,6 +525,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     if (tipoSelect && precioInput) {
+        function actualizarPrecio() {
+            const tipo = tipoSelect.value;
+            if (preciosPorTipo[tipo] && (!precioInput.value || precioInput.value == 0)) {
+                precioInput.value = preciosPorTipo[tipo];
+            }
+        }
+        
         tipoSelect.addEventListener('change', function() {
             const tipo = this.value;
             if (preciosPorTipo[tipo]) {
@@ -533,6 +542,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => precioInput.classList.remove('is-valid'), 2000);
             }
         });
+        
+        // Ejecutar al cargar si el precio está vacío
+        actualizarPrecio();
     }
 
     // Limpiar búsqueda al abrir el modal

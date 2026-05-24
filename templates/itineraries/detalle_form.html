@@ -120,50 +120,6 @@
     </div>
 
     <div class="col-12 col-lg-4">
-        <!-- Selector rápido de Localidades -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h5 class="card-title">
-                    <i class="bi bi-geo-alt me-2 text-primary"></i>
-                    Selector de Localidades
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="p-2 border-bottom">
-                    <input type="text" class="form-control form-control-sm" id="searchLocalidadPicker" placeholder="Filtrar localidades...">
-                </div>
-                <div class="locality-picker-list list-group list-group-flush" id="localityPickerList" style="max-height: 500px; overflow-y: auto;">
-                    {% for loc in localidades %}
-                    <div class="list-group-item locality-item p-2 {% if not loc.paradas.all %}has-no-stops{% endif %}" 
-                         data-name="{{ loc.nombre|lower }}">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold">{{ loc.nombre }}</span>
-                            {% if not loc.paradas.all %}
-                            <button type="button" class="btn btn-ghost-primary btn-sm p-0 px-1" 
-                                    onclick="quickCreateParada('{{ loc.id }}', '{{ loc.nombre }}')"
-                                    title="Crear Parada para esta localidad">
-                                <i class="bi bi-plus"></i> Crear Parada
-                            </button>
-                            {% endif %}
-                        </div>
-                        <div class="d-flex flex-wrap gap-1">
-                            {% for parada in loc.paradas.all %}
-                            <span class="badge bg-blue-lt stop-badge cursor-pointer" 
-                                  onclick="selectParada('{{ parada.id }}')"
-                                  style="cursor: pointer;"
-                                  title="Usar esta parada">
-                                {{ parada.nombre }}
-                            </span>
-                            {% empty %}
-                            <small class="text-muted italic">Sin paradas definidas</small>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title">
@@ -178,7 +134,7 @@
                 </p>
                 <h6 class="fw-semibold mb-2">Minutos</h6>
                 <p class="text-secondary small mb-0">
-                    Tiempo estimado desde el origen para calcular el ETA.
+                    Tiempo estimado desde el origen para calcular el tiempo estimado de llegada.
                 </p>
             </div>
         </div>
@@ -266,11 +222,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const formLoc = document.getElementById('formNuevaLocalidad');
     const btnSaveLoc = document.getElementById('btnGuardarLocalidad');
     
-    // Abrir modal localidad desde el modal de parada sin cerrar el primero
+    // Abrir modal localidad y parada desde el modal de parada o formulario sin cerrar el primero
     document.addEventListener('click', function(e) {
         if (e.target.closest('.btn-open-localidad-modal')) {
-            const modalLoc = new bootstrap.Modal(modalLocEl);
+            let modalLoc = bootstrap.Modal.getInstance(modalLocEl);
+            if (!modalLoc) {
+                modalLoc = new bootstrap.Modal(modalLocEl);
+            }
             modalLoc.show();
+        }
+        
+        const btnPar = e.target.closest('[data-bs-target="#modalParada"]');
+        if (btnPar) {
+            let modalPar = bootstrap.Modal.getInstance(modalParEl);
+            if (!modalPar) {
+                modalPar = new bootstrap.Modal(modalParEl);
+            }
+            modalPar.show();
         }
     });
     
@@ -397,26 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 document.getElementById('map-instructions-loc').classList.remove('hidden');
                 
-                // 4. Actualizar el buscador de localidades a la derecha si existe
-                const pickerList = document.getElementById('localityPickerList');
-                if (pickerList) {
-                    const newLocHtml = `
-                        <div class="list-group-item locality-item p-2 has-no-stops" data-name="${data.nombre.toLowerCase()}">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold">${data.nombre}</span>
-                                <button type="button" class="btn btn-ghost-primary btn-sm p-0 px-1" 
-                                        onclick="quickCreateParada('${data.id}', '${data.nombre}')"
-                                        title="Crear Parada para esta localidad">
-                                    <i class="bi bi-plus"></i> Crear Parada
-                                </button>
-                            </div>
-                            <div class="d-flex flex-wrap gap-1">
-                                <small class="text-muted italic">Sin paradas definidas</small>
-                            </div>
-                        </div>
-                    `;
-                    pickerList.insertAdjacentHTML('afterbegin', newLocHtml);
-                }
+                // (Se removió la actualización del buscador de localidades de la derecha ya que dicho selector fue eliminado)
             } else {
                 alert("Error al crear localidad: " + JSON.stringify(data.errors));
             }
@@ -469,44 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    // ==========================================
-    // SELECTOR RÁPIDO DE LOCALIDADES (UI)
-    // ==========================================
-    window.selectParada = function(paradaId) {
-        const select = document.getElementById('id_parada');
-        select.value = paradaId;
-        // Trigger visual effect
-        select.classList.add('is-valid');
-        setTimeout(() => select.classList.remove('is-valid'), 1000);
-        
-        // Scroll to form on mobile
-        if (window.innerWidth < 992) {
-            select.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
-
-    window.quickCreateParada = function(locId, locName) {
-        // Pre-seleccionar localidad en el modal de parada
-        const modal = new bootstrap.Modal(modalParEl);
-        modal.show();
-        
-        // Esperar a que el modal se muestre para setear el valor
-        modalParEl.addEventListener('shown.bs.modal', function() {
-            const selectLoc = document.querySelector('#formNuevaParada #id_localidad');
-            if (selectLoc) selectLoc.value = locId;
-            const nameInput = document.querySelector('#formNuevaParada #id_nombre');
-            if (nameInput) nameInput.value = 'Terminal ' + locName;
-        }, { once: true });
-    };
-
-    const searchLocPicker = document.getElementById('searchLocalidadPicker');
-    searchLocPicker.addEventListener('input', function() {
-        const query = this.value.toLowerCase();
-        document.querySelectorAll('.locality-item').forEach(item => {
-            const name = item.dataset.name;
-            item.style.display = name.includes(query) ? '' : 'none';
-        });
-    });
+    // (Se removieron las funciones de selector rápido de localidades ya que dicho selector fue eliminado)
 });
 </script>
 {% endblock %}

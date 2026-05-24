@@ -82,9 +82,7 @@ Viaje: {{ viaje.itinerario.nombre }}
                 <i class="bi bi-box-seam me-1"></i> Registrar Encomienda
             </a>
             {% endif %}
-            <a href="{% url 'operations:incidencia_viaje_create' viaje.pk %}" class="btn btn-outline-danger">
-                <i class="bi bi-exclamation-triangle me-1"></i> Reportar Incidencia
-            </a>
+
             
             <a href="{% url 'operations:viaje_create' %}?itinerario={{ viaje.itinerario_id }}&horario={{ viaje.horario_id }}&fecha={{ proxima_fecha_sugerida }}" class="btn btn-outline-info">
                 <i class="bi bi-calendar-plus me-1"></i> Programar Siguiente
@@ -243,12 +241,7 @@ Viaje: {{ viaje.itinerario.nombre }}
                     Mapa de Asientos
                 </a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#incidencias">
-                    <i class="bi bi-exclamation-triangle me-1"></i>
-                    Incidencias <span class="badge bg-danger ms-1">{{ incidencias|length }}</span>
-                </a>
-            </li>
+
         </ul>
 
         <div class="tab-content">
@@ -390,39 +383,7 @@ Viaje: {{ viaje.itinerario.nombre }}
                 </div>
             </div>
 
-            <!-- Tab Incidencias -->
-            <div class="tab-pane" id="incidencias">
-                <div class="card">
-                    <div class="list-group list-group-flush">
-                        {% for inc in incidencias %}
-                        <a href="{% url 'operations:incidencia_detail' inc.pk %}"
-                            class="list-group-item list-group-item-action">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <span class="badge 
-                                        {% if inc.prioridad == 'critica' %}bg-red
-                                        {% elif inc.prioridad == 'alta' %}bg-orange
-                                        {% elif inc.prioridad == 'media' %}bg-yellow
-                                        {% else %}bg-secondary{% endif %} me-2">
-                                        {{ inc.get_prioridad_display }}
-                                    </span>
-                                    <strong>{{ inc.get_tipo_display }}</strong>
-                                    <p class="mb-0 text-muted small mt-1">{{ inc.descripcion|truncatechars:100 }}</p>
-                                </div>
-                                <span
-                                    class="badge {% if inc.estado == 'resuelta' %}bg-green{% else %}bg-azure{% endif %}">
-                                    {{ inc.get_estado_display }}
-                                </span>
-                            </div>
-                        </a>
-                        {% empty %}
-                        <div class="list-group-item text-center py-4 text-muted">
-                            No hay incidencias reportadas
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 </div>

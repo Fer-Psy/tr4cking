@@ -123,7 +123,13 @@ class FacturacionService:
                 if pasaje.estado == 'reservado':
                     pasaje.estado = 'vendido'
                     pasaje.fecha_venta = timezone.now()
-                    pasaje.save()
+                
+                # Si el cajero es personal de bus (ayudante/chofer), marcar como abordado automáticamente
+                persona_cajero = getattr(cajero, 'persona', None)
+                if persona_cajero and (persona_cajero.es_ayudante or persona_cajero.es_chofer):
+                    pasaje.estado = 'abordado'
+                    
+                pasaje.save()
                     
                 DetalleFactura.objects.create(
                     factura=factura,

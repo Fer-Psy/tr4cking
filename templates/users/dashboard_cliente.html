@@ -167,11 +167,36 @@
                 <div class="list-group-item px-3 py-3 border-0 border-bottom">
                     <div class="row align-items-center">
                         <div class="col">
-                            <div class="font-weight-medium text-truncate" style="max-width: 150px;">{{ enc.descripcion }}</div>
-                            <div class="text-muted small">Destino: {{ enc.parada_destino.nombre }}</div>
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div class="font-weight-medium text-truncate" style="max-width: 250px;">{{ enc.descripcion }}</div>
+                                <small class="text-muted fw-bold">{{ enc.codigo }}</small>
+                            </div>
+                            <div class="text-muted small">
+                                <i class="bi bi-geo-alt me-1"></i>{{ enc.parada_origen.nombre }} <i class="bi bi-arrow-right mx-1"></i> {{ enc.parada_destino.nombre }}
+                            </div>
+                            <div class="text-muted small mt-1">
+                                {% if enc.remitente.user == user %}
+                                    <span class="text-azure"><i class="bi bi-person-up me-1"></i>Enviado a: {{ enc.destinatario.nombre_completo }}</span>
+                                {% else %}
+                                    <span class="text-purple"><i class="bi bi-person-down me-1"></i>Recibido de: {{ enc.remitente.nombre_completo }}</span>
+                                {% endif %}
+                                <span class="mx-2">•</span>
+                                <i class="bi bi-calendar3 me-1"></i>{{ enc.fecha_registro|date:"d/m/Y" }}
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <span class="badge bg-{{ enc.estado }}-lt">{{ enc.get_estado_display }}</span>
+                        <div class="col-auto text-end">
+                            <div class="mb-2">
+                                <span class="badge 
+                                    {% if enc.estado == 'entregado' %}bg-success-lt
+                                    {% elif enc.estado == 'en_transito' %}bg-blue-lt
+                                    {% elif enc.estado == 'en_destino' %}bg-azure-lt
+                                    {% elif enc.estado == 'registrado' %}bg-warning-lt
+                                    {% elif enc.estado == 'cancelado' %}bg-danger-lt
+                                    {% else %}bg-secondary-lt{% endif %}">
+                                    {{ enc.get_estado_display }}
+                                </span>
+                            </div>
+                            <div class="text-muted small fw-bold">Gs. {{ enc.precio|floatformat:0 }}</div>
                         </div>
                     </div>
                 </div>

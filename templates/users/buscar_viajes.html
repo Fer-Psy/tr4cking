@@ -228,10 +228,17 @@
             </div>
             <div class="col-md-2 text-end">
                 {% if info.asientos_libres > 0 %}
-                <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
-                   class="btn btn-primary btn-sm px-4 rounded-pill">
-                    <i class="bi bi-ticket-perforated me-1"></i>Reservar
-                </a>
+                    {% if request.user.is_superuser or request.user.persona.es_empleado or request.user.persona.es_agente or request.user.persona.es_ayudante %}
+                    <a href="{% url 'operations:pasaje_venta' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
+                       class="btn btn-success btn-sm px-4 rounded-pill">
+                        <i class="bi bi-cash-coin me-1"></i>Vender
+                    </a>
+                    {% else %}
+                    <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
+                       class="btn btn-primary btn-sm px-4 rounded-pill">
+                        <i class="bi bi-ticket-perforated me-1"></i>Reservar
+                    </a>
+                    {% endif %}
                 {% else %}
                 <button class="btn btn-outline-secondary btn-sm px-4 rounded-pill" disabled>
                     Agotado
