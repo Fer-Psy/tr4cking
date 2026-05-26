@@ -567,6 +567,10 @@
                                 <button id="btn-recibir-{{ enc.pk }}" class="btn btn-sm btn-outline-success" onclick="recibirEnTerminal({{ enc.pk }}, '{{ enc.parada_destino.nombre }}')">
                                     <i class="bi bi-check2-circle me-1"></i> Entregar en Terminal
                                 </button>
+                                {% elif enc.estado == 'en_destino' %}
+                                <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-success">
+                                    <i class="bi bi-person-check-fill me-1"></i> Confirmar Entrega
+                                </a>
                                 {% endif %}
                             </div>
                         </div>

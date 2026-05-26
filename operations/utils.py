@@ -189,6 +189,7 @@ def obtener_mapa_ocupacion(viaje):
             'pasajero': pasaje.pasajero.nombre_completo,
             'codigo': pasaje.codigo,
             'estado': pasaje.estado,
+            'vendedor_id': pasaje.vendedor_id,
         })
     
     return mapa

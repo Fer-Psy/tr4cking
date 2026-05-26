@@ -73,10 +73,23 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
         
         # === ENCOMIENDAS HOY ===
         encomiendas_hoy = Encomienda.objects.filter(fecha_registro__date=hoy)
-        context['encomiendas_hoy'] = encomiendas_hoy.count()
-        context['encomiendas_pendientes'] = Encomienda.objects.filter(
+        encomiendas_pendientes = Encomienda.objects.filter(
             estado__in=['registrado', 'en_transito', 'en_destino']
-        ).count()
+        )
+        persona = getattr(self.request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+            encomiendas_hoy = encomiendas_hoy.filter(
+                Q(viaje__chofer=persona) | Q(viaje__ayudantes=persona)
+            ).filter(
+                Q(viaje__estado='en_curso') | Q(viaje__fecha_viaje__gte=hoy)
+            )
+            encomiendas_pendientes = encomiendas_pendientes.filter(
+                Q(viaje__chofer=persona) | Q(viaje__ayudantes=persona)
+            ).filter(
+                Q(viaje__estado='en_curso') | Q(viaje__fecha_viaje__gte=hoy)
+            )
+        context['encomiendas_hoy'] = encomiendas_hoy.count()
+        context['encomiendas_pendientes'] = encomiendas_pendientes.count()
         
         # === CAJA ===
         try:
@@ -252,7 +265,7 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
             context['encomiendas_viaje'] = Encomienda.objects.filter(
                 viaje=viaje_activo,
                 estado__in=['registrado', 'en_transito', 'en_destino']
-            ).select_related('remitente', 'destinatario', 'parada_destino')
+            ).select_related('remitente', 'destinatario', 'parada_destino').order_by('parada_destino__nombre')
 
             # Pasajes vendidos/reservados recientemente en este viaje
             context['pasajes_recientes'] = Pasaje.objects.filter(
@@ -1066,6 +1079,16 @@ class EncomiendaListView(LoginRequiredMixin, ListView):
             'parada_origen', 'parada_destino'
         )
         
+        # Restricción para ayudantes y choferes
+        persona = getattr(self.request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+            hoy = timezone.localtime(timezone.now()).date()
+            queryset = queryset.filter(
+                Q(viaje__chofer=persona) | Q(viaje__ayudantes=persona)
+            ).filter(
+                Q(viaje__estado='en_curso') | Q(viaje__fecha_viaje__gte=hoy)
+            )
+        
         # Filtros
         estado = self.request.GET.get('estado')
         if estado:
@@ -1097,6 +1120,18 @@ class EncomiendaDetailView(LoginRequiredMixin, DetailView):
     template_name = 'operations/encomienda_detail.html'
     context_object_name = 'encomienda'
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        persona = getattr(self.request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+            hoy = timezone.localtime(timezone.now()).date()
+            queryset = queryset.filter(
+                Q(viaje__chofer=persona) | Q(viaje__ayudantes=persona)
+            ).filter(
+                Q(viaje__estado='en_curso') | Q(viaje__fecha_viaje__gte=hoy)
+            )
+        return queryset
+
 
 class EncomiendaCreateView(LoginRequiredMixin, CreateView):
     """Registrar una nueva encomienda."""
@@ -1104,11 +1139,29 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
     form_class = EncomiendaForm
     template_name = 'operations/encomienda_form.html'
     
+    def dispatch(self, request, *args, **kwargs):
+        persona = getattr(request.user, 'persona', None)
+        if persona and persona.es_ayudante and not request.user.is_superuser:
+            from django.contrib import messages
+            messages.error(request, "Los ayudantes no tienen permiso para registrar encomiendas.")
+            return redirect('operations:encomienda_list')
+        return super().dispatch(request, *args, **kwargs)
+    
     def get_form_kwargs(self):
+        from django.core.exceptions import PermissionDenied
         kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
         viaje_pk = self.kwargs.get('viaje_pk')
         if viaje_pk:
-            kwargs['viaje'] = get_object_or_404(Viaje, pk=viaje_pk)
+            viaje = get_object_or_404(Viaje, pk=viaje_pk)
+            persona = getattr(self.request.user, 'persona', None)
+            if persona and (persona.es_ayudante or persona.es_chofer) and not self.request.user.is_superuser:
+                is_assigned = (viaje.chofer == persona) or (viaje.ayudantes.filter(pk=persona.pk).exists())
+                hoy = timezone.localtime(timezone.now()).date()
+                is_active = (viaje.estado == 'en_curso') or (viaje.fecha_viaje >= hoy)
+                if not is_assigned or not is_active:
+                    raise PermissionDenied("No tienes permiso para registrar encomiendas en este bus.")
+            kwargs['viaje'] = viaje
         return kwargs
     
     def get_context_data(self, **kwargs):
@@ -1182,11 +1235,7 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
         encomienda.registrador = self.request.user
         encomienda.save()
         
-        # NOTA: El ingreso en caja se registra al momento de generar la factura,
-        # no al crear la encomienda
         
-        messages.success(self.request, f"Encomienda {encomienda.codigo} registrada exitosamente.")
-        # Redirigir al ticket con auto-print para imprimir inmediatamente
         return redirect(f"{reverse('operations:encomienda_ticket', kwargs={'pk': encomienda.pk})}?print=1")
 
 
@@ -1195,6 +1244,12 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
     
     def get(self, request, pk):
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                messages.error(request, "No tienes permiso para ver o entregar encomiendas de otro bus.")
+                return redirect('operations:encomienda_list')
         form = EncomiendaEntregaForm()
         return render(request, 'operations/encomienda_entrega.html', {
             'encomienda': encomienda,
@@ -1203,6 +1258,12 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
     
     def post(self, request, pk):
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                messages.error(request, "No tienes permiso para entregar encomiendas de otro bus.")
+                return redirect('operations:encomienda_list')
         form = EncomiendaEntregaForm(request.POST)
         
         if form.is_valid():
@@ -1213,30 +1274,42 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
             encomienda.save()
             
             messages.success(request, f"Encomienda {encomienda.codigo} entregada exitosamente.")
+            if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+                return redirect('operations:dashboard_ayudante')
             return redirect('operations:encomienda_detail', pk=encomienda.pk)
         
         return render(request, 'operations/encomienda_entrega.html', {
             'encomienda': encomienda,
             'form': form
         })
-
-
+ 
+ 
 class EncomiendaAbordarView(LoginRequiredMixin, View):
     """Marca una encomienda como recibida en el bus (En Tránsito)."""
     def post(self, request, pk):
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                return JsonResponse({'ok': False, 'error': 'No autorizado para esta encomienda.'}, status=403)
         if encomienda.estado == 'registrado':
             encomienda.estado = 'en_transito'
             encomienda.fecha_en_transito = timezone.now()
             encomienda.save()
             return JsonResponse({'ok': True, 'mensaje': 'Encomienda marcada como en tránsito.'})
         return JsonResponse({'ok': False, 'error': 'El estado de la encomienda no permite esta acción.'}, status=400)
-
-
+ 
+ 
 class EncomiendaRecibirTerminalView(LoginRequiredMixin, View):
     """Marca una encomienda como recibida en la terminal de destino (En Destino)."""
     def post(self, request, pk):
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                return JsonResponse({'ok': False, 'error': 'No autorizado para esta encomienda.'}, status=403)
         if encomienda.estado == 'en_transito':
             encomienda.estado = 'en_destino'
             encomienda.fecha_en_destino = timezone.now()
@@ -1250,6 +1323,15 @@ class EncomiendaCambiarEstadoView(LoginRequiredMixin, View):
     
     def post(self, request, pk):
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and persona.es_ayudante and not request.user.is_superuser:
+            messages.error(request, "Los ayudantes no tienen permiso para cambiar el estado de las encomiendas.")
+            return redirect('operations:encomienda_detail', pk=pk)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                messages.error(request, "No autorizado para esta encomienda.")
+                return redirect('operations:encomienda_list')
         nuevo_estado = request.POST.get('estado')
         
         if nuevo_estado in dict(Encomienda.ESTADO_CHOICES):
@@ -1805,6 +1887,15 @@ class CancelarEncomiendaRapidaView(LoginRequiredMixin, View):
         from django.utils import timezone
         
         encomienda = get_object_or_404(Encomienda, pk=pk)
+        persona = getattr(request.user, 'persona', None)
+        if persona and persona.es_ayudante and not request.user.is_superuser:
+            messages.error(request, "Los ayudantes no tienen permiso para realizar esta acción.")
+            return redirect('operations:encomienda_detail', pk=pk)
+        if persona and (persona.es_ayudante or persona.es_chofer) and not request.user.is_superuser:
+            is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
+            if not is_assigned:
+                messages.error(request, "No autorizado para esta encomienda.")
+                return redirect('operations:clientes_pendientes_factura')
         
         if encomienda.estado != 'registrado':
             messages.error(request, "Esta encomienda ya está en tránsito o entregada, no se puede cancelar.")
@@ -3226,7 +3317,10 @@ class APIViajosEnCursoView(LoginRequiredMixin, View):
             ubicacion = None
             personas = [viaje.chofer] + list(viaje.ayudantes.all())
             for p in personas:
-                ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
+                # Intentar buscar la ubicación específica de este viaje en curso, de lo contrario la activa general
+                ub = UbicacionAyudante.objects.filter(persona=p, viaje=viaje).order_by('-timestamp').first()
+                if not ub:
+                    ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
                 if ub:
                     ubicacion = ub
                     break
@@ -3324,7 +3418,10 @@ class APIViajesPublicosView(LoginRequiredMixin, View):
             ubicacion = None
             personas = [viaje.chofer] + list(viaje.ayudantes.all())
             for p in personas:
-                ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
+                # Intentar buscar la ubicación específica de este viaje en curso, de lo contrario la activa general
+                ub = UbicacionAyudante.objects.filter(persona=p, viaje=viaje).order_by('-timestamp').first()
+                if not ub:
+                    ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
                 if ub:
                     ubicacion = ub
                     break
@@ -3347,15 +3444,70 @@ class APIViajesPublicosView(LoginRequiredMixin, View):
                     'lng': float(d.parada.longitud_gps) if d.parada.longitud_gps else None,
                 }
                 paradas.append(p_data)
-                
-                # Calcular proxima parada si tenemos ubicación
-                if ubicacion and not proxima_parada and p_data['lat']:
-                    dist = calcular_km(float(ubicacion.latitud), float(ubicacion.longitud), p_data['lat'], p_data['lng'])
-                    # Si el bus está a más de 0.5km y es una parada futura (simplificado)
-                    if dist > 0.5:
-                        proxima_parada = d.parada.nombre
-                        velocidad = float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh and ubicacion.velocidad_kmh > 10 else 40
-                        eta_minutos = math.ceil((dist / velocidad) * 60)
+
+            # Calcular próxima parada basada en la ubicación real del bus
+            if ubicacion and paradas:
+                # Filtrar paradas con coordenadas válidas
+                paradas_validas = [p for p in paradas if p['lat'] is not None and p['lng'] is not None]
+                if paradas_validas:
+                    bus_lat = float(ubicacion.latitud)
+                    bus_lng = float(ubicacion.longitud)
+                    
+                    # 1. Calcular distancia del bus a cada parada
+                    distancias = []
+                    for p in paradas_validas:
+                        d_bus = calcular_km(bus_lat, bus_lng, p['lat'], p['lng'])
+                        distancias.append(d_bus)
+                    
+                    # 2. Verificar si está muy cerca de alguna parada (<= 0.5 km)
+                    cerca_idx = None
+                    for idx, d_bus in enumerate(distancias):
+                        if d_bus <= 0.5:
+                            cerca_idx = idx
+                            break
+                    
+                    if cerca_idx is not None:
+                        # Si está en la parada final, ya llegó
+                        if cerca_idx == len(paradas_validas) - 1:
+                            proxima_parada = paradas_validas[cerca_idx]['nombre']
+                            eta_minutos = 0
+                        else:
+                            # Si está en una parada intermedia, la próxima es la siguiente
+                            proxima_parada = paradas_validas[cerca_idx + 1]['nombre']
+                            dist_next = distancias[cerca_idx + 1]
+                            velocidad = float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh and ubicacion.velocidad_kmh > 10 else 40
+                            eta_minutos = math.ceil((dist_next / velocidad) * 60)
+                    else:
+                        # 3. Si no está cerca de ninguna parada, encontrar el segmento activo
+                        # calculando el score para cada segmento consecutivo P_j -> P_{j+1}
+                        if len(paradas_validas) >= 2:
+                            best_segment_idx = 0
+                            min_score = float('inf')
+                            
+                            for j in range(len(paradas_validas) - 1):
+                                p_j = paradas_validas[j]
+                                p_next = paradas_validas[j+1]
+                                d_segment = calcular_km(p_j['lat'], p_j['lng'], p_next['lat'], p_next['lng'])
+                                d_to_j = distancias[j]
+                                d_to_next = distancias[j+1]
+                                
+                                # score = d_to_j + d_to_next - d_segment
+                                score = d_to_j + d_to_next - d_segment
+                                if score < min_score:
+                                    min_score = score
+                                    best_segment_idx = j
+                            
+                            # El bus está entre best_segment_idx y best_segment_idx + 1,
+                            # por lo que la próxima parada es best_segment_idx + 1
+                            next_p = paradas_validas[best_segment_idx + 1]
+                            proxima_parada = next_p['nombre']
+                            dist_next = distancias[best_segment_idx + 1]
+                            velocidad = float(ubicacion.velocidad_kmh) if ubicacion.velocidad_kmh and ubicacion.velocidad_kmh > 10 else 40
+                            eta_minutos = math.ceil((dist_next / velocidad) * 60)
+                        else:
+                            # Fallback si solo hay una parada con coords
+                            proxima_parada = paradas_validas[0]['nombre']
+                            eta_minutos = math.ceil((distancias[0] / 40) * 60)
 
             viaje_data = {
                 'id': viaje.pk,
@@ -3708,6 +3860,23 @@ class ReservarPasajeView(LoginRequiredMixin, TemplateView):
         context['initial_origen_id'] = self.request.GET.get('origen')
         context['initial_destino_id'] = self.request.GET.get('destino')
 
+        # Obtener la última ubicación del bus/chofer/ayudante para la advertencia de proximidad
+        bus_lat = None
+        bus_lng = None
+        personas = [viaje.chofer] + list(viaje.ayudantes.all())
+        for p in personas:
+            if not p:
+                continue
+            ub = UbicacionAyudante.objects.filter(persona=p, viaje=viaje).order_by('-timestamp').first()
+            if not ub:
+                ub = UbicacionAyudante.objects.filter(persona=p, activo=True).first()
+            if ub:
+                bus_lat = float(ub.latitud)
+                bus_lng = float(ub.longitud)
+                break
+        context['bus_lat'] = bus_lat
+        context['bus_lng'] = bus_lng
+
         # Verificar si ya tiene una reserva previa (para mostrar alerta al cargar)
         persona = getattr(self.request.user, 'persona', None)
         if persona:
@@ -3882,8 +4051,19 @@ class APIAsientosSegmentoView(LoginRequiredMixin, View):
                         'orden_origen': oc['orden_origen'],
                         'orden_destino': oc['orden_destino'],
                         'estado': oc['estado'],
+                        'vendedor_id': oc.get('vendedor_id'),
                     })
             asientos_data.append(info)
+
+        # Determinar si el usuario es ayudante/chofer (no agente ni admin)
+        # para bloquear asientos ocupados en el frontend
+        persona_actual = getattr(request.user, 'persona', None)
+        es_ayudante = bool(
+            persona_actual and 
+            (persona_actual.es_ayudante or persona_actual.es_chofer) and 
+            not persona_actual.es_agente and 
+            not request.user.is_superuser
+        )
 
         return JsonResponse({
             'asientos': asientos_data,
@@ -3892,6 +4072,8 @@ class APIAsientosSegmentoView(LoginRequiredMixin, View):
             'precio': precio,
             'orden_origen': orden_origen,
             'orden_destino': orden_destino,
+            'es_ayudante': es_ayudante,
+            'usuario_actual_id': request.user.id,
         })
 
 

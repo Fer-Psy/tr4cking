@@ -157,7 +157,6 @@
     <span class="stat-pulse"></span>
     Rastreo en Vivo
     <span class="badge bg-primary ms-2" id="badge-total">{{ total_en_curso }} en curso</span>
-    <span class="badge bg-green-lt ms-1" id="badge-gps-count">0 con GPS</span>
 </div>
 {% endblock %}
 
@@ -226,11 +225,9 @@
     let firstLoad = true;
 
     function crearIconoBus(tieneGps) {
-        const extraClass = tieneGps ? '' : ' no-gps';
-        const icon = tieneGps ? 'bi-bus-front-fill' : 'bi-bus-front';
         return L.divIcon({
             className: 'bus-icon-marker',
-            html: `<div class="bus-marker-inner${extraClass}"><i class="bi ${icon}"></i></div>`,
+            html: `<div class="bus-marker-inner"><i class="bi bi-bus-front-fill"></i></div>`,
             iconSize: [48, 48],
             iconAnchor: [24, 24],
             popupAnchor: [0, -28],
@@ -272,9 +269,7 @@
         const pct = v.porcentaje_ocupacion;
         const color = getOcupacionColor(pct);
         const tieneGps = v.ubicacion != null;
-        const gpsBadge = tieneGps
-            ? `<span class="gps-badge-on"><span class="gps-dot on"></span> GPS Activo</span>`
-            : `<span class="gps-badge-off"><span class="gps-dot off"></span> Sin GPS</span>`;
+        const gpsBadge = `<span class="gps-badge-on"><span class="gps-dot on"></span> En vivo</span>`;
         const velocidadHtml = tieneGps && v.ubicacion.velocidad != null
             ? `<div class="col-6 small text-end"><i class="bi bi-speedometer2 me-1 text-muted"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
             : '';
@@ -336,7 +331,6 @@
                         <div class="col-6 small"><i class="bi bi-clock me-1 text-muted"></i>Salida: ${v.hora_salida}</div>
                         ${velocidadHtml}
                     </div>
-                    ${!tieneGps ? '<div class="mt-1 smaller text-warning text-center"><i class="bi bi-exclamation-triangle me-1"></i>Ubicación estimada (sin GPS activo)</div>' : ''}
                     <div class="mt-1 smaller text-muted text-center italic">Capacidad: ${v.asientos_total} asientos</div>
                 </div>
             </div>`;
@@ -347,9 +341,7 @@
         const tieneGps = v.ubicacion != null;
         const pct = v.porcentaje_ocupacion;
         const color = getOcupacionColor(pct);
-        const gpsBadge = tieneGps
-            ? '<span class="gps-badge-on"><span class="gps-dot on"></span> GPS</span>'
-            : '<span class="gps-badge-off"><span class="gps-dot off"></span> Sin GPS</span>';
+        const gpsBadge = '<span class="gps-badge-on"><span class="gps-dot on"></span> En vivo</span>';
 
         return `
         <div class="card viaje-card mb-2 border-0 shadow-sm" data-viaje-id="${v.id}" onclick="centrarViaje(${v.id})">
@@ -408,10 +400,6 @@
                 const overlay = document.getElementById('no-viajes-overlay');
                 document.getElementById('badge-total').textContent = data.total + ' en curso';
                 document.getElementById('total-buses').textContent = data.total;
-
-                // Contar cuántos tienen GPS
-                const conGps = data.viajes.filter(v => v.ubicacion != null).length;
-                document.getElementById('badge-gps-count').textContent = conGps + ' con GPS';
 
                 // Mostrar/ocultar overlay
                 if (data.total === 0) {
@@ -526,15 +514,15 @@
                             rutaLines[v.id].setLatLngs(paradasConCoords);
                         } else {
                             rutaLines[v.id] = L.polyline(paradasConCoords, {
-                                color: tieneGps ? '#4dabf7' : '#6c757d',
+                                color: '#4dabf7',
                                 weight: 3,
                                 opacity: 0.6,
                                 dashArray: '8, 6',
                             }).addTo(map);
                         }
-                        // Actualizar color de la ruta según estado GPS
+                        // Actualizar color de la ruta
                         rutaLines[v.id].setStyle({
-                            color: tieneGps ? '#4dabf7' : '#6c757d',
+                            color: '#4dabf7',
                         });
                     }
                 });

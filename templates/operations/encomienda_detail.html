@@ -165,6 +165,7 @@
                         </a>
                         
                         <!-- Botón de factura -->
+                        {% if not request.user.persona.es_ayudante %}
                         {% if encomienda.factura %}
                         <a href="{% url 'operations:factura_detail' encomienda.factura.pk %}" class="btn btn-azure">
                             <i class="bi bi-printer me-1"></i> Ver/Imprimir Factura
@@ -174,7 +175,9 @@
                             <i class="bi bi-receipt me-1"></i> Generar Factura
                         </a>
                         {% endif %}
+                        {% endif %}
                         
+                        {% if not request.user.persona.es_ayudante %}
                         <div class="btn-group">
                             {% if encomienda.estado == 'en_destino' %}
                             <a href="{% url 'operations:encomienda_entregar' encomienda.pk %}" class="btn btn-green">
@@ -212,6 +215,8 @@
                             </form>
                             {% endif %}
                         </div>
+                        {% endif %}
+                    </div>
                     </div>
                 </div>
             </div>

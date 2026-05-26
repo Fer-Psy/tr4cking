@@ -95,6 +95,7 @@
                                 <i class="bi bi-eye"></i>
                             </a>
                             
+                            {% if not request.user.persona.es_ayudante %}
                             {% if enc.estado == 'registrado' %}
                             <form method="post" action="{% url 'operations:cancelar_encomienda_rapida' enc.pk %}"
                                 class="d-inline" onsubmit="return confirm('¿Está seguro de cancelar esta encomienda?');">
@@ -109,6 +110,7 @@
                             <a href="{% url 'operations:encomienda_entregar' enc.pk %}" class="btn btn-sm btn-green" title="Entregar">
                                 <i class="bi bi-check-lg"></i>
                             </a>
+                            {% endif %}
                             {% endif %}
                         </div>
                     </td>

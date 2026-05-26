@@ -425,9 +425,14 @@ class PasajeVentaForm(forms.ModelForm):
             # Verificar disponibilidad del asiento en el tramo
             from .utils import asiento_disponible_en_tramo
             
-            # Si el usuario es ayudante o chofer, tiene permisos para "vender sobre ocupado"
-            # (ej. pasajeros parados o re-asignación manual), pero NUNCA puede tocar una RESERVA.
-            es_personal_bus = self.user and (self.user.is_superuser or (hasattr(self.user, 'persona') and (self.user.persona.es_ayudante or self.user.persona.es_chofer)))
+            # Solo agentes, empleados y superusuarios pueden "vender sobre ocupado"
+            # Los ayudantes/choferes NO pueden vender sobre un asiento ya vendido por un agente
+            persona_vendedor = getattr(self.user, 'persona', None) if self.user else None
+            puede_overbooking = self.user and (
+                self.user.is_superuser or 
+                (persona_vendedor and (persona_vendedor.es_agente or persona_vendedor.es_empleado) 
+                 and not persona_vendedor.es_ayudante and not persona_vendedor.es_chofer)
+            )
             
             if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
                 # Verificar si el conflicto es con una RESERVA hecha por sistema/clientes
@@ -442,14 +447,34 @@ class PasajeVentaForm(forms.ModelForm):
                 if conflictos_reserva.exists():
                     raise ValidationError(
                         f"El asiento {asiento.numero_asiento} tiene una RESERVA ACTIVA en este tramo. "
-                        "No puede ser facturado por el ayudante."
+                        "No puede ser vendido."
                     )
-                elif not es_personal_bus:
-                    # Si no es ayudante/chofer, aplicamos restricción estricta de ocupación
-                    raise ValidationError(
-                        f"El asiento {asiento.numero_asiento} ya está ocupado en parte de este recorrido."
-                    )
-                # Si es ayudante y el conflicto es solo con vendidos/abordados, permitimos continuar
+                
+                # Para usuarios sin permiso de overbooking general (como el ayudante)
+                if not puede_overbooking:
+                    es_ayudante = persona_vendedor and (persona_vendedor.es_ayudante or persona_vendedor.es_chofer)
+                    
+                    if es_ayudante:
+                        # Buscar conflictos con pasajes vendidos por otros usuarios
+                        conflictos_otros = Pasaje.objects.filter(
+                            viaje=viaje,
+                            asiento=asiento,
+                            estado__in=['vendido', 'abordado'],
+                            orden_origen__lt=orden_destino,
+                            orden_destino__gt=orden_origen,
+                        ).exclude(vendedor=self.user)
+                        
+                        if conflictos_otros.exists():
+                            raise ValidationError(
+                                f"El asiento {asiento.numero_asiento} ya está vendido en este tramo por otro vendedor. "
+                                "Solo puede vender sobre sus propias ventas o si es administrador/agente de ventas."
+                            )
+                    else:
+                        raise ValidationError(
+                            f"El asiento {asiento.numero_asiento} ya está vendido en este tramo. "
+                            "Solo un agente de ventas o administrador puede reasignar este asiento."
+                        )
+                # Si es agente/admin y el conflicto es solo con vendidos/abordados, permitimos continuar
             
             # Guardar los órdenes para uso posterior en la vista
             cleaned_data['orden_origen'] = orden_origen
@@ -589,7 +614,7 @@ class EncomiendaForm(forms.ModelForm):
             }),
         }
 
-    def __init__(self, *args, viaje=None, empresa=None, **kwargs):
+    def __init__(self, *args, viaje=None, empresa=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         
         if viaje:
@@ -629,6 +654,13 @@ class EncomiendaForm(forms.ModelForm):
             if empresa:
                 viajes_disponibles = viajes_disponibles.filter(
                     Q(empresa=empresa) | Q(bus__empresa=empresa)
+                )
+            
+            # Restricción para ayudantes y choferes
+            persona = getattr(user, 'persona', None) if user else None
+            if persona and (persona.es_ayudante or persona.es_chofer) and not user.is_superuser:
+                viajes_disponibles = viajes_disponibles.filter(
+                    Q(chofer=persona) | Q(ayudantes=persona)
                 )
             
             self.fields['viaje'].queryset = viajes_disponibles

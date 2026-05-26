@@ -180,7 +180,7 @@
         </div>
         <div class="col-md-4 text-md-end">
             <span class="badge bg-green-lt p-2 px-3">
-                <span class="stat-pulse me-2"></span> Actualizando cada 10 seg
+                <span class="stat-pulse me-2"></span> Actualizando cada 30 seg
             </span>
         </div>
     </div>
@@ -208,7 +208,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function() {
-    const REFRESH_INTERVAL = 10000; // 10 segundos
+    const REFRESH_INTERVAL = 30000; // 30 segundos
 
     const map = L.map('mapa-publico', {
         zoomControl: true,
@@ -231,15 +231,12 @@
     let hasFocused = false;
 
     function crearIconoBus(tieneGps, asientosLibres) {
-        const extraClass = tieneGps ? '' : ' no-gps';
-        const badgeClass = tieneGps ? '' : ' sin-gps';
-        const badgeTitle = tieneGps ? 'Asientos disponibles' : 'Sin señal GPS';
         return L.divIcon({
             className: 'bus-marker-public',
             html: `
-                <div class="bus-marker-inner${extraClass}">
+                <div class="bus-marker-inner">
                     <i class="bi bi-bus-front-fill"></i>
-                    <div class="bus-badge${badgeClass}" title="${badgeTitle}">${asientosLibres}</div>
+                    <div class="bus-badge" title="Asientos disponibles">${asientosLibres}</div>
                 </div>`,
             iconSize: [44, 44],
             iconAnchor: [22, 22],
@@ -279,9 +276,7 @@
         let btnText = isStaff ? 'Vender Asiento' : 'Reservar Asiento';
         let reserveBtn = v.asientos_libres > 0 ? `<a href="${url}" class="btn-reserve-map">${btnText}</a>` : '<div class="alert alert-warning py-1 mt-2 mb-0 small text-center">Bus Lleno</div>';
         
-        const gpsBadge = tieneGps
-            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
-            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Ubicación estimada</span>';
+        const gpsBadge = '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>';
 
         const velocidadHtml = tieneGps && v.ubicacion.velocidad
             ? `<div class="small mb-1"><i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
@@ -319,7 +314,6 @@
                     </div>
 
                     ${etaHtml}
-                    ${!tieneGps ? '<div class="small text-warning text-center mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Posición aproximada</div>' : ''}
                     ${reserveBtn}
                 </div>
             </div>`;
@@ -328,9 +322,7 @@
     // Generar card HTML del panel lateral
     function crearCardViaje(v) {
         const tieneGps = v.ubicacion != null;
-        const gpsBadge = tieneGps
-            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
-            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Estimado</span>';
+        const gpsBadge = '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>';
 
         let url = isStaff ? `/operations/viajes/${v.id}/vender-pasaje/` : `/operations/reservar/${v.id}/`;
         let btnText = isStaff ? 'Vender' : 'Reservar';
@@ -493,14 +485,14 @@
                             rutaLines[v.id].setLatLngs(paradasConCoords);
                         } else {
                             rutaLines[v.id] = L.polyline(paradasConCoords, {
-                                color: tieneGps ? '#206bc4' : '#94a3b8',
+                                color: '#206bc4',
                                 weight: 3,
                                 opacity: 0.5,
                                 dashArray: '8, 6',
                             }).addTo(map);
                         }
                         rutaLines[v.id].setStyle({
-                            color: tieneGps ? '#206bc4' : '#94a3b8',
+                            color: '#206bc4',
                         });
                     }
                 });

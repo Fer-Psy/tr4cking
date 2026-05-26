@@ -64,6 +64,20 @@
         color: #c62828;
         border-color: #ffcdd2;
         cursor: not-allowed;
+        position: relative;
+    }
+
+    .seat-occupied::after {
+        content: 'VENDIDO';
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 0.4rem;
+        background: #c62828;
+        color: white;
+        padding: 1px 3px;
+        border-radius: 3px;
+        font-weight: bold;
     }
 
     .seat-reserved {
@@ -428,7 +442,7 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <div class="p-2 rounded bg-danger-lt border border-danger" style="width: 20px; height: 20px;"></div>
-                        <span class="small">Ocupado (Vender si es necesario)</span>
+                        <span class="small">Vendido (Bloqueado)</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <div class="p-2 rounded bg-warning-lt border border-warning" style="width: 20px; height: 20px;"></div>
@@ -786,10 +800,43 @@ $(document).ready(function() {
                             icon = 'bi-person-clock';
                             disabled = true;
                             tooltip = `Asiento ${asiento.numero} - RESERVADO (Bloqueado)`;
+                        } else if (data.es_ayudante) {
+                            // Filtrar ocupaciones solapadas en el segmento actual
+                            const ocOverlapping = asiento.ocupaciones ? asiento.ocupaciones.filter(oc => oc.orden_origen < data.orden_destino && oc.orden_destino > data.orden_origen) : [];
+                            
+                            // El ayudante puede vender sobre asientos ocupados SOLO si él mismo los vendió todos en los tramos solapados
+                            const todosVendidosPorMi = ocOverlapping.length > 0 && ocOverlapping.every(oc => oc.vendedor_id === data.usuario_actual_id);
+                            
+                            if (todosVendidosPorMi) {
+                                // Permitido porque él mismo lo vendió
+                                statusClass = 'seat-overbookable';
+                                icon = 'bi-person-x-fill';
+                                disabled = false;
+                                
+                                if (ocOverlapping.length > 0) {
+                                    const oc = ocOverlapping[0];
+                                    tooltip = `Ocupado (Vendido por mí) hasta ${oc.hasta} - Clic para reasignar`;
+                                } else {
+                                    tooltip = `Ocupado (Vendido por mí) - Clic para reasignar`;
+                                }
+                            } else {
+                                // Bloqueado si lo vendió un agente/admin o si no es de su propiedad o está reservado
+                                statusClass = 'seat-occupied';
+                                icon = 'bi-person-x-fill';
+                                disabled = true; // Bloqueado para ayudantes
+                                
+                                if (ocOverlapping.length > 0) {
+                                    const oc = ocOverlapping[0];
+                                    tooltip = `Asiento ${asiento.numero} - VENDIDO (${oc.pasajero} → ${oc.hasta})`;
+                                } else {
+                                    tooltip = `Asiento ${asiento.numero} - VENDIDO (Bloqueado)`;
+                                }
+                            }
                         } else {
+                            // Agentes y admins pueden vender sobre asientos ocupados
                             statusClass = 'seat-overbookable';
                             icon = 'bi-person-x-fill';
-                            disabled = false; // Permitir al ayudante
+                            disabled = false;
                             
                             if (asiento.ocupaciones && asiento.ocupaciones.length > 0) {
                                 const oc = asiento.ocupaciones[0];

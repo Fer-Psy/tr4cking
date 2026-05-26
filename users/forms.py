@@ -349,7 +349,7 @@ class ClientePerfilForm(forms.ModelForm):
     
     class Meta:
         model = Persona
-        fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion']
+        fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion', 'latitud', 'longitud']
         widgets = {
             'cedula': forms.NumberInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),

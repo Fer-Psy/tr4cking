@@ -327,7 +327,7 @@
                     {% if not forloop.first %}
                     <div class="parada-line"></div>
                     {% endif %}
-                    <div class="parada-item" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}">
+                    <div class="parada-item" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}" data-lat="{{ detalle.parada.latitud_gps|default:'' }}" data-lng="{{ detalle.parada.longitud_gps|default:'' }}">
                         <div class="parada-orden">{{ detalle.orden }}</div>
                         <div class="flex-fill">
                             <div class="fw-bold">{{ detalle.parada.nombre }}</div>
@@ -342,6 +342,16 @@
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+
+                <div id="proximity-warning" class="alert alert-warning border-warning-subtle bg-warning-lt mt-3" style="display: none; border-radius: 12px; border: 1px dashed #f59f00;">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h4 class="alert-title fw-bold mb-1">¡Atención! El bus está muy próximo</h4>
+                            <div class="text-secondary small" id="proximity-warning-text">El bus está muy próximo a esta parada.</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="d-flex gap-2 mt-3 align-items-center">
@@ -561,6 +571,21 @@
     const INITIAL_DESTINO_ID = "{{ initial_destino_id|default:'' }}";
     const TIENE_RESERVA_PREVIA = {% if tiene_reserva_previa %}true{% else %}false{% endif %};
     const RESERVA_PREVIA_MSG = "{{ reserva_previa_msg|default:'' }}";
+    
+    // GPS coordinates of the bus
+    const busLat = {% if bus_lat %}{{ bus_lat }}{% else %}null{% endif %};
+    const busLng = {% if bus_lng %}{{ bus_lng }}{% else %}null{% endif %};
+
+    function calcularKm(lat1, lon1, lat2, lon2) {
+        const R = 6371; // km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
 
     if (TIENE_RESERVA_PREVIA) {
         alert(RESERVA_PREVIA_MSG);
@@ -582,6 +607,24 @@
 
             // Mostrar botón reiniciar
             document.getElementById('btn-reiniciar-seleccion').style.display = 'block';
+
+            // Verificar proximidad del bus
+            const lat = this.dataset.lat ? parseFloat(this.dataset.lat) : null;
+            const lng = this.dataset.lng ? parseFloat(this.dataset.lng) : null;
+            if (busLat && busLng && lat && lng) {
+                const dist = calcularKm(busLat, busLng, lat, lng);
+                if (dist <= 1.0) {
+                    const distStr = dist < 0.1 ? `${Math.round(dist * 1000)} metros` : `${dist.toFixed(2)} km`;
+                    const msg = `¡Atención! El bus está muy próximo a la parada "${nombre}" (a ${distStr}). Por favor, seleccione de esa parada a otras paradas siguientes para que no se equivoque.`;
+                    alert(msg);
+                    document.getElementById('proximity-warning-text').textContent = `El bus está muy próximo a la parada "${nombre}" (a ${distStr}). Por favor, seleccione de esa parada a otras paradas siguientes para que no se equivoque.`;
+                    document.getElementById('proximity-warning').style.display = 'block';
+                } else {
+                    document.getElementById('proximity-warning').style.display = 'none';
+                }
+            } else {
+                document.getElementById('proximity-warning').style.display = 'none';
+            }
 
             if (!origenId || (origenId && destinoId)) {
                 // Caso: No hay origen, o ya se ha completado tramo (reinicio)
@@ -733,6 +776,7 @@
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('panel-asientos').style.display = 'none';
         document.getElementById('btn-reiniciar-seleccion').style.display = 'none';
+        document.getElementById('proximity-warning').style.display = 'none';
         
         // Reset facturación
         document.getElementById('check-facturacion').checked = false;
