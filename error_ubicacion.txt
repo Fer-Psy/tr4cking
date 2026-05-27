@@ -10,7 +10,7 @@ sqlite3.OperationalError: database is locked
 The above exception was the direct cause of the following exception:
 
 Traceback (most recent call last):
-  File "C:\Users\carol\Downloads\tr4cking-app\tr4cking\operations\views.py", line 3596, in post
+  File "C:\Users\carol\Downloads\tr4cking-app\tr4cking\operations\views.py", line 3628, in post
     ub, created = UbicacionAyudante.objects.update_or_create(
                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
         persona=persona,

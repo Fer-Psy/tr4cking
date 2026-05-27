@@ -59,14 +59,14 @@ class Viaje(models.Model):
         on_delete=models.PROTECT,
         related_name='viajes_como_chofer',
         verbose_name="Chofer",
-        limit_choices_to=models.Q(es_chofer=True) | models.Q(es_empleado=True)
+        limit_choices_to=models.Q(es_chofer=True)
     )
     ayudantes = models.ManyToManyField(
         'users.Persona',
         blank=True,
         related_name='viajes_como_ayudante',
         verbose_name="Ayudantes",
-        limit_choices_to=models.Q(es_ayudante=True) | models.Q(es_empleado=True)
+        limit_choices_to=models.Q(es_ayudante=True)
     )
     fecha_viaje = models.DateField(
         verbose_name="Fecha del viaje"
@@ -400,7 +400,42 @@ class Pasaje(models.Model):
     def get_absolute_url(self):
         return reverse('operations:pasaje_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        super().clean()
+        if self.viaje and self.asiento and self.parada_origen and self.parada_destino:
+            from .utils import obtener_orden_parada
+            ord_origen = self.orden_origen or obtener_orden_parada(self.viaje, self.parada_origen) or 1
+            ord_destino = self.orden_destino or obtener_orden_parada(self.viaje, self.parada_destino) or 2
+            
+            conflictos = Pasaje.objects.filter(
+                viaje=self.viaje,
+                asiento=self.asiento,
+                estado__in=['reservado', 'vendido', 'abordado'],
+                orden_origen__lt=ord_destino,
+                orden_destino__gt=ord_origen,
+            )
+            if self.pk:
+                conflictos = conflictos.exclude(pk=self.pk)
+                
+            if conflictos.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError(
+                    f"El asiento {self.asiento.numero_asiento} ya está ocupado en el tramo "
+                    f"solicitado ({self.parada_origen.nombre} -> {self.parada_destino.nombre})."
+                )
+
     def save(self, *args, **kwargs):
+        # Asegurar de calcular orden_origen y orden_destino antes de limpiar
+        if self.viaje and self.parada_origen and self.parada_destino:
+            from .utils import obtener_orden_parada
+            if not self.orden_origen or self.orden_origen == 1:
+                self.orden_origen = obtener_orden_parada(self.viaje, self.parada_origen) or 1
+            if not self.orden_destino or self.orden_destino == 2:
+                self.orden_destino = obtener_orden_parada(self.viaje, self.parada_destino) or 2
+
+        # Ejecutar validaciones del modelo para evitar duplicados
+        self.full_clean()
+
         if not self.descripcion:
             # Generar descripción detallada para el usuario
             fecha = self.viaje.fecha_viaje.strftime('%d/%m/%Y')

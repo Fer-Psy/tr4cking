@@ -65,6 +65,8 @@ class PersonaListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(es_chofer=True)
         elif rol == 'ayudante':
             queryset = queryset.filter(es_ayudante=True)
+        elif rol == 'agente':
+            queryset = queryset.filter(es_agente=True)
         
         return queryset
     

@@ -1,7 +1,7 @@
 """
 Views for itineraries app.
 """
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from base.mixins import AdminOnlyMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -13,7 +13,7 @@ from django.db.models.deletion import ProtectedError
 
 from django.http import HttpResponse, JsonResponse
 from .models import Itinerario, DetalleItinerario, Precio, Horario
-from .forms import ItinerarioForm, DetalleItinerarioForm, PrecioForm, HorarioForm
+from .forms import ItinerarioForm, DetalleItinerarioForm, PrecioForm, HorarioForm, ItinerarioAddHorarioForm
 
 
 # =============================================================================
@@ -394,8 +394,33 @@ class HorarioListView(AdminOnlyMixin, ListView):
         context['estado_filter'] = self.request.GET.get('estado', '')
         return context
 
+class ItinerarioAddHorarioView(AdminOnlyMixin, SuccessMessageMixin, FormView):
+    """Vista para agregar horarios existentes a un itinerario."""
+    template_name = 'itineraries/itinerario_add_horario.html'
+    form_class = ItinerarioAddHorarioForm
+    success_message = "Horarios agregados exitosamente al itinerario."
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        self.itinerario = get_object_or_404(Itinerario, pk=self.kwargs['itinerario_pk'])
+        kwargs['itinerario'] = self.itinerario
+        return kwargs
+
+    def form_valid(self, form):
+        horarios = form.cleaned_data['horarios']
+        self.itinerario.horarios.add(*horarios)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('itineraries:itinerario_detail', kwargs={'pk': self.itinerario.pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['itinerario'] = self.itinerario
+        return context
+
 class HorarioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
-    """Agregar un horario a un itinerario."""
+    """Crear un nuevo horario general."""
     model = Horario
     form_class = HorarioForm
     template_name = 'itineraries/horario_form.html'

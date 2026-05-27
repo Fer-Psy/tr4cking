@@ -335,9 +335,9 @@
                         </div>
                         <div class="text-muted small">
                             {% if detalle.minutos_desde_origen %}
-                            +{{ detalle.minutos_desde_origen }} min
+                            Llegada: {{ detalle.hora_llegada_estimada }}
                             {% else %}
-                            Origen
+                            Salida: {{ detalle.hora_llegada_estimada }}
                             {% endif %}
                         </div>
                     </div>
@@ -361,9 +361,6 @@
                     <div class="badge bg-danger-lt px-3 py-2" id="badge-destino">
                         <i class="bi bi-geo-alt me-1"></i>Destino: <span id="destino-nombre">No seleccionado</span>
                     </div>
-                    <button class="btn btn-ghost-secondary btn-sm ms-auto" id="btn-reiniciar-seleccion" onclick="resetSeleccion()" style="display:none;">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reiniciar
-                    </button>
                 </div>
             </div>
         </div>
@@ -605,9 +602,6 @@
             const orden = parseInt(this.dataset.orden);
             const nombre = this.dataset.nombre;
 
-            // Mostrar botón reiniciar
-            document.getElementById('btn-reiniciar-seleccion').style.display = 'block';
-
             // Verificar proximidad del bus
             const lat = this.dataset.lat ? parseFloat(this.dataset.lat) : null;
             const lng = this.dataset.lng ? parseFloat(this.dataset.lng) : null;
@@ -712,7 +706,6 @@
         itemOrigen.classList.add('selected-origen');
         document.getElementById('origen-nombre').textContent = origenNombre;
         document.getElementById('resumen-origen').textContent = origenNombre;
-        document.getElementById('btn-reiniciar-seleccion').style.display = 'block';
 
         // Deshabilitar paradas anteriores al origen
         document.querySelectorAll('.parada-item').forEach(p => {
@@ -775,7 +768,6 @@
         document.getElementById('resumen-precio').textContent = '--';
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('panel-asientos').style.display = 'none';
-        document.getElementById('btn-reiniciar-seleccion').style.display = 'none';
         document.getElementById('proximity-warning').style.display = 'none';
         
         // Reset facturación
@@ -881,21 +873,6 @@
         });
 
         container.innerHTML = html;
-
-        // Mostrar info de asientos disponibles con liberación parcial
-        const infoPanel = document.getElementById('info-asiento-seleccionado');
-        const asientosConLiberacion = asientos.filter(a => !a.disponible && a.ocupaciones);
-        if (asientosConLiberacion.length > 0) {
-            let infoHtml = '<div class="info-liberacion"><i class="bi bi-info-circle me-1 text-primary"></i><strong>Info de asientos ocupados:</strong><br>';
-            asientosConLiberacion.forEach(a => {
-                a.ocupaciones.forEach(oc => {
-                    infoHtml += `<small>Asiento <strong>${a.numero}</strong>: ocupado de <strong>${oc.desde}</strong> hasta <strong>${oc.hasta}</strong>. Se libera en parada "${oc.hasta}".</small><br>`;
-                });
-            });
-            infoHtml += '</div>';
-            infoPanel.innerHTML = infoHtml;
-            infoPanel.style.display = 'block';
-        }
     }
 
     // ========= PASO 3: Seleccionar asientos (Multi-select) =========

@@ -474,6 +474,11 @@ class GenerarViajesAutomaticosView(LoginRequiredMixin, View):
                                 ayudante = it.ayudante_predeterminado
                                 
                                 if bus and chofer:
+                                    if Viaje.objects.filter(chofer=chofer, fecha_viaje=fecha).exists():
+                                        continue
+                                    if ayudante and Viaje.objects.filter(ayudantes=ayudante, fecha_viaje=fecha).exists():
+                                        continue
+                                    
                                     viaje = Viaje.objects.create(
                                         itinerario=it,
                                         horario=h,
@@ -693,6 +698,23 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
                 itinerario=itinerario, horario=horario, fecha_viaje=fecha
             ).exists():
                 omitidos += 1
+                continue
+            
+            # No crear si el chofer ya tiene un viaje en esa fecha
+            if chofer and Viaje.objects.filter(chofer=chofer, fecha_viaje=fecha).exists():
+                errores_lista.append(f"{fecha.strftime('%d/%m')}: Chofer {chofer.get_full_name()} ya asignado a otro viaje")
+                continue
+                
+            # No crear si algún ayudante ya tiene un viaje en esa fecha
+            ayudante_conflicto = False
+            if ayudantes_ids:
+                for ayudante_id in ayudantes_ids:
+                    if Viaje.objects.filter(ayudantes__id=ayudante_id, fecha_viaje=fecha).exists():
+                        ayudante_conflicto = True
+                        break
+            
+            if ayudante_conflicto:
+                errores_lista.append(f"{fecha.strftime('%d/%m')}: Un ayudante ya asignado a otro viaje")
                 continue
             
             # Validar fecha pasada
@@ -1200,6 +1222,10 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
         apellido_destinatario = form.cleaned_data.get('apellido_destinatario')
         telefono_destinatario = form.cleaned_data.get('telefono_destinatario')
         direccion_destinatario = form.cleaned_data.get('direccion_destinatario', '')
+        
+        if not cedula_destinatario:
+            import time
+            cedula_destinatario = -int(time.time() * 1000)
         
         try:
             destinatario = Persona.objects.get(cedula=cedula_destinatario)
@@ -1900,6 +1926,16 @@ class CancelarEncomiendaRapidaView(LoginRequiredMixin, View):
         if encomienda.estado != 'registrado':
             messages.error(request, "Esta encomienda ya está en tránsito o entregada, no se puede cancelar.")
             return redirect('operations:clientes_pendientes_factura')
+        
+        # Verificar si la encomienda tiene factura emitida
+        factura_activa = encomienda.factura
+        if factura_activa:
+            messages.warning(
+                request,
+                f"No se puede cancelar la encomienda {encomienda.codigo} porque tiene la factura "
+                f"{factura_activa.numero_completo} emitida. Primero debe anular la factura."
+            )
+            return redirect(request.META.get('HTTP_REFERER', reverse('operations:encomienda_list')))
             
         encomienda.estado = 'cancelado'
         encomienda.save()
@@ -2142,19 +2178,15 @@ class FacturaAnularView(LoginRequiredMixin, View):
         
         if form.is_valid():
             try:
-                revertir_caja = form.cleaned_data.get('revertir_caja', True)
-                
                 FacturacionService.anular_factura(
                     factura=factura,
                     motivo=form.cleaned_data['motivo'],
                     usuario=request.user,
-                    revertir_caja=revertir_caja
+                    revertir_caja=True
                 )
                 
                 messages.success(request, f"Factura {factura.numero_completo} anulada.")
-                
-                if revertir_caja:
-                    messages.info(request, "Se registró un egreso en caja para revertir el pago.")
+                messages.info(request, "Se registró un egreso en caja para revertir el pago.")
                 
                 return redirect('operations:factura_detail', pk=pk)
                 
@@ -3174,8 +3206,8 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                 if itinerario.ayudante_predeterminado:
                     ayudante_pred_cedula = itinerario.ayudante_predeterminado.cedula
 
-                # Obtener todos los horarios activos para que estén disponibles globalmente
-                todos_horarios = Horario.objects.filter(activo=True).order_by('hora_salida')
+                # Obtener solo los horarios asignados a este itinerario
+                todos_horarios = itinerario.horarios.filter(activo=True).order_by('hora_salida')
 
                 # Filtrar si la fecha es hoy
                 ahora = timezone.localtime(timezone.now())
@@ -3847,9 +3879,19 @@ class ReservarPasajeView(LoginRequiredMixin, TemplateView):
         context['viaje'] = viaje
 
         # Paradas del itinerario en orden
-        detalles = viaje.itinerario.detalles.select_related(
+        detalles = list(viaje.itinerario.detalles.select_related(
             'parada', 'parada__localidad'
-        ).order_by('orden')
+        ).order_by('orden'))
+
+        # Calcular hora estimada de llegada para cada parada
+        for detalle in detalles:
+            if viaje.horario and viaje.horario.hora_salida:
+                from datetime import datetime, timedelta
+                dt = datetime.combine(viaje.fecha_viaje, viaje.horario.hora_salida)
+                dt += timedelta(minutes=detalle.minutos_desde_origen or 0)
+                detalle.hora_llegada_estimada = dt.strftime("%H:%M hs")
+            else:
+                detalle.hora_llegada_estimada = "--:--"
         context['detalles_itinerario'] = detalles
 
         # Todos los asientos del bus
@@ -3874,8 +3916,9 @@ class ReservarPasajeView(LoginRequiredMixin, TemplateView):
                 bus_lat = float(ub.latitud)
                 bus_lng = float(ub.longitud)
                 break
-        context['bus_lat'] = bus_lat
-        context['bus_lng'] = bus_lng
+        # Convert to string to avoid localization comma in Javascript
+        context['bus_lat'] = str(bus_lat).replace(',', '.') if bus_lat is not None else None
+        context['bus_lng'] = str(bus_lng).replace(',', '.') if bus_lng is not None else None
 
         # Verificar si ya tiene una reserva previa (para mostrar alerta al cargar)
         persona = getattr(self.request.user, 'persona', None)
@@ -4082,12 +4125,19 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
 
     def post(self, request, viaje_pk):
         import json
-        viaje = get_object_or_404(Viaje, pk=viaje_pk)
+        from django.db import transaction
 
         try:
             body = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        with transaction.atomic():
+            # Lock the viaje row to serialize bookings and prevent concurrent race conditions
+            try:
+                viaje = Viaje.objects.select_for_update().get(pk=viaje_pk)
+            except Viaje.DoesNotExist:
+                return JsonResponse({'error': 'Viaje no encontrado'}, status=404)
 
         if viaje.reservas_bloqueadas:
             return JsonResponse({'error': 'Este viaje ya no admite nuevas reservas (bus lleno).'}, status=403)
@@ -4452,10 +4502,9 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
     def get(self, request):
         origen_id = request.GET.get('origen')
         destino_id = request.GET.get('destino')
+        fecha_desde = request.GET.get('fecha_desde')
+        fecha_hasta = request.GET.get('fecha_hasta')
         
-        if not origen_id or not destino_id:
-            return JsonResponse({'viajes': []})
-            
         from django.utils import timezone
         
         # Obtener fecha y hora local actual
@@ -4463,48 +4512,56 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
         hoy = ahora_local.date()
         hora_actual = ahora_local.time()
         
-        from fleet.models import Parada
-        origen_p = Parada.objects.filter(pk=origen_id).first()
-        destino_p = Parada.objects.filter(pk=destino_id).first()
-
-        origen_ids = get_similar_paradas_ids(origen_p, origen_id) if origen_p else [origen_id]
-        destino_ids = get_similar_paradas_ids(destino_p, destino_id) if destino_p else [destino_id]
+        viajes = Viaje.objects.filter(estado__in=['programado', 'en_curso'])
         
-        # 1. Encontrar itinerarios que tengan ambas paradas en el orden correcto
-        from itineraries.models import DetalleItinerario
-        from django.db.models import OuterRef, Subquery, F
-        
-        # Subconsulta para obtener el orden del origen para cada itinerario
-        sub_origen = DetalleItinerario.objects.filter(
-            itinerario_id=OuterRef('itinerario_id'),
-            parada_id__in=origen_ids
-        ).values('orden')[:1]
-        
-        # Subconsulta para obtener el orden del destino para cada itinerario
-        sub_destino = DetalleItinerario.objects.filter(
-            itinerario_id=OuterRef('itinerario_id'),
-            parada_id__in=destino_ids
-        ).values('orden')[:1]
-
-        # Obtener IDs de itinerarios compatibles
-        itinerarios_compatibles_ids = DetalleItinerario.objects.annotate(
-            orden_o=Subquery(sub_origen),
-            orden_d=Subquery(sub_destino)
-        ).filter(
-            orden_o__isnull=False,
-            orden_d__isnull=False,
-            orden_o__lt=F('orden_d')
-        ).values_list('itinerario_id', flat=True).distinct()
-        
-        if not itinerarios_compatibles_ids:
-            return JsonResponse({'viajes': []})
+        if fecha_desde:
+            viajes = viajes.filter(fecha_viaje__gte=fecha_desde)
+        else:
+            viajes = viajes.filter(fecha_viaje__gte=hoy)
             
-        # 2. Obtener viajes para esos itinerarios
-        viajes = Viaje.objects.filter(
-            itinerario_id__in=itinerarios_compatibles_ids,
-            fecha_viaje__gte=hoy,
-            estado__in=['programado', 'en_curso']
-        ).select_related('itinerario', 'bus', 'horario', 'empresa').order_by('fecha_viaje', 'horario__hora_salida')
+        if fecha_hasta:
+            viajes = viajes.filter(fecha_viaje__lte=fecha_hasta)
+
+        if origen_id and destino_id:
+            from fleet.models import Parada
+            origen_p = Parada.objects.filter(pk=origen_id).first()
+            destino_p = Parada.objects.filter(pk=destino_id).first()
+    
+            origen_ids = get_similar_paradas_ids(origen_p, origen_id) if origen_p else [origen_id]
+            destino_ids = get_similar_paradas_ids(destino_p, destino_id) if destino_p else [destino_id]
+            
+            # 1. Encontrar itinerarios que tengan ambas paradas en el orden correcto
+            from itineraries.models import DetalleItinerario
+            from django.db.models import OuterRef, Subquery, F
+            
+            # Subconsulta para obtener el orden del origen para cada itinerario
+            sub_origen = DetalleItinerario.objects.filter(
+                itinerario_id=OuterRef('itinerario_id'),
+                parada_id__in=origen_ids
+            ).values('orden')[:1]
+            
+            # Subconsulta para obtener el orden del destino para cada itinerario
+            sub_destino = DetalleItinerario.objects.filter(
+                itinerario_id=OuterRef('itinerario_id'),
+                parada_id__in=destino_ids
+            ).values('orden')[:1]
+    
+            # Obtener IDs de itinerarios compatibles
+            itinerarios_compatibles_ids = DetalleItinerario.objects.annotate(
+                orden_o=Subquery(sub_origen),
+                orden_d=Subquery(sub_destino)
+            ).filter(
+                orden_o__isnull=False,
+                orden_d__isnull=False,
+                orden_o__lt=F('orden_d')
+            ).values_list('itinerario_id', flat=True).distinct()
+            
+            if not itinerarios_compatibles_ids:
+                return JsonResponse({'viajes': []})
+                
+            viajes = viajes.filter(itinerario_id__in=itinerarios_compatibles_ids)
+            
+        viajes = viajes.select_related('itinerario', 'bus', 'horario', 'empresa').order_by('fecha_viaje', 'horario__hora_salida')
         
         viajes_data = []
         for v in viajes:

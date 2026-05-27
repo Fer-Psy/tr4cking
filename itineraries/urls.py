@@ -28,7 +28,7 @@ urlpatterns = [
     # Horarios
     path('horarios/', views.HorarioListView.as_view(), name='horario_list'),
     path('horarios/nuevo/', views.HorarioCreateView.as_view(), name='horario_create_generic'),
-    path('<int:itinerario_pk>/horarios/nuevo/', views.HorarioCreateView.as_view(), name='horario_create'),
+    path('<int:itinerario_pk>/horarios/nuevo/', views.ItinerarioAddHorarioView.as_view(), name='horario_create'),
     path('horarios/<int:pk>/editar/', views.HorarioUpdateView.as_view(), name='horario_edit'),
     path('horarios/<int:pk>/eliminar/', views.HorarioDeleteView.as_view(), name='horario_delete'),
     path('horarios/crear-ajax/', views.HorarioCreateAjaxView.as_view(), name='horario_create_ajax'),

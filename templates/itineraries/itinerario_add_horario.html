@@ -1,0 +1,40 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Agregar Horario - {{ itinerario.nombre }} - TR4CKING{% endblock %}
+
+{% block page_header %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}" class="text-secondary">{{ itinerario.nombre }}</a>
+                </div>
+                <h2 class="page-title">
+                    Seleccionar Horarios Disponibles
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {% load crispy_forms_tags %}
+            {% crispy form %}
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-2"></i>Añadir al Itinerario
+                </button>
+                <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

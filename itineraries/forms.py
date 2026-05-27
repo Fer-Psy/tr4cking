@@ -249,3 +249,27 @@ class PrecioForm(forms.ModelForm):
             raise forms.ValidationError("El origen y destino no pueden ser iguales.")
         
         return cleaned_data
+
+class ItinerarioAddHorarioForm(forms.Form):
+    """Formulario para seleccionar horarios existentes y agregarlos al itinerario."""
+    horarios = forms.ModelMultipleChoiceField(
+        queryset=Horario.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Horarios Disponibles",
+        help_text="Seleccione uno o más horarios para agregar al itinerario."
+    )
+    
+    def __init__(self, *args, itinerario=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.itinerario = itinerario
+        
+        if self.itinerario:
+            self.fields['horarios'].queryset = Horario.objects.exclude(
+                id__in=self.itinerario.horarios.values_list('id', flat=True)
+            ).order_by('hora_salida')
+            
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+            'horarios'
+        )

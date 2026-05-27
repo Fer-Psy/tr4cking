@@ -57,8 +57,16 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Fecha Desde</label>
+                                    <input type="date" id="filtro_fecha_desde" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Fecha Hasta</label>
+                                    <input type="date" id="filtro_fecha_hasta" class="form-control">
+                                </div>
                                 <div class="col-12">
-                                    <label class="form-label">Buses que hacen este recorrido *</label>
+                                    <label class="form-label">Buses disponibles *</label>
                                     {{ form.viaje }}
                                     <small class="text-muted">
                                         Seleccione el bus de acuerdo a la empresa y horario de preferencia.
@@ -114,7 +122,7 @@
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Cédula del Destinatario *</label>
+                                            <label class="form-label">Cédula del Destinatario</label>
                                             {{ form.cedula_destinatario }}
                                         </div>
                                         <div class="col-md-6 mb-3">
@@ -331,15 +339,19 @@ document.addEventListener('DOMContentLoaded', function() {
     function filtrarViajes() {
         if (!viajeSelect) return; // Solo si estamos en creación directa
         
-        const origen = paradaOrigen.value;
-        const destino = paradaDestino.value;
-        
-        if (!origen || !destino) return;
+        const origen = paradaOrigen ? paradaOrigen.value : '';
+        const destino = paradaDestino ? paradaDestino.value : '';
+        const fechaDesde = document.getElementById('filtro_fecha_desde') ? document.getElementById('filtro_fecha_desde').value : '';
+        const fechaHasta = document.getElementById('filtro_fecha_hasta') ? document.getElementById('filtro_fecha_hasta').value : '';
         
         const currentViaje = viajeSelect.value;
         viajeSelect.innerHTML = '<option value="">-- Buscando viajes disponibles... --</option>';
         
-        fetch(`/operations/api/viajes-compatibles/?origen=${origen}&destino=${destino}`)
+        let url = `/operations/api/viajes-compatibles/?origen=${origen}&destino=${destino}`;
+        if (fechaDesde) url += `&fecha_desde=${fechaDesde}`;
+        if (fechaHasta) url += `&fecha_hasta=${fechaHasta}`;
+        
+        fetch(url)
             .then(response => response.json())
             .then(data => {
                 viajeSelect.innerHTML = '<option value="">-- Seleccione un viaje --</option>';
@@ -372,6 +384,26 @@ document.addEventListener('DOMContentLoaded', function() {
         paradaOrigen.addEventListener('change', filtrarViajes);
         paradaDestino.addEventListener('change', filtrarViajes);
     }
+    
+    const fechaDesdeInput = document.getElementById('filtro_fecha_desde');
+    const fechaHastaInput = document.getElementById('filtro_fecha_hasta');
+    if (fechaDesdeInput) fechaDesdeInput.addEventListener('change', filtrarViajes);
+    if (fechaHastaInput) fechaHastaInput.addEventListener('change', filtrarViajes);
+    
+    // Set default date values to today
+    const today = new Date();
+    const tzOffset = today.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(today - tzOffset)).toISOString().split('T')[0];
+    
+    if (fechaDesdeInput && !fechaDesdeInput.value) {
+        fechaDesdeInput.value = localISOTime;
+    }
+    if (fechaHastaInput && !fechaHastaInput.value) {
+        fechaHastaInput.value = localISOTime;
+    }
+    
+    // Call initially to load trips for the default dates
+    filtrarViajes();
     
     // ========================================================
     // BÚSQUEDA DE REMITENTE

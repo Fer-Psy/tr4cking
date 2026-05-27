@@ -268,11 +268,7 @@
     function crearPopupContent(v) {
         const pct = v.porcentaje_ocupacion;
         const color = getOcupacionColor(pct);
-        const tieneGps = v.ubicacion != null;
         const gpsBadge = `<span class="gps-badge-on"><span class="gps-dot on"></span> En vivo</span>`;
-        const velocidadHtml = tieneGps && v.ubicacion.velocidad != null
-            ? `<div class="col-6 small text-end"><i class="bi bi-speedometer2 me-1 text-muted"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
-            : '';
 
         return `
             <div style="min-width: 260px;">
@@ -328,8 +324,7 @@
                     </div>
 
                     <div class="row g-1 mt-2 border-top pt-2">
-                        <div class="col-6 small"><i class="bi bi-clock me-1 text-muted"></i>Salida: ${v.hora_salida}</div>
-                        ${velocidadHtml}
+                        <div class="col-12 small"><i class="bi bi-clock me-1 text-muted"></i>Salida: ${v.hora_salida}</div>
                     </div>
                     <div class="mt-1 smaller text-muted text-center italic">Capacidad: ${v.asientos_total} asientos</div>
                 </div>
@@ -383,12 +378,6 @@
                         <span title="Total"><i class="bi bi-bus-front"></i> ${v.asientos_total}</span>
                     </div>
                 </div>
-                ${tieneGps && v.ubicacion.velocidad != null ? `
-                <div class="mt-2 pt-2 border-top">
-                    <span class="text-muted" style="font-size: 0.7rem;">
-                        <i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h
-                    </span>
-                </div>` : ''}
             </div>
         </div>`;
     }

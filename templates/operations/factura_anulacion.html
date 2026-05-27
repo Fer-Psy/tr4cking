@@ -112,41 +112,13 @@
                         </div>
                     </div>
 
-                    <!-- Opción de revertir caja -->
-                    <div class="mb-4">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <div class="form-check">
-                                    {{ form.revertir_caja }}
-                                    <label class="form-check-label" for="id_revertir_caja">
-                                        <strong>Revertir movimiento de caja</strong>
-                                    </label>
-                                </div>
-                                <div class="form-text mt-2">
-                                    {% if tiene_caja_abierta %}
-                                    <span class="text-success">
-                                        <i class="bi bi-check-circle me-1"></i>
-                                        Tiene caja abierta. Se registrará un egreso de Gs. {{ factura.total|floatformat:0 }} para revertir el pago.
-                                    </span>
-                                    {% else %}
-                                    <span class="text-warning">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        No tiene caja abierta. No se podrá registrar el egreso automáticamente.
-                                    </span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Consecuencias de la anulación -->
                     <div class="alert alert-info mb-4">
                         <h6 class="alert-heading">Consecuencias de la anulación:</h6>
                         <ul class="mb-0">
                             <li>La factura quedará marcada como <strong>ANULADA</strong></li>
-                            {% if tiene_caja_abierta %}
                             <li>Se creará un movimiento de <strong>EGRESO</strong> en caja por Gs. {{ factura.total|floatformat:0 }}</li>
-                            {% endif %}
                             {% for d in factura.detalles.all %}
                                 {% if d.pasaje %}
                                 <li>El pasaje <strong>{{ d.pasaje.codigo }}</strong> será cancelado</li>

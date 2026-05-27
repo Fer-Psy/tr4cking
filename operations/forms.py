@@ -54,9 +54,13 @@ class ViajeForm(forms.ModelForm):
         # Filtrar solo itinerarios activos
         self.fields['itinerario'].queryset = Itinerario.objects.filter(activo=True)
         
-        # Mostrar todos los horarios activos por defecto para reutilizarlos
-        self.fields['horario'].queryset = Horario.objects.filter(activo=True).order_by('hora_salida')
+        # Inicialmente el queryset de horarios vacío si no hay itinerario
+        self.fields['horario'].queryset = Horario.objects.none()
         self.fields['horario'].required = True
+        
+        # Filtros iniciales base para personal
+        self.fields['chofer'].queryset = Persona.objects.filter(es_chofer=True).order_by('apellido', 'nombre')
+        self.fields['ayudantes'].queryset = Persona.objects.filter(es_ayudante=True).order_by('apellido', 'nombre')
         
         # Obtener valores actuales (de la instancia o del POST)
         itinerario_id = None
@@ -104,11 +108,11 @@ class ViajeForm(forms.ModelForm):
                     empresa_id=emp_id
                 ).order_by('placa')
                 self.fields['chofer'].queryset = Persona.objects.filter(
-                    Q(es_chofer=True) | Q(es_empleado=True),
+                    Q(es_chofer=True),
                     empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
                 self.fields['ayudantes'].queryset = Persona.objects.filter(
-                    Q(es_ayudante=True) | Q(es_empleado=True),
+                    Q(es_ayudante=True),
                     empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
             except (ValueError, TypeError):
@@ -119,8 +123,8 @@ class ViajeForm(forms.ModelForm):
                 it_id = int(itinerario_id)
                 itinerario_obj = Itinerario.objects.get(pk=it_id)
                 
-                # Permitir seleccionar cualquier horario activo
-                self.fields['horario'].queryset = Horario.objects.filter(
+                # Permitir seleccionar horarios activos asignados al itinerario
+                self.fields['horario'].queryset = itinerario_obj.horarios.filter(
                     activo=True
                 ).order_by('hora_salida')
                 self.fields['horario'].required = True
@@ -131,11 +135,11 @@ class ViajeForm(forms.ModelForm):
                         empresa=itinerario_obj.empresa
                     ).order_by('placa')
                     self.fields['chofer'].queryset = Persona.objects.filter(
-                        Q(es_chofer=True) | Q(es_empleado=True),
+                        Q(es_chofer=True),
                         empresa=itinerario_obj.empresa
                     ).order_by('apellido', 'nombre')
                     self.fields['ayudantes'].queryset = Persona.objects.filter(
-                        Q(es_ayudante=True) | Q(es_empleado=True),
+                        Q(es_ayudante=True),
                         empresa=itinerario_obj.empresa
                     ).order_by('apellido', 'nombre')
             except (ValueError, TypeError, Itinerario.DoesNotExist):
@@ -159,6 +163,13 @@ class ViajeForm(forms.ModelForm):
         })
         
         self.fields['horario'].widget.attrs.update({
+            'hx-get': '/operations/obtener-horarios/',
+            'hx-target': '#id_horario',
+            'hx-trigger': 'change',
+            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
+        })
+        
+        self.fields['empresa'].widget.attrs.update({
             'hx-get': '/operations/obtener-horarios/',
             'hx-target': '#id_horario',
             'hx-trigger': 'change',
@@ -268,17 +279,30 @@ class ViajeForm(forms.ModelForm):
                     )
             
             chofer = cleaned_data.get('chofer')
-            if chofer and itinerario and fecha:
+            if chofer and fecha:
                 chofer_exists = Viaje.objects.filter(
                     chofer=chofer,
-                    itinerario=itinerario,
                     fecha_viaje=fecha
                 ).exclude(pk=self.instance.pk).exists()
                 
                 if chofer_exists:
                     raise ValidationError(
-                        "Este chofer ya tiene asignado un viaje para este itinerario en esta fecha."
+                        f"El chofer {chofer.get_full_name()} ya tiene asignado un viaje en esta fecha."
                     )
+            
+            ayudantes = cleaned_data.get('ayudantes')
+            if ayudantes and fecha:
+                # ayudantes is a queryset from the form
+                for ayudante in ayudantes:
+                    ayudante_exists = Viaje.objects.filter(
+                        ayudantes=ayudante,
+                        fecha_viaje=fecha
+                    ).exclude(pk=self.instance.pk).exists()
+                    
+                    if ayudante_exists:
+                        raise ValidationError(
+                            f"El ayudante {ayudante.get_full_name()} ya tiene asignado un viaje en esta fecha."
+                        )
         
         return cleaned_data
 
@@ -537,10 +561,11 @@ class EncomiendaForm(forms.ModelForm):
     
     # Campos del destinatario (para crear nuevo si no existe)
     cedula_destinatario = forms.IntegerField(
-        label="Cédula del Destinatario",
+        label="Cédula del Destinatario (Opcional)",
+        required=False,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Número de cédula'
+            'placeholder': 'Dejar vacío si no tiene'
         })
     )
     
@@ -993,13 +1018,7 @@ class FacturaAnulacionForm(forms.Form):
         })
     )
     
-    revertir_caja = forms.BooleanField(
-        label="¿Revertir movimiento de caja?",
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        help_text="Crea un movimiento de egreso para revertir el ingreso original."
-    )
+    # revertir_caja se aplica siempre automáticamente
 
 
 # =============================================================================

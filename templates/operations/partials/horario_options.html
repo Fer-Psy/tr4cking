@@ -10,11 +10,7 @@
 {% endfor %}
 
 {% if itinerarios %}
-<select id="id_itinerario" name="itinerario" class="form-select select2" hx-swap-oob="true"
-    hx-get="/operations/obtener-horarios/"
-    hx-target="#id_horario"
-    hx-trigger="change"
-    hx-vals='js:{itinerario: this.value, fecha: document.getElementById("id_fecha_viaje")?.value || "", empresa: document.getElementById("id_empresa")?.value || "", viaje_id: "{{ viaje_id|default:'' }}"}'>
+<select id="id_itinerario" hx-swap-oob="innerHTML">
     <option value="">-- Seleccione un itinerario --</option>
     {% for it in itinerarios %}
         <option value="{{ it.id }}" {% if it.id|stringformat:"s" == itinerario_id %}selected{% endif %}>{{ it.nombre }}</option>
@@ -22,7 +18,7 @@
 </select>
 {% endif %}
 
-<select id="id_bus" name="bus" class="form-select" hx-swap-oob="true">
+<select id="id_bus" hx-swap-oob="innerHTML">
     <option value="">---------</option>
     {% for bus in buses %}
         <option value="{{ bus.id }}" {% if bus.id == bus_pred_id %}selected{% endif %}>
@@ -36,7 +32,7 @@
     {% endfor %}
 </select>
 
-<select id="id_chofer" name="chofer" class="form-select" hx-swap-oob="true">
+<select id="id_chofer" hx-swap-oob="innerHTML">
     <option value="">---------</option>
     {% for c in choferes %}
         <option value="{{ c.cedula|stringformat:'s' }}" {% if c.cedula == chofer_pred_cedula %}selected{% endif %}>
@@ -50,7 +46,7 @@
     {% endfor %}
 </select>
 
-<select id="id_ayudantes" name="ayudantes" class="form-select select2-multiple" multiple hx-swap-oob="true">
+<select id="id_ayudantes" hx-swap-oob="innerHTML">
     {% for a in ayudantes %}
         <option value="{{ a.cedula|stringformat:'s' }}" {% if a.cedula == ayudante_pred_cedula %}selected{% endif %}>
             {{ a.apellido }}, {{ a.nombre }}
