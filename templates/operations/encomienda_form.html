@@ -33,11 +33,29 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Parada de Origen *</label>
-                                    {{ form.parada_origen }}
+                                    <div class="d-none">{{ form.parada_origen }}</div>
+                                    <div class="input-group">
+                                        <input type="text" id="origen_display" class="form-control bg-light" readonly placeholder="Seleccione origen...">
+                                        <button type="button" class="btn btn-primary" onclick="abrirModalParada('origen')">
+                                            <i class="bi bi-search me-1"></i> Buscar
+                                        </button>
+                                    </div>
+                                    {% if form.parada_origen.errors %}
+                                    <div class="text-danger small mt-1">{{ form.parada_origen.errors.0 }}</div>
+                                    {% endif %}
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Parada de Destino *</label>
-                                    {{ form.parada_destino }}
+                                    <div class="d-none">{{ form.parada_destino }}</div>
+                                    <div class="input-group">
+                                        <input type="text" id="destino_display" class="form-control bg-light" readonly placeholder="Seleccione destino...">
+                                        <button type="button" class="btn btn-primary" onclick="abrirModalParada('destino')">
+                                            <i class="bi bi-search me-1"></i> Buscar
+                                        </button>
+                                    </div>
+                                    {% if form.parada_destino.errors %}
+                                    <div class="text-danger small mt-1">{{ form.parada_destino.errors.0 }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="alert alert-info py-2 mb-0">
@@ -57,18 +75,22 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Fecha Desde</label>
-                                    <input type="date" id="filtro_fecha_desde" class="form-control">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Fecha Hasta</label>
-                                    <input type="date" id="filtro_fecha_hasta" class="form-control">
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Fecha</label>
+                                    <input type="date" id="filtro_fecha" class="form-control">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Buses disponibles *</label>
-                                    {{ form.viaje }}
-                                    <small class="text-muted">
+                                    <div class="d-none">
+                                        {{ form.viaje }}
+                                    </div>
+                                    <div id="viajes-cards-container" class="mt-2">
+                                        <div class="alert alert-info">Seleccione un origen y destino para ver los buses disponibles.</div>
+                                    </div>
+                                    {% if form.viaje.errors %}
+                                    <div class="text-danger small mt-1">{{ form.viaje.errors.0 }}</div>
+                                    {% endif %}
+                                    <small class="text-muted d-block mt-2">
                                         Seleccione el bus de acuerdo a la empresa y horario de preferencia.
                                     </small>
                                 </div>
@@ -294,6 +316,45 @@
     </div>
 </div>
 
+<!-- Modal Búsqueda de Paradas -->
+<div class="modal modal-lg fade" id="modalBuscarParada" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-green-lt">
+                <h5 class="modal-title">
+                    <i class="bi bi-search me-2"></i>
+                    Buscar Parada de <span id="tipoParadaText"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="buscarParadaInput" class="form-control" placeholder="Escriba el nombre de la parada..." autocomplete="off">
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-vcenter">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>Nombre de la Parada</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaParadas">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const viajeSelect = document.getElementById('id_viaje');
@@ -331,6 +392,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currentValue) {
             select.value = currentValue;
         }
+        
+        // Sincronizar display visible si estamos actualizando las opciones del tramo actual
+        if (select.id === 'id_parada_origen') {
+            initParadaDisplay('origen');
+        } else if (select.id === 'id_parada_destino') {
+            initParadaDisplay('destino');
+        }
     }
     
     // ========================================================
@@ -341,42 +409,120 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const origen = paradaOrigen ? paradaOrigen.value : '';
         const destino = paradaDestino ? paradaDestino.value : '';
-        const fechaDesde = document.getElementById('filtro_fecha_desde') ? document.getElementById('filtro_fecha_desde').value : '';
-        const fechaHasta = document.getElementById('filtro_fecha_hasta') ? document.getElementById('filtro_fecha_hasta').value : '';
+        const fecha = document.getElementById('filtro_fecha') ? document.getElementById('filtro_fecha').value : '';
+        
+        const viajesContainer = document.getElementById('viajes-cards-container');
+        
+        if (!origen || !destino) {
+            viajeSelect.innerHTML = '<option value="">-- Seleccione origen y destino --</option>';
+            if (viajesContainer) {
+                viajesContainer.innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>Seleccione un origen y destino para ver los buses disponibles.</div>';
+            }
+            return;
+        }
         
         const currentViaje = viajeSelect.value;
+        if (viajesContainer) {
+            viajesContainer.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Buscando buses disponibles...</div></div>';
+        }
         viajeSelect.innerHTML = '<option value="">-- Buscando viajes disponibles... --</option>';
         
         let url = `/operations/api/viajes-compatibles/?origen=${origen}&destino=${destino}`;
-        if (fechaDesde) url += `&fecha_desde=${fechaDesde}`;
-        if (fechaHasta) url += `&fecha_hasta=${fechaHasta}`;
+        if (fecha) url += `&fecha_desde=${fecha}&fecha_hasta=${fecha}`;
         
         fetch(url)
             .then(response => response.json())
             .then(data => {
                 viajeSelect.innerHTML = '<option value="">-- Seleccione un viaje --</option>';
+                let cardsHtml = '';
+                
                 if (data.viajes && data.viajes.length > 0) {
+                    cardsHtml = '<div class="row g-3">';
+                    
                     data.viajes.forEach(v => {
+                        // Agregamos el option al select oculto (necesario para el form submit y validacion)
                         const opt = document.createElement('option');
                         opt.value = v.id;
                         opt.textContent = v.label;
                         viajeSelect.appendChild(opt);
+                        
+                        const isSelected = (currentViaje == v.id);
+                        if (isSelected) {
+                            opt.selected = true;
+                        }
+                        
+                        // Si v.fecha o v.hora no existen (por compatibilidad con el API viejo), usamos label
+                        const displayFecha = v.fecha ? v.fecha : v.label.split(' - ')[0];
+                        const displayHora = v.hora ? v.hora : '';
+                        const displayEmpresa = v.empresa ? v.empresa : 'Bus';
+                        const displayBus = v.bus ? `Bus: ${v.bus}` : '';
+                        const displayItinerario = v.itinerario ? v.itinerario : '';
+                        
+                        cardsHtml += `
+                            <div class="col-md-6 col-lg-4">
+                                <label class="form-selectgroup-item w-100 h-100">
+                                    <input type="radio" name="viaje_radio" value="${v.id}" class="form-selectgroup-input" ${isSelected ? 'checked' : ''} onchange="document.getElementById('id_viaje').value = this.value;">
+                                    <div class="form-selectgroup-label d-flex align-items-center p-3 h-100 text-start" style="cursor: pointer; border-radius: 8px;">
+                                        <div class="me-3">
+                                            <span class="form-selectgroup-check"></span>
+                                        </div>
+                                        <div class="flex-fill">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <div class="fw-bold fs-4 text-primary"><i class="bi bi-clock me-1"></i> ${displayHora}</div>
+                                                <div class="badge bg-green-lt">${displayFecha}</div>
+                                            </div>
+                                            <div class="fw-bold text-body mt-2 mb-1"><i class="bi bi-building me-1 text-muted"></i> ${displayEmpresa}</div>
+                                            <div class="text-muted small"><i class="bi bi-geo me-1"></i> ${displayItinerario}</div>
+                                            <div class="text-muted small mt-1"><i class="bi bi-bus-front me-1"></i> ${displayBus}</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        `;
                     });
                     
-                    // Restaurar selección si sigue siendo válida
+                    cardsHtml += '</div>';
+                    
+                    // Restaurar selección si sigue siendo válida en el select
                     if (currentViaje) {
                         const stillValid = data.viajes.some(v => v.id == currentViaje);
                         if (stillValid) {
                             viajeSelect.value = currentViaje;
+                        } else {
+                            viajeSelect.value = '';
                         }
                     }
                 } else {
                     viajeSelect.innerHTML = '<option value="">-- No hay buses para este tramo --</option>';
+                    cardsHtml = `
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="bi bi-exclamation-triangle-fill fs-3 me-3 text-warning"></i>
+                            <div>
+                                <h4 class="alert-title mb-1">Sin buses disponibles</h4>
+                                <div class="text-muted">No se encontraron buses programados para el origen y destino seleccionados en las fechas indicadas.</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (viajesContainer) {
+                    viajesContainer.innerHTML = cardsHtml;
                 }
             })
             .catch(error => {
                 console.error('Error al filtrar viajes:', error);
                 viajeSelect.innerHTML = '<option value="">-- Error al cargar viajes --</option>';
+                if (viajesContainer) {
+                    viajesContainer.innerHTML = `
+                        <div class="alert alert-danger d-flex align-items-center">
+                            <i class="bi bi-x-circle-fill fs-3 me-3 text-danger"></i>
+                            <div>
+                                <h4 class="alert-title mb-1">Error de conexión</h4>
+                                <div class="text-muted">Ocurrió un error al intentar cargar los buses disponibles.</div>
+                            </div>
+                        </div>
+                    `;
+                }
             });
     }
 
@@ -385,21 +531,17 @@ document.addEventListener('DOMContentLoaded', function() {
         paradaDestino.addEventListener('change', filtrarViajes);
     }
     
-    const fechaDesdeInput = document.getElementById('filtro_fecha_desde');
-    const fechaHastaInput = document.getElementById('filtro_fecha_hasta');
-    if (fechaDesdeInput) fechaDesdeInput.addEventListener('change', filtrarViajes);
-    if (fechaHastaInput) fechaHastaInput.addEventListener('change', filtrarViajes);
+    const fechaInput = document.getElementById('filtro_fecha');
+    
+    if (fechaInput) fechaInput.addEventListener('change', filtrarViajes);
     
     // Set default date values to today
     const today = new Date();
     const tzOffset = today.getTimezoneOffset() * 60000;
     const localISOTime = (new Date(today - tzOffset)).toISOString().split('T')[0];
     
-    if (fechaDesdeInput && !fechaDesdeInput.value) {
-        fechaDesdeInput.value = localISOTime;
-    }
-    if (fechaHastaInput && !fechaHastaInput.value) {
-        fechaHastaInput.value = localISOTime;
+    if (fechaInput && !fechaInput.value) {
+        fechaInput.value = localISOTime;
     }
     
     // Call initially to load trips for the default dates
@@ -583,6 +725,122 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('modalBuscarRemitente')?.addEventListener('shown.bs.modal', function() {
         buscarInput?.focus();
     });
+
+    // ========================================================
+    // BÚSQUEDA DE PARADAS EN MODAL
+    // ========================================================
+    let tipoParadaActual = '';
+    const modalParadaEl = document.getElementById('modalBuscarParada');
+    let modalParada;
+    if (modalParadaEl) {
+        modalParada = new bootstrap.Modal(modalParadaEl);
+    }
+    const buscarParadaInput = document.getElementById('buscarParadaInput');
+    
+    window.abrirModalParada = function(tipo) {
+        if (!modalParada) return;
+        tipoParadaActual = tipo;
+        document.getElementById('tipoParadaText').textContent = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        buscarParadaInput.value = '';
+        renderizarParadas('');
+        modalParada.show();
+    };
+    
+    if (buscarParadaInput) {
+        buscarParadaInput.addEventListener('input', function() {
+            renderizarParadas(this.value.trim().toLowerCase());
+        });
+    }
+    
+    function renderizarParadas(filtro) {
+        const selectId = tipoParadaActual === 'origen' ? 'id_parada_origen' : 'id_parada_destino';
+        const selectEl = document.getElementById(selectId);
+        const listaParadas = document.getElementById('listaParadas');
+        
+        if (!selectEl || !listaParadas) return;
+        
+        let html = '';
+        let count = 0;
+        const nombresVistos = new Set();
+        
+        for (let i = 0; i < selectEl.options.length; i++) {
+            const opt = selectEl.options[i];
+            if (!opt.value) continue;
+            
+            const textoParada = opt.text;
+            
+            if (!filtro || textoParada.toLowerCase().includes(filtro)) {
+                if (nombresVistos.has(textoParada)) {
+                    continue; // Omitir paradas duplicadas con el mismo nombre
+                }
+                nombresVistos.add(textoParada);
+                
+                // Escapar comillas para la llamada a la funcion
+                const safeText = textoParada.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                html += `
+                    <tr>
+                        <td><strong>${textoParada}</strong></td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-success" onclick="seleccionarParada('${opt.value}', '${safeText}')">
+                                <i class="bi bi-check-lg me-1"></i> Seleccionar
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                count++;
+            }
+        }
+        
+        if (count === 0) {
+            html = `<tr><td colspan="2" class="text-center text-muted py-3">No se encontraron paradas</td></tr>`;
+        }
+        
+        listaParadas.innerHTML = html;
+    }
+    
+    window.seleccionarParada = function(value, text) {
+        const selectId = tipoParadaActual === 'origen' ? 'id_parada_origen' : 'id_parada_destino';
+        const displayId = tipoParadaActual === 'origen' ? 'origen_display' : 'destino_display';
+        
+        const selectEl = document.getElementById(selectId);
+        const displayEl = document.getElementById(displayId);
+        
+        if (selectEl && displayEl) {
+            selectEl.value = value;
+            displayEl.value = text;
+            
+            if (modalParada) {
+                modalParada.hide();
+            }
+            
+            // Disparar evento change para filtrar viajes
+            const event = new Event('change');
+            selectEl.dispatchEvent(event);
+        }
+    };
+
+    window.initParadaDisplay = function(tipo) {
+        const selectId = tipo === 'origen' ? 'id_parada_origen' : 'id_parada_destino';
+        const displayId = tipo === 'origen' ? 'origen_display' : 'destino_display';
+        const selectEl = document.getElementById(selectId);
+        const displayEl = document.getElementById(displayId);
+        
+        if (selectEl && displayEl && selectEl.value && selectEl.selectedIndex >= 0) {
+            displayEl.value = selectEl.options[selectEl.selectedIndex].text;
+        }
+    };
+    
+    // Inicializar valores visuales
+    initParadaDisplay('origen');
+    initParadaDisplay('destino');
+    
+    // Enfocar input al abrir modal
+    if (modalParadaEl) {
+        modalParadaEl.addEventListener('shown.bs.modal', function () {
+            buscarParadaInput.focus();
+        });
+    }
+
 });
 </script>
 {% endblock %}

@@ -17,23 +17,60 @@
 </div></div>
 
 <!-- Tablas detalle -->
-<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-ticket-perforated me-2"></i>Detalle de Pasajes</h3></div>
-<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped">
-<thead><tr><th>Código</th><th>Fecha</th><th>Pasajero</th><th>Ruta</th><th>Asiento</th><th>Vendedor</th><th class="text-end">Precio</th><th>Estado</th></tr></thead>
+<style>
+@media print {
+  #tabla-sit-pasajes .sit-pasaje-row { display: table-row !important; }
+  #tabla-sit-enc .sit-enc-row { display: table-row !important; }
+  #tabla-sit-pasajes tfoot, #tabla-sit-enc tfoot { display: table-row-group !important; }
+}
+body.exporting-pdf #tabla-sit-pasajes .sit-pasaje-row { display: table-row !important; }
+body.exporting-pdf #tabla-sit-enc .sit-enc-row { display: table-row !important; }
+body.exporting-pdf #tabla-sit-pasajes tfoot, body.exporting-pdf #tabla-sit-enc tfoot { display: table-row-group !important; }
+</style>
+
+<div class="card mb-4"><div class="card-header d-flex align-items-center justify-content-between">
+<h3 class="card-title mb-0"><i class="bi bi-ticket-perforated me-2"></i>Detalle de Pasajes</h3>
+<span class="text-muted small" id="sit-pasajes-info"></span>
+</div>
+<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped" id="tabla-sit-pasajes">
+<thead><tr><th>Código</th><th>Fecha</th><th>Pasajero</th><th>Ruta</th><th>Asiento</th><th>Vendedor</th><th class="text-end">Ingreso</th><th>Estado</th></tr></thead>
 <tbody>{% for p in pasajes_situacion %}
-<tr><td>{{ p.codigo }}</td><td>{{ p.fecha_venta|date:"d/m H:i" }}</td><td>{{ p.pasajero.nombre_completo }}</td><td>{{ p.parada_origen.nombre }} → {{ p.parada_destino.nombre }}</td><td class="text-center">{{ p.asiento.numero_asiento }}</td><td>{% if p.vendedor and not p.vendedor.persona.es_cliente %}{{ p.vendedor.username }}{% elif not p.vendedor %}—{% endif %}</td><td class="text-end">Gs. {{ p.precio|floatformat:0 }}</td>
+<tr class="sit-pasaje-row"><td>{{ p.codigo }}</td><td>{{ p.fecha_venta|date:"d/m H:i" }}</td><td>{{ p.pasajero.nombre_completo }}</td><td>{{ p.parada_origen.nombre }} → {{ p.parada_destino.nombre }}</td><td class="text-center">{{ p.asiento.numero_asiento }}</td><td>{% if p.vendedor and not p.vendedor.persona.es_cliente %}{{ p.vendedor.username }}{% elif not p.vendedor %}—{% endif %}</td><td class="text-end">Gs. {{ p.precio|floatformat:0 }}</td>
 <td><span class="badge {% if p.estado == 'vendido' %}bg-success{% elif p.estado == 'reservado' %}bg-info{% elif p.estado == 'abordado' %}bg-primary{% elif p.estado == 'cancelado' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.get_estado_display }}</span></td></tr>
 {% empty %}<tr><td colspan="8" class="text-center text-muted py-3">Sin pasajes</td></tr>{% endfor %}
-</tbody></table></div></div>
+</tbody>
+<tfoot>
+<tr>
+  <th colspan="6" class="text-end text-uppercase">Total General del Período:</th>
+  <th class="text-end text-green fs-3 fw-bold">Gs. {{ total_pasajes_sit|floatformat:0 }}</th>
+  <th></th>
+</tr>
+</tfoot>
+</table></div>
+<div class="card-footer d-flex justify-content-between align-items-center no-print" id="sit-pasajes-pagination"></div>
+</div>
 
-<div class="card mb-4"><div class="card-header"><h3 class="card-title"><i class="bi bi-box-seam me-2"></i>Detalle de Encomiendas</h3></div>
-<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped">
-<thead><tr><th>Código</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Registrador</th><th class="text-end">Precio</th><th>Estado</th></tr></thead>
+<div class="card mb-4"><div class="card-header d-flex align-items-center justify-content-between">
+<h3 class="card-title mb-0"><i class="bi bi-box-seam me-2"></i>Detalle de Encomiendas</h3>
+<span class="text-muted small" id="sit-enc-info"></span>
+</div>
+<div class="table-responsive" style="max-height:350px;overflow-y:auto"><table class="table table-vcenter table-sm table-striped" id="tabla-sit-enc">
+<thead><tr><th>Código</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Registrador</th><th class="text-end">Ingreso</th><th>Estado</th></tr></thead>
 <tbody>{% for e in encomiendas_situacion %}
-<tr><td>{{ e.codigo }}</td><td>{{ e.fecha_registro|date:"d/m H:i" }}</td><td>{{ e.remitente.nombre_completo }}</td><td>{{ e.destinatario.nombre_completo }}</td><td>{{ e.parada_destino.nombre }}</td><td>{{ e.registrador.username|default:"—" }}</td><td class="text-end">Gs. {{ e.precio|floatformat:0 }}</td>
+<tr class="sit-enc-row"><td>{{ e.codigo }}</td><td>{{ e.fecha_registro|date:"d/m H:i" }}</td><td>{{ e.remitente.nombre_completo }}</td><td>{{ e.destinatario.nombre_completo }}</td><td>{{ e.parada_destino.nombre }}</td><td>{{ e.registrador.username|default:"—" }}</td><td class="text-end">Gs. {{ e.precio|floatformat:0 }}</td>
 <td><span class="badge {% if e.estado == 'entregado' %}bg-success{% elif e.estado == 'en_transito' %}bg-primary{% elif e.estado == 'en_destino' %}bg-cyan{% elif e.estado == 'cancelado' %}bg-danger{% else %}bg-info{% endif %}">{{ e.get_estado_display }}</span></td></tr>
 {% empty %}<tr><td colspan="8" class="text-center text-muted py-3">Sin encomiendas</td></tr>{% endfor %}
-</tbody></table></div></div>
+</tbody>
+<tfoot>
+<tr>
+  <th colspan="6" class="text-end text-uppercase">Total General del Período:</th>
+  <th class="text-end text-green fs-3 fw-bold">Gs. {{ total_enc_sit|floatformat:0 }}</th>
+  <th></th>
+</tr>
+</tfoot>
+</table></div>
+<div class="card-footer d-flex justify-content-between align-items-center no-print" id="sit-enc-pagination"></div>
+</div>
 
 <script>
 (function initSitCharts(){
@@ -44,4 +81,72 @@
   var ctx2=document.getElementById('chartSitEnc');
   if(ctx2){new Chart(ctx2,{type:'doughnut',data:{labels:{{ chart_sit_enc_labels|safe }},datasets:[{data:{{ chart_sit_enc_data|safe }},backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});}
 })();
+
+function setupPagination(rowSelector, pagId, infoId) {
+  var rows = document.querySelectorAll(rowSelector);
+  var totalRows = rows.length;
+  var perPage = 10;
+  var totalPages = Math.ceil(totalRows / perPage);
+  var currentPage = 1;
+  var paginationContainer = document.getElementById(pagId);
+  var pageInfo = document.getElementById(infoId);
+
+  if (totalRows <= perPage) {
+    if (paginationContainer) paginationContainer.style.display = 'none';
+    if (pageInfo) pageInfo.textContent = totalRows + ' registro' + (totalRows !== 1 ? 's' : '');
+    return;
+  }
+
+  function showPage(page) {
+    currentPage = page;
+    var start = (page - 1) * perPage;
+    var end = start + perPage;
+    for (var i = 0; i < totalRows; i++) {
+      rows[i].style.display = (i >= start && i < end) ? '' : 'none';
+    }
+    renderPagination();
+  }
+
+  function renderPagination() {
+    var start = (currentPage - 1) * perPage + 1;
+    var end = Math.min(currentPage * perPage, totalRows);
+    if(pageInfo) pageInfo.textContent = 'Mostrando ' + start + '-' + end + ' de ' + totalRows;
+
+    var html = '<span class="text-secondary">Página ' + currentPage + ' de ' + totalPages + '</span>';
+    html += '<nav><ul class="pagination pagination-sm mb-0">';
+
+    html += '<li class="page-item ' + (currentPage === 1 ? 'disabled' : '') + '">';
+    html += '<a class="page-link" href="#" data-page="' + (currentPage - 1) + '"><i class="bi bi-chevron-left"></i></a></li>';
+
+    for (var p = 1; p <= totalPages; p++) {
+      if (p === currentPage) {
+        html += '<li class="page-item active"><span class="page-link">' + p + '</span></li>';
+      } else if (p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)) {
+        html += '<li class="page-item"><a class="page-link" href="#" data-page="' + p + '">' + p + '</a></li>';
+      } else if (p === currentPage - 3 || p === currentPage + 3) {
+        html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+      }
+    }
+
+    html += '<li class="page-item ' + (currentPage === totalPages ? 'disabled' : '') + '">';
+    html += '<a class="page-link" href="#" data-page="' + (currentPage + 1) + '"><i class="bi bi-chevron-right"></i></a></li>';
+
+    html += '</ul></nav>';
+    if(paginationContainer) {
+      paginationContainer.innerHTML = html;
+      paginationContainer.querySelectorAll('a[data-page]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          var pg = parseInt(this.getAttribute('data-page'));
+          if (pg >= 1 && pg <= totalPages) showPage(pg);
+        });
+      });
+    }
+  }
+
+  showPage(1);
+}
+
+setupPagination('#tabla-sit-pasajes .sit-pasaje-row', 'sit-pasajes-pagination', 'sit-pasajes-info');
+setupPagination('#tabla-sit-enc .sit-enc-row', 'sit-enc-pagination', 'sit-enc-info');
 </script>

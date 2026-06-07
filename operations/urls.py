@@ -121,6 +121,10 @@ urlpatterns = [
     path('viajes/<int:viaje_pk>/paradas/', views.ViajeParadasView.as_view(), name='viaje_paradas'),
     path('api/itinerarios-por-empresa/', views.APIItinerariosEmpresaView.as_view(), name='api_itinerarios_empresa'),
     path('api/horarios-por-itinerario/', views.APIHorariosItinerarioView.as_view(), name='api_horarios_itinerario'),
+    path('api/buscar-itinerarios/', views.APIBuscarItinerariosView.as_view(), name='api_buscar_itinerarios'),
+    path('api/buscar-buses/', views.APIBuscarBusesView.as_view(), name='api_buscar_buses'),
+    path('api/buscar-choferes/', views.APIBuscarChoferesView.as_view(), name='api_buscar_choferes'),
+    path('api/buscar-ayudantes/', views.APIBuscarAyudantesView.as_view(), name='api_buscar_ayudantes'),
     path('obtener-horarios/', views.ObtenerHorariosItinerarioView.as_view(), name='obtener_horarios'),
     
     # ==========================================================================
@@ -144,5 +148,6 @@ urlpatterns = [
     path('api/crear-reserva/<int:viaje_pk>/', views.CrearReservaClienteView.as_view(), name='api_crear_reserva'),
     path('api/viajes-compatibles/', views.APIObtenerViajesCompatiblesView.as_view(), name='api_viajes_compatibles'),
     path('mis-encomiendas/', views.MisEncomiendasClienteView.as_view(), name='mis_encomiendas_cliente'),
+    path('mis-pasajes/', views.MisPasajesClienteView.as_view(), name='mis_pasajes_cliente'),
 ]
 

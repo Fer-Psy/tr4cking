@@ -1,6 +1,6 @@
 {% extends 'layouts/base_tabler.html' %}
 
-{% block title %}Buses - TR4CKING{% endblock %}
+{% block title %}Bus - TR4CKING{% endblock %}
 
 {% block page_header %}
 <div class="page-header d-print-none">
@@ -11,7 +11,7 @@
                     Flota de Transporte
                 </div>
                 <h2 class="page-title">
-                    Buses
+                    Bus
                 </h2>
             </div>
             <!-- Page title actions -->
@@ -80,6 +80,7 @@
             <table class="table mb-0">
                 <thead>
                     <tr>
+                        <th>Nº Bus</th>
                         <th>Placa</th>
                         <th>Empresa</th>
                         <th>Marca / Modelo</th>
@@ -92,6 +93,13 @@
                 <tbody>
                     {% for bus in buses %}
                     <tr>
+                        <td>
+                            {% if bus.numero_bus %}
+                            <span class="fw-bold">{{ bus.numero_bus }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <a href="{% url 'fleet:bus_detail' bus.pk %}"
                                 class="text-decoration-none text-primary fw-bold">

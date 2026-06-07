@@ -110,7 +110,7 @@
   /* Tablas compactas */
   .table{font-size:0.8rem!important}
   .table th,.table td{padding:4px 8px!important; border-color:#000!important}
-  .badge{border:1px solid #000!important; color:#000!important; print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .badge{border:none!important; color:#000!important; padding:0!important; background:transparent!important; font-weight:500!important; font-size:inherit!important}
 
   /* Forzar blanco y negro, sin fondos */
   *, *::before, *::after {
@@ -161,6 +161,12 @@ body.exporting-pdf *, body.exporting-pdf *::before, body.exporting-pdf *::after 
   border-color: #000 !important;
   text-shadow: none !important;
   box-shadow: none !important;
+}
+body.exporting-pdf .badge {
+  border: none !important;
+  padding: 0 !important;
+  font-weight: 500 !important;
+  font-size: inherit !important;
 }
 
 /* Activar cabecera y pie para PDF sin fixed position para que no se superpongan */

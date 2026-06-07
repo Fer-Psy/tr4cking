@@ -471,7 +471,11 @@
             <div class="persona-titulo">REMITENTE</div>
             <div class="persona-nombre">{{ encomienda.remitente.nombre_completo }}</div>
             <div class="info-row">
+                {% if encomienda.remitente.cedula %}
                 <span>C.I.: {{ encomienda.remitente.cedula }}</span>
+                {% else %}
+                <span></span>
+                {% endif %}
                 <span>Tel: {{ encomienda.remitente.telefono|default:"-" }}</span>
             </div>
         </div>
@@ -485,7 +489,11 @@
             <div class="persona-titulo">DESTINATARIO</div>
             <div class="persona-nombre">{{ encomienda.destinatario.nombre_completo }}</div>
             <div class="info-row">
+                {% if encomienda.destinatario.cedula %}
                 <span>C.I.: {{ encomienda.destinatario.cedula }}</span>
+                {% else %}
+                <span></span>
+                {% endif %}
                 <span>Tel: {{ encomienda.destinatario.telefono|default:"-" }}</span>
             </div>
         </div>

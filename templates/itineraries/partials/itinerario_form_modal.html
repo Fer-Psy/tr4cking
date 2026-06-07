@@ -10,36 +10,86 @@
 
 <form hx-post="{% if object %}{% url 'itineraries:itinerario_update' object.pk %}{% else %}{% url 'itineraries:itinerario_create' %}{% endif %}{% if request.GET.refresh %}?refresh={{ request.GET.refresh }}{% endif %}"
       hx-target="#modal-itinerario .modal-content"
+      id="itinerarioModalForm"
       novalidate>
     {% csrf_token %}
     <div class="modal-body">
+        <!-- Alerta de duplicado -->
+        <div id="duplicate-warning" class="alert alert-warning d-flex align-items-center d-none" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+            <div id="duplicate-warning-text"></div>
+        </div>
+
         <div class="row">
             <div class="col-md-12">
                 {% crispy form %}
             </div>
         </div>
-        
-        <div class="mt-4 p-3 bg-light rounded-3">
-            <h6 class="fw-semibold mb-2">
-                <i class="bi bi-info-circle me-1"></i>
-                Guía rápida: Días de operación
-            </h6>
-            <p class="text-secondary small mb-2">
-                Usa 7 dígitos (1=Opera, 0=No opera). De lunes a domingo.
-            </p>
-            <div class="d-flex gap-2 flex-wrap">
-                <span class="badge bg-blue-lt">1111111 = Diario</span>
-                <span class="badge bg-indigo-lt">1111100 = Lun a Vie</span>
-                <span class="badge bg-purple-lt">0000011 = Sáb y Dom</span>
-            </div>
-        </div>
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-primary ms-auto">
+        <button type="submit" class="btn btn-primary ms-auto" id="btn-submit-itinerario">
             <i class="bi bi-check-lg me-2"></i>
             {% if object %}Guardar Cambios{% else %}Crear Itinerario{% endif %}
         </button>
     </div>
 </form>
 
+<script>
+(function() {
+    const form = document.getElementById('itinerarioModalForm');
+    if (!form) return;
+
+    const empresaField = form.querySelector('[name="empresa"]');
+    const nombreField = form.querySelector('[name="nombre"]');
+    const warning = document.getElementById('duplicate-warning');
+    const warningText = document.getElementById('duplicate-warning-text');
+    const submitBtn = document.getElementById('btn-submit-itinerario');
+    const checkUrl = '{% url "itineraries:verificar_itinerario_duplicado" %}';
+    const excludePk = '{{ object.pk|default:"" }}';
+
+    let debounceTimer = null;
+
+    function checkDuplicate() {
+        const empresa = empresaField ? empresaField.value : '';
+        const nombre = nombreField ? nombreField.value.trim() : '';
+
+        if (!empresa || !nombre) {
+            warning.classList.add('d-none');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            let url = checkUrl + '?empresa=' + encodeURIComponent(empresa) + '&nombre=' + encodeURIComponent(nombre);
+            if (excludePk) {
+                url += '&exclude_pk=' + encodeURIComponent(excludePk);
+            }
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.exists) {
+                        warningText.textContent = data.message;
+                        warning.classList.remove('d-none');
+                        submitBtn.disabled = true;
+                    } else {
+                        warning.classList.add('d-none');
+                        submitBtn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    warning.classList.add('d-none');
+                    submitBtn.disabled = false;
+                });
+        }, 400);
+    }
+
+    if (empresaField) empresaField.addEventListener('change', checkDuplicate);
+    if (nombreField) {
+        nombreField.addEventListener('input', checkDuplicate);
+        nombreField.addEventListener('change', checkDuplicate);
+    }
+})();
+</script>

@@ -38,10 +38,10 @@ class PersonaForm(forms.ModelForm):
         model = Persona
         fields = [
             'cedula', 'nombre', 'apellido', 'telefono', 'email', 
-            'direccion', 'latitud', 'longitud', 'empresa', 'es_empleado', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user'
+            'direccion', 'latitud', 'longitud', 'empresa', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user'
         ]
         widgets = {
-            'cedula': forms.NumberInput(attrs={'placeholder': 'Ej: 4567890'}),
+            'cedula': forms.NumberInput(attrs={'placeholder': 'Ej: 4567890', 'min': '0'}),
             'nombre': forms.TextInput(attrs={'placeholder': 'Nombre'}),
             'apellido': forms.TextInput(attrs={'placeholder': 'Apellido'}),
             'telefono': forms.TextInput(attrs={'placeholder': 'Ej: 0981 123 456'}),
@@ -59,7 +59,7 @@ class PersonaForm(forms.ModelForm):
         # Ocultar roles administrativos si no es admin
         if not self.user_is_admin:
             # Los roles se ocultan del formulario
-            for field in ['es_empleado', 'es_chofer', 'es_ayudante', 'es_agente', 'empresa']:
+            for field in ['es_chofer', 'es_ayudante', 'es_agente', 'empresa']:
                 if field in self.fields:
                     self.fields[field].disabled = True
                     self.fields[field].required = False
@@ -87,10 +87,9 @@ class PersonaForm(forms.ModelForm):
         if self.user_is_admin:
             roles_layout_admin = [
                 Row(
-                    Column(Div('es_empleado', css_class='form-check form-switch'), css_class='col-md-3'),
-                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-3'),
-                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-3'),
-                    Column(Div('es_agente', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-4'),
+                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-4'),
+                    Column(Div('es_agente', css_class='form-check form-switch'), css_class='col-md-4'),
                 )
             ]
         else:
@@ -155,7 +154,6 @@ class PersonaForm(forms.ModelForm):
 
         if self.user_is_agente:
             persona.es_cliente = True
-            persona.es_empleado = False
             persona.es_chofer = False
             persona.es_ayudante = False
             persona.es_agente = False
@@ -248,7 +246,7 @@ class ClienteRegistroForm(forms.ModelForm):
         model = Persona
         fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion']
         widgets = {
-            'cedula': forms.NumberInput(attrs={'placeholder': 'Sin puntos ni espacios'}),
+            'cedula': forms.NumberInput(attrs={'placeholder': 'Sin puntos ni espacios', 'min': '0'}),
             'direccion': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Para entrega de encomiendas'}),
             'latitud': forms.HiddenInput(),
             'longitud': forms.HiddenInput(),
@@ -351,7 +349,7 @@ class ClientePerfilForm(forms.ModelForm):
         model = Persona
         fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion', 'latitud', 'longitud']
         widgets = {
-            'cedula': forms.NumberInput(attrs={'class': 'form-control'}),
+            'cedula': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
             'telefono': forms.TextInput(attrs={'class': 'form-control'}),

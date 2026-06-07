@@ -10,20 +10,34 @@
 <div class="card mb-4 no-print"><div class="card-header"><h3 class="card-title"><i class="bi bi-bar-chart me-2"></i>Ingresos por Día</h3></div>
 <div class="card-body"><div class="chart-container"><canvas id="chartVentas"></canvas></div></div></div>
 
+<style>
+@media print {
+  #tabla-ventas-dia .venta-row { display: table-row !important; }
+  #tabla-ventas-dia tfoot { display: table-row-group !important; }
+}
+body.exporting-pdf #tabla-ventas-dia .venta-row { display: table-row !important; }
+body.exporting-pdf #tabla-ventas-dia tfoot { display: table-row-group !important; }
+</style>
+
 <div class="row mb-4">
 <div class="col-md-8">
-<div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-calendar3 me-2"></i>Ventas por Día</h3></div>
-<div class="table-responsive"><table class="table table-vcenter card-table table-striped">
+<div class="card"><div class="card-header d-flex align-items-center justify-content-between">
+<h3 class="card-title mb-0"><i class="bi bi-calendar3 me-2"></i>Ventas por Día</h3>
+<span class="text-muted small" id="ventas-dia-info"></span>
+</div>
+<div class="table-responsive"><table class="table table-vcenter card-table table-striped" id="tabla-ventas-dia">
 <thead><tr><th>Fecha</th><th class="text-center">Pasajes</th><th class="text-center">Encomiendas</th><th class="text-center">Facturas</th><th class="text-end">Ing. Pasajes</th><th class="text-end">Ing. Encomiendas</th><th class="text-end">Total</th></tr></thead>
 <tbody>{% for dia in ventas_por_dia %}
-<tr><td><strong>{{ dia.fecha|date:"d/m/Y" }}</strong> <span class="text-muted ms-1">{{ dia.fecha|date:"l" }}</span></td>
+<tr class="venta-row"><td><strong>{{ dia.fecha|date:"d/m/Y" }}</strong> <span class="text-muted ms-1">{{ dia.fecha|date:"l" }}</span></td>
 <td class="text-center">{{ dia.pasajes }}</td><td class="text-center">{{ dia.encomiendas }}</td><td class="text-center">{{ dia.facturas }}</td>
 <td class="text-end">Gs. {{ dia.ingresos_pasajes|floatformat:0 }}</td><td class="text-end">Gs. {{ dia.ingresos_encomiendas|floatformat:0 }}</td>
 <td class="text-end h5 text-green">Gs. {{ dia.total|floatformat:0 }}</td></tr>
 {% empty %}<tr><td colspan="7" class="text-center text-muted py-3">Sin ventas</td></tr>{% endfor %}
 </tbody>
 {% if ventas_por_dia %}<tfoot class="table-light"><tr><th>TOTAL</th><th class="text-center">{{ total_pasajes }}</th><th class="text-center">{{ total_encomiendas }}</th><th class="text-center">{{ total_facturas }}</th><th class="text-end">Gs. {{ ingresos_pasajes|floatformat:0 }}</th><th class="text-end">Gs. {{ ingresos_encomiendas|floatformat:0 }}</th><th class="text-end h4 text-green">Gs. {{ total_ingresos|floatformat:0 }}</th></tr></tfoot>{% endif %}
-</table></div></div>
+</table></div>
+<div class="card-footer d-flex justify-content-between align-items-center no-print" id="ventas-dia-pagination"></div>
+</div>
 </div>
 <div class="col-md-4 no-print"><div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-pie-chart me-2"></i>Distribución</h3></div><div class="card-body">
 <div class="mb-3"><div class="d-flex justify-content-between mb-1"><span>Pasajes</span><span>{{ porcentaje_pasajes }}%</span></div><div class="progress" style="height:8px"><div class="progress-bar bg-azure" style="width:{{ porcentaje_pasajes }}%"></div></div></div>
@@ -37,5 +51,70 @@
   var ctx=document.getElementById('chartVentas');
   if(!ctx)return;
   new Chart(ctx,{type:'bar',data:{labels:{{ chart_ventas_labels|safe }},datasets:[{label:'Pasajes',data:{{ chart_ventas_pasajes|safe }},backgroundColor:'rgba(32,107,196,0.7)',borderRadius:6},{label:'Encomiendas',data:{{ chart_ventas_encomiendas|safe }},backgroundColor:'rgba(247,103,7,0.7)',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{callback:function(v){return 'Gs. '+v.toLocaleString()}}}}}});
+})();
+
+(function() {
+  var rows = document.querySelectorAll('#tabla-ventas-dia .venta-row');
+  var totalRows = rows.length;
+  var perPage = 10;
+  var totalPages = Math.ceil(totalRows / perPage);
+  var currentPage = 1;
+  var paginationContainer = document.getElementById('ventas-dia-pagination');
+  var pageInfo = document.getElementById('ventas-dia-info');
+
+  if (totalRows <= perPage) {
+    if (paginationContainer) paginationContainer.style.display = 'none';
+    if (pageInfo) pageInfo.textContent = totalRows + ' registro' + (totalRows !== 1 ? 's' : '');
+    return;
+  }
+
+  function showPage(page) {
+    currentPage = page;
+    var start = (page - 1) * perPage;
+    var end = start + perPage;
+    for (var i = 0; i < totalRows; i++) {
+      rows[i].style.display = (i >= start && i < end) ? '' : 'none';
+    }
+    renderPagination();
+  }
+
+  function renderPagination() {
+    var start = (currentPage - 1) * perPage + 1;
+    var end = Math.min(currentPage * perPage, totalRows);
+    if(pageInfo) pageInfo.textContent = 'Mostrando ' + start + '-' + end + ' de ' + totalRows;
+
+    var html = '<span class="text-secondary">Página ' + currentPage + ' de ' + totalPages + '</span>';
+    html += '<nav><ul class="pagination pagination-sm mb-0">';
+
+    html += '<li class="page-item ' + (currentPage === 1 ? 'disabled' : '') + '">';
+    html += '<a class="page-link" href="#" data-page="' + (currentPage - 1) + '"><i class="bi bi-chevron-left"></i></a></li>';
+
+    for (var p = 1; p <= totalPages; p++) {
+      if (p === currentPage) {
+        html += '<li class="page-item active"><span class="page-link">' + p + '</span></li>';
+      } else if (p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)) {
+        html += '<li class="page-item"><a class="page-link" href="#" data-page="' + p + '">' + p + '</a></li>';
+      } else if (p === currentPage - 3 || p === currentPage + 3) {
+        html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+      }
+    }
+
+    html += '<li class="page-item ' + (currentPage === totalPages ? 'disabled' : '') + '">';
+    html += '<a class="page-link" href="#" data-page="' + (currentPage + 1) + '"><i class="bi bi-chevron-right"></i></a></li>';
+
+    html += '</ul></nav>';
+    if(paginationContainer) {
+      paginationContainer.innerHTML = html;
+      paginationContainer.querySelectorAll('a[data-page]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          var pg = parseInt(this.getAttribute('data-page'));
+          if (pg >= 1 && pg <= totalPages) showPage(pg);
+        });
+      });
+    }
+  }
+
+  showPage(1);
 })();
 </script>

@@ -13,6 +13,23 @@ from fleet.models import Parada
 class ItinerarioForm(forms.ModelForm):
     """Formulario para crear/editar itinerarios."""
     
+    DIAS_CHOICES = [
+        ('0', 'Lunes'),
+        ('1', 'Martes'),
+        ('2', 'Miércoles'),
+        ('3', 'Jueves'),
+        ('4', 'Viernes'),
+        ('5', 'Sábado'),
+        ('6', 'Domingo'),
+    ]
+    
+    dias_semana_checkboxes = forms.MultipleChoiceField(
+        choices=DIAS_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label="Días de la semana",
+        required=True,
+    )
+    
     parada_origen = forms.ModelChoiceField(
         queryset=Parada.objects.all(),
         required=False,
@@ -31,22 +48,56 @@ class ItinerarioForm(forms.ModelForm):
             'ruta': forms.TextInput(attrs={'placeholder': 'Ej: PY02'}),
             'distancia_total_km': forms.NumberInput(attrs={'placeholder': 'Ej: 327.5', 'step': '0.01'}),
             'duracion_estimada_hs': forms.NumberInput(attrs={'placeholder': 'Ej: 5.5', 'step': '0.01'}),
-            'dias_semana': forms.TextInput(attrs={'placeholder': '1111111', 'maxlength': 7}),
+            'dias_semana': forms.HiddenInput(),
             'horarios': forms.CheckboxSelectMultiple(),
-        }
-        help_texts = {
-            'dias_semana': 'Patrón de 7 dígitos: 1=opera, 0=no opera. Ej: 1111111 = Todos los días',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         # Mejorar visualización de paradas
-        paradas_qs = Parada.objects.all().select_related('localidad').order_by('localidad__nombre', 'nombre')
-        self.fields['parada_origen'].queryset = paradas_qs
+        paradas_qs = Parada.objects.all().select_related('localidad', 'empresa').order_by('localidad__nombre', 'nombre')
         
-        label_func = lambda obj: f"{obj.localidad.nombre}: {obj.nombre}"
-        self.fields['parada_origen'].label_from_instance = label_func
+        # Configurar atributos HTMX para filtrar la parada de origen al cambiar la empresa
+        from django.urls import reverse
+        self.fields['empresa'].widget.attrs.update({
+            'hx-get': reverse('itineraries:obtener_paradas_empresa'),
+            'hx-target': '#id_parada_origen',
+            'hx-trigger': 'change',
+        })
+
+        # Hacer que dias_semana no sea requerido en el formulario porque se calcula en clean_dias_semana
+        self.fields['dias_semana'].required = False
+
+        # Obtener la empresa seleccionada (de POST o de la instancia) para filtrar inicialmente
+        empresa_id = None
+        if self.is_bound and self.data and hasattr(self.data, 'get') and self.data.get('empresa'):
+            empresa_id = self.data.get('empresa')
+        elif self.instance and self.instance.empresa_id:
+            empresa_id = self.instance.empresa_id
+            
+        if empresa_id:
+            try:
+                paradas_qs = paradas_qs.filter(empresa_id=int(empresa_id))
+            except (ValueError, TypeError):
+                pass
+                
+        self.fields['parada_origen'].queryset = paradas_qs
+        self.fields['parada_origen'].label_from_instance = lambda obj: f"{obj.localidad.nombre}: {obj.nombre} ({obj.empresa.nombre})"
+
+        # Cargar parada de origen inicial si existe instancia y tiene primera parada
+        if self.instance and self.instance.pk:
+            primera = self.instance.primera_parada
+            if primera:
+                self.fields['parada_origen'].initial = primera.parada
+
+        # Cargar los días de la semana iniciales si existe instancia
+        if self.instance and self.instance.pk and self.instance.dias_semana:
+            dias_activos = []
+            for i, char in enumerate(self.instance.dias_semana):
+                if char == '1':
+                    dias_activos.append(str(i))
+            self.fields['dias_semana_checkboxes'].initial = dias_activos
 
         self.helper = FormHelper()
         self.helper.form_tag = False
@@ -84,7 +135,10 @@ class ItinerarioForm(forms.ModelForm):
             Fieldset(
                 'Operación y Horarios',
                 Row(
-                    Column('dias_semana', css_class='col-md-8'),
+                    Column(
+                        Field('dias_semana_checkboxes', wrapper_class='d-flex flex-wrap gap-3'),
+                        css_class='col-md-8'
+                    ),
                     Column(
                         Div('activo', css_class='form-check form-switch mt-4'),
                         css_class='col-md-4'
@@ -105,13 +159,41 @@ class ItinerarioForm(forms.ModelForm):
         )
     
     def clean_dias_semana(self):
-        dias = self.cleaned_data['dias_semana']
-        if len(dias) != 7:
-            raise forms.ValidationError("Debe tener exactamente 7 caracteres.")
-        if not all(c in '01' for c in dias):
-            raise forms.ValidationError("Solo puede contener 0 y 1.")
+        # Use self.data instead of self.cleaned_data because dias_semana_checkboxes
+        # (a declared field) is cleaned AFTER dias_semana (a model field in Meta.fields)
+        # due to Django's field ordering in ModelForms.
+        dias_seleccionados = self.data.getlist('dias_semana_checkboxes', [])
+        
+        if not dias_seleccionados:
+            raise forms.ValidationError("Debe seleccionar al menos un día de la semana.")
+            
+        bin_list = ['0'] * 7
+        for val in dias_seleccionados:
+            try:
+                idx = int(val)
+                if 0 <= idx < 7:
+                    bin_list[idx] = '1'
+            except (ValueError, TypeError):
+                continue
+        
+        dias = "".join(bin_list)
         return dias
 
+    def clean(self):
+        cleaned_data = super().clean()
+        nombre = cleaned_data.get('nombre')
+        empresa = cleaned_data.get('empresa')
+        
+        if nombre and empresa:
+            existing = Itinerario.objects.filter(
+                empresa=empresa,
+                nombre__iexact=nombre.strip()
+            )
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                self.add_error('nombre', f"Ya existe un itinerario con el nombre '{nombre}' para la empresa {empresa.nombre}.")
+        return cleaned_data
 
 class DetalleItinerarioForm(forms.ModelForm):
     """Formulario para agregar/editar paradas de un itinerario."""
@@ -220,6 +302,8 @@ class PrecioForm(forms.ModelForm):
         fields = ['origen', 'destino', 'precio']
         widgets = {
             'precio': forms.NumberInput(attrs={'min': 0, 'step': '100', 'placeholder': 'Ej: 85000'}),
+            'origen': forms.HiddenInput(),
+            'destino': forms.HiddenInput(),
         }
     
     def __init__(self, *args, **kwargs):
@@ -227,10 +311,6 @@ class PrecioForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
-            Row(
-                Column('origen', css_class='col-md-6'),
-                Column('destino', css_class='col-md-6'),
-            ),
             'precio',
             HTML('''
                 <div class="form-text mb-3">

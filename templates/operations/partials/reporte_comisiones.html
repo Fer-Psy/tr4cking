@@ -21,7 +21,7 @@
 <button type="submit" class="btn btn-primary"><i class="bi bi-calculator me-1"></i>Recalcular</button>
 </div>
 <div class="col-md">
-<div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Modifique el valor y presione <strong>Recalcular</strong> para actualizar las comisiones. Solo comisionan usuarios con rol <strong>Empleado</strong> o <strong>Ayudante</strong>.</div>
+<div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Modifique el valor y presione <strong>Recalcular</strong> para actualizar las comisiones. Solo comisionan usuarios con rol <strong>Agente de Ventas</strong> o <strong>Ayudante</strong>.</div>
 </div>
 </form>
 </div>
@@ -31,7 +31,7 @@
 <div class="alert alert-info mb-3" style="font-size:0.85rem">
 <i class="bi bi-info-circle me-2"></i>Comisiones calculadas para el mes de <strong>{{ mes_inicio|date:"F Y" }}</strong>.
 Tarifa aplicada: <strong>Gs. {{ comision_por_boleta|floatformat:0 }}</strong> por cada boleta de pasaje vendida.
-Solo comisionan roles: Empleado y Ayudante.
+Solo comisionan roles: Agente de Ventas y Ayudante.
 {% if empresa_seleccionada %}<br><i class="bi bi-building me-1"></i>Filtrado por empresa: <strong>{{ empresa_seleccionada.nombre }}</strong>{% endif %}
 </div>
 

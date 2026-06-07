@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    'operations.middleware.CierreCajaObligatorioMiddleware',
 ]
 
 ROOT_URLCONF = 'base.urls'
@@ -173,3 +174,7 @@ MESSAGE_TAGS = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 ALLOWED_HOSTS = ['*']
+
+# Caja: hora límite para cerrar la caja diaria (24h format)
+# Después de esta hora, se fuerza el cierre al día siguiente
+CAJA_HORA_LIMITE_CIERRE = 23

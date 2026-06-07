@@ -2,6 +2,8 @@
 
 {% block title %}Sigue tu Bus - TR4CKING{% endblock %}
 
+{% block page_header %}{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -223,7 +225,6 @@
     let firstLoad = true;
 
     const isStaff = "{{ request.user.is_superuser|yesno:'true,false' }}" === 'true' || 
-                    "{{ request.user.persona.es_empleado|yesno:'true,false' }}" === 'true' ||
                     "{{ request.user.persona.es_agente|yesno:'true,false' }}" === 'true' ||
                     "{{ request.user.persona.es_ayudante|yesno:'true,false' }}" === 'true';
 

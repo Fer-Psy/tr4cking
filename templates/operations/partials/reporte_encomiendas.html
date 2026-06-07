@@ -6,7 +6,7 @@
 <input type="hidden" name="desde" value="{{ fecha_desde|date:'Y-m-d' }}">
 <input type="hidden" name="hasta" value="{{ fecha_hasta|date:'Y-m-d' }}">
 <div class="col-md-3"><label class="form-label">Destino</label>
-<select name="destino" class="form-select"><option value="">Todos</option>{% for p in paradas_disponibles %}<option value="{{ p.pk }}" {% if destino_filter == p.pk|stringformat:"d" %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}</select></div>
+<select name="destino" class="form-select"><option value="">Todos</option>{% for p in paradas_disponibles %}<option value="{{ p }}" {% if destino_filter == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></div>
 <div class="col-md-3"><label class="form-label">Cliente (CI/Nombre)</label><input type="text" name="cliente_ci" class="form-control" value="{{ cliente_ci_filter }}" placeholder="Buscar..."></div>
 <div class="col-md-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Filtrar</button></div>
 </form></div></div>
@@ -23,8 +23,14 @@
 <div class="col-md-5"><div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-pie-chart me-2"></i>Por Destino</h3></div><div class="card-body"><div style="height:280px"><canvas id="chartEncDest"></canvas></div></div></div></div>
 <div class="col-md-7">
 <div class="card"><div class="card-header"><h3 class="card-title"><i class="bi bi-list-ul me-2"></i>Detalle de Encomiendas</h3></div>
-<div class="table-responsive" style="max-height:400px;overflow-y:auto"><table class="table table-vcenter table-striped table-sm">
-<thead><tr><th>Código</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Tipo</th><th class="text-end">Precio</th><th>Estado</th></tr></thead>
+<style>
+@media print {
+  #tabla-encomiendas tfoot { display: table-row-group !important; }
+}
+body.exporting-pdf #tabla-encomiendas tfoot { display: table-row-group !important; }
+</style>
+<div class="table-responsive" style="max-height:400px;overflow-y:auto"><table class="table table-vcenter table-striped table-sm" id="tabla-encomiendas">
+<thead><tr><th>Código</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Tipo</th><th class="text-end">Ingreso</th><th>Estado</th></tr></thead>
 <tbody>{% for e in encomiendas_reporte %}
 <tr><td><a href="{% url 'operations:encomienda_detail' e.pk %}">{{ e.codigo }}</a></td>
 <td>{{ e.fecha_registro|date:"d/m/Y" }}</td>
@@ -33,7 +39,15 @@
 <td class="text-end">Gs. {{ e.precio|floatformat:0 }}</td>
 <td><span class="badge {% if e.estado == 'entregado' %}bg-success{% elif e.estado == 'en_transito' %}bg-primary{% elif e.estado == 'en_destino' %}bg-cyan{% elif e.estado == 'cancelado' %}bg-danger{% else %}bg-info{% endif %}">{{ e.get_estado_display }}</span></td></tr>
 {% empty %}<tr><td colspan="8" class="text-center text-muted py-3">Sin encomiendas</td></tr>{% endfor %}
-</tbody></table></div></div>
+</tbody>
+<tfoot>
+<tr>
+  <th colspan="6" class="text-end text-uppercase">Total General del Período:</th>
+  <th class="text-end text-green fs-3 fw-bold">Gs. {{ enc_total|floatformat:0 }}</th>
+  <th></th>
+</tr>
+</tfoot>
+</table></div></div>
 </div></div>
 
 <script>

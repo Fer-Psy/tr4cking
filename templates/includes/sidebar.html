@@ -44,8 +44,8 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if 'reservar' in request.resolver_match.url_name %}active{% endif %}"
-                        href="{% url 'operations:buscar_viajes' %}">
+                    <a class="nav-link {% if request.resolver_match.view_name == 'operations:mis_pasajes_cliente' %}active{% endif %}"
+                        href="{% url 'operations:mis_pasajes_cliente' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="bi bi-ticket-perforated"></i>
                         </span>
@@ -134,7 +134,7 @@
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="bi bi-bus-front"></i>
                         </span>
-                        <span class="nav-link-title">Buses</span>
+                        <span class="nav-link-title">Bus</span>
                     </a>
                 </li>
                 <li class="nav-item">

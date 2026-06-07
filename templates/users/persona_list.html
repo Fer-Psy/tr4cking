@@ -50,7 +50,6 @@
                     <div class="col-12 col-md-2 col-lg-2">
                         <select name="rol" class="form-select" aria-label="Filtrar por rol">
                             <option value="">Todos los roles</option>
-                            <option value="empleado" {% if rol == 'empleado' %}selected{% endif %}>Empleados</option>
                             <option value="chofer" {% if rol == 'chofer' %}selected{% endif %}>Choferes</option>
                             <option value="ayudante" {% if rol == 'ayudante' %}selected{% endif %}>Ayudantes</option>
                             <option value="cliente" {% if rol == 'cliente' %}selected{% endif %}>Clientes</option>
@@ -88,6 +87,9 @@
                             <th>Nombre Completo</th>
                             <th>Teléfono</th>
                             <th>Email</th>
+                            {% if request.user.is_superuser or request.user.is_staff %}
+                            <th>Empresa</th>
+                            {% endif %}
                             <th>Roles</th>
                             <th></th>
                         </tr>
@@ -105,12 +107,18 @@
                             <td>
                                 {{ persona.email|default:"-" }}
                             </td>
+                            {% if request.user.is_superuser or request.user.is_staff %}
+                            <td>
+                                {% if persona.empresa %}
+                                    {{ persona.empresa.nombre }}
+                                {% else %}
+                                    <span class="text-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
                             <td>
                                 {% if not persona.activo %}
                                 <span class="badge bg-red text-red-fg">Inactivo</span>
-                                {% endif %}
-                                {% if persona.es_empleado %}
-                                <span class="badge bg-blue text-blue-fg">Empleado</span>
                                 {% endif %}
                                 {% if persona.es_chofer %}
                                 <span class="badge bg-yellow text-yellow-fg">Chofer</span>
@@ -124,7 +132,7 @@
                                 {% if persona.es_agente %}
                                 <span class="badge bg-purple text-purple-fg">Agente de Ventas</span>
                                 {% endif %}
-                                {% if not persona.es_empleado and not persona.es_chofer and not persona.es_ayudante and not persona.es_cliente and not persona.es_agente and persona.activo %}
+                                {% if not persona.es_chofer and not persona.es_ayudante and not persona.es_cliente and not persona.es_agente and persona.activo %}
                                 <span class="badge bg-secondary text-secondary-fg">Sin rol</span>
                                 {% endif %}
                             </td>

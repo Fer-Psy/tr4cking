@@ -51,6 +51,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Contexto específico para el Agente Comercial
         if persona and persona.es_agente and not (self.request.user.is_staff or self.request.user.is_superuser):
             hoy = timezone.now().date()
+            ahora = timezone.localtime(timezone.now())
             
             context['stats'] = {
                 'facturas_hoy': Factura.objects.filter(fecha_emision__date=hoy).count(),
@@ -58,6 +59,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'encomiendas_hoy': Encomienda.objects.filter(fecha_registro__date=hoy).count(),
                 'caja_abierta': SesionCaja.objects.filter(cajero=self.request.user, estado='abierta').exists(),
             }
+            
+            # Alerta de cierre de caja próximo (después de las 20:00)
+            sesion_abierta = SesionCaja.objects.filter(
+                cajero=self.request.user, estado='abierta'
+            ).first()
+            if sesion_abierta and ahora.hour >= 20:
+                context['alerta_cierre_caja'] = True
+                context['hora_limite_caja'] = 23
             
             context['ultimas_facturas'] = Factura.objects.order_by('-fecha_emision')[:5]
             context['ultimos_pasajes'] = Pasaje.objects.select_related('viaje', 'pasajero').order_by('-fecha_venta')[:5]

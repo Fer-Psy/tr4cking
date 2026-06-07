@@ -28,6 +28,36 @@
             <div class="card-body">
                 <form method="post" novalidate>
                     {% csrf_token %}
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label requiredField">Parada de Origen<span class="asteriskField">*</span></label>
+                            <button type="button" class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#modalOrigen" id="btn-select-origen">
+                                <span id="display-origen" class="text-truncate">
+                                    {% if form.instance.origen %}
+                                        {{ form.instance.origen.localidad.nombre }}: {{ form.instance.origen.nombre }}
+                                    {% else %}
+                                        Seleccione parada origen...
+                                    {% endif %}
+                                </span>
+                                <i class="bi bi-search text-muted"></i>
+                            </button>
+                            {{ form.origen }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label requiredField">Parada de Destino<span class="asteriskField">*</span></label>
+                            <button type="button" class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#modalDestino" id="btn-select-destino">
+                                <span id="display-destino" class="text-truncate">
+                                    {% if form.instance.destino %}
+                                        {{ form.instance.destino.localidad.nombre }}: {{ form.instance.destino.nombre }}
+                                    {% else %}
+                                        Seleccione parada destino...
+                                    {% endif %}
+                                </span>
+                                <i class="bi bi-search text-muted"></i>
+                            </button>
+                            {{ form.destino }}
+                        </div>
+                    </div>
                     {% crispy form %}
 
                     <div class="divider"></div>
@@ -72,6 +102,191 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Origen -->
+<div class="modal modal-blur fade" id="modalOrigen" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Seleccionar Parada de Origen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-icon">
+                        <span class="input-icon-addon">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="search_origen" placeholder="Buscar por localidad, nombre o empresa...">
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-vcenter table-hover card-table">
+                        <thead>
+                            <tr>
+                                <th>Localidad</th>
+                                <th>Nombre Parada</th>
+                                <th>Empresa</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_origen">
+                            {% for parada in paradas %}
+                            <tr class="selectable-row" data-id="{{ parada.id }}" data-label="{{ parada.localidad.nombre }}: {{ parada.nombre }}" data-search="{{ parada.localidad.nombre|lower }} {{ parada.nombre|lower }} {% if parada.empresa %}{{ parada.empresa.nombre|lower }}{% endif %}">
+                                <td>{{ parada.localidad.nombre }}</td>
+                                <td><strong>{{ parada.nombre }}</strong></td>
+                                <td class="text-secondary">{% if parada.empresa %}{{ parada.empresa.nombre }}{% else %}-{% endif %}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary">Seleccionar</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted">No hay paradas disponibles</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Destino -->
+<div class="modal modal-blur fade" id="modalDestino" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Seleccionar Parada de Destino</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-icon">
+                        <span class="input-icon-addon">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="search_destino" placeholder="Buscar por localidad, nombre o empresa...">
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-vcenter table-hover card-table">
+                        <thead>
+                            <tr>
+                                <th>Localidad</th>
+                                <th>Nombre Parada</th>
+                                <th>Empresa</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_destino">
+                            {% for parada in paradas %}
+                            <tr class="selectable-row" data-id="{{ parada.id }}" data-label="{{ parada.localidad.nombre }}: {{ parada.nombre }}" data-search="{{ parada.localidad.nombre|lower }} {{ parada.nombre|lower }} {% if parada.empresa %}{{ parada.empresa.nombre|lower }}{% endif %}">
+                                <td>{{ parada.localidad.nombre }}</td>
+                                <td><strong>{{ parada.nombre }}</strong></td>
+                                <td class="text-secondary">{% if parada.empresa %}{{ parada.empresa.nombre }}{% else %}-{% endif %}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary">Seleccionar</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted">No hay paradas disponibles</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .selectable-row { cursor: pointer; }
+    .selectable-row:hover { background-color: rgba(32, 107, 196, 0.05) !important; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Logic for Origen
+    const modalOrigen = document.getElementById('modalOrigen');
+    const searchOrigen = document.getElementById('search_origen');
+    const tbodyOrigen = document.getElementById('tbody_origen');
+    const inputOrigen = document.getElementById('id_origen');
+    const displayOrigen = document.getElementById('display-origen');
+
+    modalOrigen.addEventListener('shown.bs.modal', function () {
+        searchOrigen.focus();
+    });
+
+    searchOrigen.addEventListener('input', function() {
+        const val = this.value.toLowerCase().trim();
+        const rows = tbodyOrigen.querySelectorAll('tr.selectable-row');
+        rows.forEach(row => {
+            const searchData = row.dataset.search;
+            if (searchData.includes(val)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    tbodyOrigen.querySelectorAll('.selectable-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const label = this.dataset.label;
+            inputOrigen.value = id;
+            displayOrigen.textContent = label;
+            displayOrigen.classList.add('fw-bold');
+            displayOrigen.classList.add('text-primary');
+            bootstrap.Modal.getInstance(modalOrigen).hide();
+        });
+    });
+
+    // Logic for Destino
+    const modalDestino = document.getElementById('modalDestino');
+    const searchDestino = document.getElementById('search_destino');
+    const tbodyDestino = document.getElementById('tbody_destino');
+    const inputDestino = document.getElementById('id_destino');
+    const displayDestino = document.getElementById('display-destino');
+
+    modalDestino.addEventListener('shown.bs.modal', function () {
+        searchDestino.focus();
+    });
+
+    searchDestino.addEventListener('input', function() {
+        const val = this.value.toLowerCase().trim();
+        const rows = tbodyDestino.querySelectorAll('tr.selectable-row');
+        rows.forEach(row => {
+            const searchData = row.dataset.search;
+            if (searchData.includes(val)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    tbodyDestino.querySelectorAll('.selectable-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const label = this.dataset.label;
+            inputDestino.value = id;
+            displayDestino.textContent = label;
+            displayDestino.classList.add('fw-bold');
+            displayDestino.classList.add('text-primary');
+            bootstrap.Modal.getInstance(modalDestino).hide();
+        });
+    });
+});
+</script>
 {% endblock %}
 
 

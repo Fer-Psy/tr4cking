@@ -1,7 +1,7 @@
 {% extends 'layouts/base_tabler.html' %}
 
 {% block title %}Mis Encomiendas - TR4CKING{% endblock %}
-{% block title_content %}Mi Historial de Encomiendas{% endblock %}
+{% block page_header %}{% endblock %}
 
 {% block content %}
 <div class="row row-cards">
@@ -73,7 +73,11 @@
                                     {% elif enc.estado == 'en_destino' %}bg-purple
                                     {% elif enc.estado == 'registrado' %}bg-yellow
                                     {% else %}bg-red{% endif %}">
-                                    {{ enc.get_estado_display }}
+                                    {% if enc.estado == 'registrado' and enc.factura %}
+                                        Registrado y Pagado
+                                    {% else %}
+                                        {{ enc.get_estado_display }}
+                                    {% endif %}
                                 </span>
                             </td>
                             <td>

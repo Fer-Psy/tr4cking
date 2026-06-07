@@ -34,6 +34,8 @@ class Localidad(models.Model):
         return reverse('users:localidad_detail', kwargs={'pk': self.pk})
 
 
+from django.core.validators import MinValueValidator
+
 class Persona(models.Model):
     """
     Modelo de persona que extiende al usuario de Django.
@@ -43,7 +45,8 @@ class Persona(models.Model):
     cedula = models.BigIntegerField(
         primary_key=True, 
         verbose_name="Cédula",
-        help_text="Número de cédula de identidad"
+        help_text="Número de cédula de identidad",
+        validators=[MinValueValidator(0)]
     )
     user = models.OneToOneField(
         User, 
@@ -83,11 +86,11 @@ class Persona(models.Model):
     )
     
     # Roles (booleanos para simplificar permisos rápidos)
-    es_empleado = models.BooleanField(default=False, verbose_name="Es empleado")
     es_chofer = models.BooleanField(default=False, verbose_name="Es chofer")
     es_ayudante = models.BooleanField(default=False, verbose_name="Es ayudante de transporte")
     es_cliente = models.BooleanField(default=False, verbose_name="Es cliente")
     es_agente = models.BooleanField(default=False, verbose_name="Es agente comercial")
+    es_empleado = models.BooleanField(default=False, verbose_name="Es empleado (Legacy)")
     activo = models.BooleanField(default=True, verbose_name="Activo")
 
 
@@ -106,3 +109,7 @@ class Persona(models.Model):
     def nombre_completo(self):
         """Retorna el nombre completo de la persona."""
         return f"{self.nombre} {self.apellido}"
+
+    def get_full_name(self):
+        """Retorna el nombre completo (alias para compatibilidad con auth.User)."""
+        return self.nombre_completo

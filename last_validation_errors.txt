@@ -1,0 +1,2 @@
+Errors: {"nombre": [{"message": "Ya existe un itinerario con el nombre 'Ciudad del Este-Asunci\u00f3n' para la empresa Ybyturuzu.", "code": ""}]}
+Data: <QueryDict: {'csrfmiddlewaretoken': ['kgr0sGnuxq1iFTsGzkUPTfGwtYJ9FTlEulavVmbpFIhTulc4VcXbCw5GWrs8mgqo', 'kgr0sGnuxq1iFTsGzkUPTfGwtYJ9FTlEulavVmbpFIhTulc4VcXbCw5GWrs8mgqo'], 'empresa': ['2'], 'nombre': ['Ciudad del Este-Asunción'], 'ruta': ['PY02'], 'parada_origen': [''], 'distancia_total_km': ['330'], 'duracion_estimada_hs': ['6'], 'dias_semana_checkboxes': ['0'], 'activo': ['on'], 'horarios': ['9']}>

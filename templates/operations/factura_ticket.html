@@ -460,8 +460,23 @@
                 {{ primer_pasaje.viaje.fecha_viaje|date:"d/m/Y" }}
             </div>
             {% if primer_pasaje.viaje.horario.hora_salida %}
-            <div style="font-size: 11px;">{{ primer_pasaje.viaje.horario.hora_salida|time:"H:i" }}</div>
+            <div style="font-size: 11px;">SALIDA ORIGEN: {{ primer_pasaje.viaje.horario.hora_salida|time:"H:i" }}</div>
             {% endif %}
+            
+            <!-- Detalles del Itinerario -->
+            <div style="margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
+                <span style="font-weight: bold; font-size: 10px;">ITINERARIO DE PARADAS:</span>
+                {% for detalle in primer_pasaje.viaje.itinerario.detalles.all %}
+                <div style="font-size: 9px; margin-left: 5px; display: flex; justify-content: space-between;">
+                    <span>{{ detalle.orden }}. {{ detalle.parada.nombre|upper }}</span>
+                    {% if detalle.minutos_desde_origen > 0 %}
+                    <span>+{{ detalle.minutos_desde_origen }} min</span>
+                    {% else %}
+                    <span>Origen</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
         </div>
         <div class="divider"></div>
         {% endif %}

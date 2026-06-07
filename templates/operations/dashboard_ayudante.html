@@ -497,7 +497,7 @@
                                         <td class="text-end text-nowrap">
                                             <div class="btn-list flex-nowrap justify-content-end">
                                                 {% if pasaje.estado != 'abordado' %}
-                                                <button id="btn-abordar-{{ pasaje.pk }}" class="btn btn-sm btn-azure" onclick="abordarPasajero({{ pasaje.pk }})">
+                                                <button id="btn-abordar-{{ pasaje.pk }}" class="btn btn-sm btn-azure" onclick="abordarPasajero({{ pasaje.pk }})" {% if pasaje.estado != 'vendido' %}disabled title="El pasaje debe estar pagado (vendido) para abordar"{% endif %}>
                                                     <i class="bi bi-person-check"></i> <span class="d-none d-md-inline">Abordar</span>
                                                 </button>
                                                 {% endif %}

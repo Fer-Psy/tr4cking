@@ -96,11 +96,6 @@
             </div>
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    {% if persona.es_empleado %}
-                    <span class="badge bg-blue text-blue-fg">
-                        Empleado
-                    </span>
-                    {% endif %}
                     {% if persona.es_chofer %}
                     <span class="badge bg-yellow text-yellow-fg">
                         Chofer
@@ -116,7 +111,7 @@
                         Cliente
                     </span>
                     {% endif %}
-                    {% if not persona.es_empleado and not persona.es_chofer and not persona.es_ayudante and not persona.es_cliente %}
+                    {% if not persona.es_chofer and not persona.es_ayudante and not persona.es_cliente %}
                     <span class="text-secondary italic">Sin roles asignados</span>
                     {% endif %}
                 </div>

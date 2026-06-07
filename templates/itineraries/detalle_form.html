@@ -3,6 +3,8 @@
 
 {% block title %}{% if object %}Editar{% else %}Nueva{% endif %} Parada en Itinerario - TR4CKING{% endblock %}
 
+{% block page_header %}{% endblock %}
+
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_list' %}">Itinerarios</a></li>
 <li class="breadcrumb-item"><a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}">{{ itinerario.nombre }}</a></li>

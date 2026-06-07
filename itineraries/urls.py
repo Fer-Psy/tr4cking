@@ -13,6 +13,8 @@ urlpatterns = [
     path('<int:pk>/', views.ItinerarioDetailView.as_view(), name='itinerario_detail'),
     path('<int:pk>/editar/', views.ItinerarioUpdateView.as_view(), name='itinerario_update'),
     path('<int:pk>/eliminar/', views.ItinerarioDeleteView.as_view(), name='itinerario_delete'),
+    path('obtener-paradas-empresa/', views.obtener_paradas_empresa, name='obtener_paradas_empresa'),
+    path('verificar-duplicado/', views.verificar_itinerario_duplicado, name='verificar_itinerario_duplicado'),
     
     # Detalles de Itinerario (paradas)
     path('<int:itinerario_pk>/paradas/nuevo/', views.DetalleItinerarioCreateView.as_view(), name='detalle_create'),

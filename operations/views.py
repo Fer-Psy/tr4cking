@@ -222,7 +222,7 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
         hoy = timezone.localtime(timezone.now()).date()
         ahora = timezone.localtime(timezone.now())
 
-        if not persona or not (persona.es_ayudante or persona.es_chofer or persona.es_empleado):
+        if not persona or not (persona.es_ayudante or persona.es_chofer):
             messages.warning(self.request, "No tienes permisos de ayudante o empleado.")
             return context
 
@@ -278,7 +278,7 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
             pasajes_activos = Pasaje.objects.filter(
                 viaje=viaje_activo,
                 estado__in=['reservado', 'vendido', 'abordado']
-            ).select_related('asiento', 'pasajero', 'parada_destino')
+            ).select_related('asiento', 'pasajero', 'parada_destino').order_by('-orden_origen', '-orden_destino')
             
             asientos_dict = {p.asiento_id: p for p in pasajes_activos}
             asientos_data = []
@@ -709,7 +709,7 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             ayudante_conflicto = False
             if ayudantes_ids:
                 for ayudante_id in ayudantes_ids:
-                    if Viaje.objects.filter(ayudantes__id=ayudante_id, fecha_viaje=fecha).exists():
+                    if Viaje.objects.filter(ayudantes=ayudante_id, fecha_viaje=fecha).exists():
                         ayudante_conflicto = True
                         break
             
@@ -819,7 +819,7 @@ class PasajeListView(LoginRequiredMixin, ListView):
         # Filtro de seguridad: Ayudantes y Choferes SOLO ven sus propias ventas
         persona = getattr(self.request.user, 'persona', None)
         es_personal = persona and (persona.es_ayudante or persona.es_chofer or persona.es_agente)
-        es_admin = self.request.user.is_superuser or (persona and persona.es_empleado and not es_personal)
+        es_admin = self.request.user.is_superuser
         
         if es_personal and not es_admin:
             queryset = queryset.filter(vendedor=self.request.user)
@@ -994,12 +994,11 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
         if self.request.GET.get('cliente'):
             return redirect(f"{reverse('operations:factura_create')}?pasaje={pasaje.pk}")
         
-        # Si el vendedor es ayudante/chofer/empleado/agente o superusuario, redirigir directamente a facturación
+        # Si el vendedor es ayudante/chofer/agente o superusuario, redirigir directamente a facturación
         persona_vendedor = getattr(self.request.user, 'persona', None)
         is_staff_or_role = self.request.user.is_superuser or (persona_vendedor and (
             persona_vendedor.es_ayudante or 
             persona_vendedor.es_chofer or 
-            persona_vendedor.es_empleado or 
             persona_vendedor.es_agente
         ))
         
@@ -1077,10 +1076,12 @@ class PasajeAbordarView(LoginRequiredMixin, View):
     """Marca un pasaje como abordado (el pasajero ya subió)."""
     def post(self, request, pk):
         pasaje = get_object_or_404(Pasaje, pk=pk)
-        if pasaje.estado in ['vendido', 'reservado']:
+        if pasaje.estado == 'vendido':
             pasaje.estado = 'abordado'
             pasaje.save()
             return JsonResponse({'ok': True, 'mensaje': 'Pasajero marcado como abordado.'})
+        elif pasaje.estado == 'reservado':
+            return JsonResponse({'ok': False, 'error': 'El cliente no puede abordar sin haber pagado el pasaje antes.'}, status=400)
         return JsonResponse({'ok': False, 'error': 'El estado del pasaje no permite abordaje.'}, status=400)
 
 
@@ -1417,6 +1418,31 @@ class MisEncomiendasClienteView(LoginRequiredMixin, ListView):
         return context
 
 
+class MisPasajesClienteView(LoginRequiredMixin, ListView):
+    """Lista detallada de pasajes reservados o comprados por el cliente."""
+    model = Pasaje
+    template_name = 'operations/mis_pasajes_cliente.html'
+    context_object_name = 'pasajes'
+    paginate_by = 10
+
+    def get_queryset(self):
+        persona = getattr(self.request.user, 'persona', None)
+        if not persona:
+            return Pasaje.objects.none()
+        
+        return Pasaje.objects.filter(
+            Q(pasajero=persona) | Q(cliente=persona)
+        ).select_related(
+            'viaje__itinerario', 'viaje__bus', 'asiento', 'parada_origen', 'parada_destino'
+        ).order_by('-fecha_venta')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        persona = getattr(self.request.user, 'persona', None)
+        context['persona'] = persona
+        return context
+
+
 # =============================================================================
 # TRACKING
 # =============================================================================
@@ -1524,6 +1550,8 @@ class CierreCajaView(LoginRequiredMixin, FormView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Detectar si es cierre forzado (redirigido por middleware)
+        context['cierre_forzado'] = self.request.GET.get('forzado') == '1'
         try:
             sesion = SesionCaja.objects.get(
                 cajero=self.request.user,
@@ -1741,17 +1769,11 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
         hoy = ahora.date()
         hora_actual = ahora.time()
         
-        # Obtener pasajes vendidos, reservados o abordados no facturados (solo futuros o vigentes)
+        # Obtener pasajes vendidos, reservados o abordados no facturados
         pasajes_sin_factura = Pasaje.objects.filter(
             estado__in=['vendido', 'reservado', 'abordado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
-        )
-        pasajes_sin_factura = pasajes_sin_factura.exclude(
-            Q(estado='reservado') & (
-                Q(viaje__fecha_viaje__lt=hoy) |
-                Q(viaje__fecha_viaje=hoy, viaje__horario__hora_salida__lt=hora_actual)
-            )
         ).select_related('pasajero', 'viaje__itinerario', 'asiento')
         
         persona_req = getattr(self.request.user, 'persona', None)
@@ -1775,21 +1797,28 @@ class ClientesPendientesFacturaView(LoginRequiredMixin, TemplateView):
         # Filtro de búsqueda
         search = self.request.GET.get('search', '').strip()
         if search:
-            pasajes_sin_factura = pasajes_sin_factura.filter(
-                Q(pasajero__nombre__icontains=search) |
-                Q(pasajero__apellido__icontains=search) |
-                Q(pasajero__cedula__icontains=search) |
-                Q(cliente__nombre__icontains=search) |
-                Q(cliente__apellido__icontains=search) |
-                Q(cliente__cedula__icontains=search) |
-                Q(codigo__icontains=search)
-            )
-            encomiendas_sin_factura = encomiendas_sin_factura.filter(
-                Q(remitente__nombre__icontains=search) |
-                Q(remitente__apellido__icontains=search) |
-                Q(remitente__cedula__icontains=search) |
-                Q(codigo__icontains=search)
-            )
+            import re
+            # Limpiar palabras comunes
+            search_clean = re.sub(r'(?i)\b(pasaje|encomienda|reserva|ticket)\b', '', search).strip()
+            if not search_clean:
+                search_clean = search
+            
+            for term in search_clean.split():
+                pasajes_sin_factura = pasajes_sin_factura.filter(
+                    Q(pasajero__nombre__icontains=term) |
+                    Q(pasajero__apellido__icontains=term) |
+                    Q(pasajero__cedula__icontains=term) |
+                    Q(cliente__nombre__icontains=term) |
+                    Q(cliente__apellido__icontains=term) |
+                    Q(cliente__cedula__icontains=term) |
+                    Q(codigo__icontains=term)
+                )
+                encomiendas_sin_factura = encomiendas_sin_factura.filter(
+                    Q(remitente__nombre__icontains=term) |
+                    Q(remitente__apellido__icontains=term) |
+                    Q(remitente__cedula__icontains=term) |
+                    Q(codigo__icontains=term)
+                )
         
         # Agrupar por cliente y empresa
         clientes_dict = {}
@@ -2355,7 +2384,7 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
 
         # Detectar rol del usuario
         persona = getattr(self.request.user, 'persona', None)
-        es_admin = self.request.user.is_superuser or (persona and persona.es_empleado and not persona.es_ayudante and not persona.es_chofer and not persona.es_agente)
+        es_admin = self.request.user.is_superuser
         es_personal = persona and (persona.es_ayudante or persona.es_chofer or persona.es_agente)
         context['es_admin'] = es_admin
         context['es_personal'] = es_personal
@@ -2414,8 +2443,36 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                 viajes = viajes.filter(empresa=empresa_obj)
             if es_personal and not es_admin:
                 viajes = viajes.filter(Q(chofer=persona) | Q(ayudantes=persona)).distinct()
-            context['viajes'] = viajes
-            context['total_viajes'] = viajes.count()
+            viajes_list = []
+            total_viajes_monto = Decimal('0')
+            for v in viajes:
+                # Calculate income for pasajes in this trip ONLY for the selected date range
+                pasajes_viaje = v.pasajes.filter(
+                    estado__in=['vendido', 'abordado'],
+                    fecha_venta__date__gte=fecha_desde,
+                    fecha_venta__date__lte=fecha_hasta
+                )
+                if es_personal and not es_admin:
+                    pasajes_viaje = pasajes_viaje.filter(vendedor=self.request.user)
+                ing_p = pasajes_viaje.aggregate(t=Sum('precio'))['t'] or Decimal('0')
+
+                # Calculate income for encomiendas in this trip ONLY for the selected date range
+                encomiendas_viaje = v.encomiendas.filter(
+                    fecha_registro__date__gte=fecha_desde,
+                    fecha_registro__date__lte=fecha_hasta
+                ).exclude(estado='cancelado')
+                if es_personal and not es_admin:
+                    encomiendas_viaje = encomiendas_viaje.filter(registrador=self.request.user)
+                ing_e = encomiendas_viaje.aggregate(t=Sum('precio'))['t'] or Decimal('0')
+
+                total_v = ing_p + ing_e
+                setattr(v, 'monto_total', total_v)
+                viajes_list.append(v)
+                total_viajes_monto += total_v
+
+            context['viajes'] = viajes_list
+            context['total_viajes'] = len(viajes_list)
+            context['total_viajes_monto'] = total_viajes_monto
 
             # Facturas emitidas
             facturas = Factura.objects.filter(
@@ -2490,9 +2547,9 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                 enc_qs = enc_qs.filter(registrador=self.request.user)
 
             # Filtro destino
-            destino_id = self.request.GET.get('destino')
-            if destino_id:
-                enc_qs = enc_qs.filter(parada_destino_id=destino_id)
+            destino_nombre = self.request.GET.get('destino')
+            if destino_nombre:
+                enc_qs = enc_qs.filter(parada_destino__nombre=destino_nombre)
             # Filtro cliente (remitente)
             cliente_ci = self.request.GET.get('cliente_ci')
             if cliente_ci:
@@ -2505,9 +2562,9 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                     Q(destinatario__apellido__icontains=cliente_ci)
                 )
             context['encomiendas_reporte'] = enc_qs
-            context['destino_filter'] = destino_id or ''
+            context['destino_filter'] = destino_nombre or ''
             context['cliente_ci_filter'] = cliente_ci or ''
-            context['paradas_disponibles'] = Parada.objects.all().order_by('nombre')
+            context['paradas_disponibles'] = Parada.objects.values_list('nombre', flat=True).distinct().order_by('nombre')
 
             # Resumen por estado
             resumen_estados = {}
@@ -2545,14 +2602,17 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
 
             # Resumen pasajes por estado
             pasaje_estados = {}
+            total_pasajes_sit = Decimal('0')
             for p in pasajes_sit:
                 label = p.get_estado_display()
                 if label not in pasaje_estados:
                     pasaje_estados[label] = {'count': 0, 'total': Decimal('0')}
                 pasaje_estados[label]['count'] += 1
                 pasaje_estados[label]['total'] += p.precio
+                total_pasajes_sit += p.precio
             context['pasaje_estados'] = pasaje_estados
             context['pasajes_situacion'] = pasajes_sit.order_by('-fecha_venta')[:50]
+            context['total_pasajes_sit'] = total_pasajes_sit
 
             # Encomiendas del rango
             enc_sit = Encomienda.objects.filter(
@@ -2563,14 +2623,17 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                 enc_sit = enc_sit.filter(registrador=self.request.user)
 
             enc_estados = {}
+            total_enc_sit = Decimal('0')
             for e in enc_sit:
                 label = e.get_estado_display()
                 if label not in enc_estados:
                     enc_estados[label] = {'count': 0, 'total': Decimal('0')}
                 enc_estados[label]['count'] += 1
                 enc_estados[label]['total'] += e.precio
+                total_enc_sit += e.precio
             context['enc_estados_sit'] = enc_estados
             context['encomiendas_situacion'] = enc_sit.order_by('-fecha_registro')[:50]
+            context['total_enc_sit'] = total_enc_sit
 
             # Chart donut: pasajes por estado
             context['chart_sit_pasaje_labels'] = json.dumps(list(pasaje_estados.keys()))
@@ -2617,8 +2680,8 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                 vend_persona = getattr(p.vendedor, 'persona', None)
                 if not vend_persona:
                     continue  # Sin perfil de persona, no comisiona
-                if not (vend_persona.es_empleado or vend_persona.es_ayudante):
-                    continue  # No es empleado ni ayudante (ej: cliente), no comisiona
+                if not vend_persona.es_ayudante:
+                    continue  # No es ayudante (ej: cliente), no comisiona
                 
                 uid = p.vendedor_id
                 if uid not in vendedores_data:
@@ -2987,15 +3050,8 @@ class ObtenerItemsPendientesClienteView(LoginRequiredMixin, View):
             detalles_factura__factura__estado='emitida'
         )
         
-        # Solo ignoramos pasajes expirados si su estado es 'reservado'. 
-        # Los vendidos/abordados SIEMPRE deben poder facturarse sin importar si el viaje ya pasó.
-        pasajes = pasajes.exclude(
-            Q(estado='reservado') & (
-                Q(viaje__fecha_viaje__lt=hoy) |
-                Q(viaje__fecha_viaje=hoy, viaje__horario__hora_salida__lt=hora_actual)
-            )
-        )
-        
+        # Los pasajes vendidos, reservados o abordados pendientes se muestran siempre
+        # para dar oportunidad a cobrar/facturar casos de último momento o buses retrasados.
         # Si el usuario actual es un ayudante/chofer, solo ve sus propias ventas. 
         # Los empleados y administradores pueden ver todo.
         persona_req = getattr(request.user, 'persona', None)
@@ -3096,6 +3152,162 @@ class APIHorariosItinerarioView(LoginRequiredMixin, View):
         return JsonResponse({'horarios': data})
 
 
+class APIBuscarItinerariosView(LoginRequiredMixin, View):
+    """API JSON para buscar itinerarios con datos tabulares para modal."""
+    
+    def get(self, request):
+        empresa_id = request.GET.get('empresa_id')
+        search = request.GET.get('search', '').strip()
+        
+        qs = Itinerario.objects.filter(activo=True).select_related('empresa').prefetch_related('horarios')
+        
+        if empresa_id:
+            try:
+                qs = qs.filter(empresa_id=int(empresa_id))
+            except (ValueError, TypeError):
+                pass
+        
+        if search:
+            qs = qs.filter(
+                Q(nombre__icontains=search) |
+                Q(ruta__icontains=search) |
+                Q(empresa__nombre__icontains=search)
+            )
+        
+        qs = qs.order_by('nombre')[:50]
+        
+        data = []
+        for it in qs:
+            data.append({
+                'id': it.pk,
+                'nombre': it.nombre,
+                'ruta': it.ruta or '-',
+                'empresa': it.empresa.nombre if it.empresa else '-',
+                'dias': it.dias_operacion_texto,
+                'origen': it.parada_origen,
+                'destino': it.parada_destino,
+                'horarios_count': it.horarios.count(),
+            })
+        
+        return JsonResponse({'results': data})
+
+
+class APIBuscarBusesView(LoginRequiredMixin, View):
+    """API JSON para buscar buses con datos tabulares para modal."""
+    
+    def get(self, request):
+        empresa_id = request.GET.get('empresa_id')
+        search = request.GET.get('search', '').strip()
+        
+        qs = Bus.objects.filter(estado='activo').select_related('empresa')
+        
+        if empresa_id:
+            try:
+                qs = qs.filter(empresa_id=int(empresa_id))
+            except (ValueError, TypeError):
+                pass
+        
+        if search:
+            qs = qs.filter(
+                Q(placa__icontains=search) |
+                Q(numero_bus__icontains=search) |
+                Q(marca__icontains=search) |
+                Q(modelo__icontains=search)
+            )
+        
+        qs = qs.order_by('placa')[:50]
+        
+        data = []
+        for bus in qs:
+            label = str(bus)
+            data.append({
+                'id': bus.pk,
+                'placa': bus.placa,
+                'numero_bus': bus.numero_bus or '-',
+                'marca': bus.marca or '-',
+                'modelo': bus.modelo or '-',
+                'capacidad': bus.capacidad_asientos,
+                'empresa': bus.empresa.nombre if bus.empresa else '-',
+                'label': label,
+            })
+        
+        return JsonResponse({'results': data})
+
+
+class APIBuscarChoferesView(LoginRequiredMixin, View):
+    """API JSON para buscar choferes con datos tabulares para modal."""
+    
+    def get(self, request):
+        empresa_id = request.GET.get('empresa_id')
+        search = request.GET.get('search', '').strip()
+        
+        qs = Persona.objects.filter(es_chofer=True, activo=True)
+        
+        if empresa_id:
+            try:
+                qs = qs.filter(empresa_id=int(empresa_id))
+            except (ValueError, TypeError):
+                pass
+        
+        if search:
+            qs = qs.filter(
+                Q(nombre__icontains=search) |
+                Q(apellido__icontains=search) |
+                Q(cedula__icontains=search)
+            )
+        
+        qs = qs.order_by('apellido', 'nombre')[:50]
+        
+        data = []
+        for p in qs:
+            data.append({
+                'cedula': p.cedula,
+                'nombre': p.nombre,
+                'apellido': p.apellido,
+                'telefono': p.telefono or '-',
+                'label': f"{p.apellido}, {p.nombre} ({p.cedula})",
+            })
+        
+        return JsonResponse({'results': data})
+
+
+class APIBuscarAyudantesView(LoginRequiredMixin, View):
+    """API JSON para buscar ayudantes con datos tabulares para modal."""
+    
+    def get(self, request):
+        empresa_id = request.GET.get('empresa_id')
+        search = request.GET.get('search', '').strip()
+        
+        qs = Persona.objects.filter(es_ayudante=True, activo=True)
+        
+        if empresa_id:
+            try:
+                qs = qs.filter(empresa_id=int(empresa_id))
+            except (ValueError, TypeError):
+                pass
+        
+        if search:
+            qs = qs.filter(
+                Q(nombre__icontains=search) |
+                Q(apellido__icontains=search) |
+                Q(cedula__icontains=search)
+            )
+        
+        qs = qs.order_by('apellido', 'nombre')[:50]
+        
+        data = []
+        for p in qs:
+            data.append({
+                'cedula': p.cedula,
+                'nombre': p.nombre,
+                'apellido': p.apellido,
+                'telefono': p.telefono or '-',
+                'label': f"{p.apellido}, {p.nombre} ({p.cedula})",
+            })
+        
+        return JsonResponse({'results': data})
+
+
 class ViajeParadasView(LoginRequiredMixin, View):
     """API para obtener las paradas de un viaje específico."""
     
@@ -3160,7 +3372,7 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
     """Retorna las opciones de horario y buses para un itinerario específico (HTMX)."""
     def get(self, request):
         itinerario_id = request.GET.get('itinerario')
-        fecha_str = request.GET.get('fecha')
+        fecha_str = request.GET.get('fecha_viaje')
         empresa_id = request.GET.get('empresa')
         
         # Filtros iniciales vacíos
@@ -3178,11 +3390,11 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                 itinerarios = itinerarios.filter(empresa_id=emp_id)
                 buses = Bus.objects.filter(empresa_id=emp_id).order_by('placa')
                 choferes = Persona.objects.filter(
-                    Q(es_chofer=True) | Q(es_empleado=True),
+                    Q(es_chofer=True),
                     empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
                 ayudantes = Persona.objects.filter(
-                    Q(es_ayudante=True) | Q(es_empleado=True),
+                    Q(es_ayudante=True),
                     empresa_id=emp_id
                 ).order_by('apellido', 'nombre')
             except (ValueError, TypeError):
@@ -3238,11 +3450,11 @@ class ObtenerHorariosItinerarioView(LoginRequiredMixin, View):
                 if not empresa_id and itinerario.empresa:
                     buses = Bus.objects.filter(empresa=itinerario.empresa).order_by('placa')
                     choferes = Persona.objects.filter(
-                        Q(es_chofer=True) | Q(es_empleado=True),
+                        Q(es_chofer=True),
                         empresa=itinerario.empresa
                     ).order_by('apellido', 'nombre')
                     ayudantes = Persona.objects.filter(
-                        Q(es_ayudante=True) | Q(es_empleado=True),
+                        Q(es_ayudante=True),
                         empresa=itinerario.empresa
                     ).order_by('apellido', 'nombre')
             except (ValueError, TypeError, Itinerario.DoesNotExist):
@@ -3588,7 +3800,7 @@ class APIActualizarUbicacionView(LoginRequiredMixin, View):
         if not persona:
             return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
 
-        if not (persona.es_ayudante or persona.es_chofer or persona.es_empleado):
+        if not (persona.es_ayudante or persona.es_chofer):
             return JsonResponse({'error': 'No autorizado para enviar ubicación'}, status=403)
 
         # Buscar viaje en curso asignado a esta persona
@@ -4394,6 +4606,28 @@ class PasajeComprobanteView(LoginRequiredMixin, DetailView):
         persona = getattr(self.request.user, 'persona', None)
         return super().get_queryset().filter(pasajero=persona)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        pasaje = self.object
+        
+        # Calcular hora origen
+        detalle_origen = pasaje.viaje.itinerario.detalles.filter(parada=pasaje.parada_origen).first()
+        if pasaje.viaje.horario and pasaje.viaje.horario.hora_salida and detalle_origen:
+            from datetime import datetime, timedelta
+            dt = datetime.combine(pasaje.viaje.fecha_viaje, pasaje.viaje.horario.hora_salida)
+            dt += timedelta(minutes=detalle_origen.minutos_desde_origen or 0)
+            context['hora_origen'] = dt.strftime("%H:%M")
+            
+        # Calcular hora destino
+        detalle_destino = pasaje.viaje.itinerario.detalles.filter(parada=pasaje.parada_destino).first()
+        if pasaje.viaje.horario and pasaje.viaje.horario.hora_salida and detalle_destino:
+            from datetime import datetime, timedelta
+            dt = datetime.combine(pasaje.viaje.fecha_viaje, pasaje.viaje.horario.hora_salida)
+            dt += timedelta(minutes=detalle_destino.minutos_desde_origen or 0)
+            context['hora_destino'] = dt.strftime("%H:%M")
+            
+        return context
+
 
 class PasajeEnviarCorreoView(LoginRequiredMixin, View):
     """Vista para enviar el comprobante de reserva por correo."""
@@ -4565,8 +4799,13 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
         
         viajes_data = []
         for v in viajes:
-            # Filtrado por tiempo: solo si el viaje es hoy y tiene horario
-            if v.fecha_viaje == hoy and v.horario:
+            # Filtrado por tiempo
+            if v.fecha_viaje < hoy:
+                continue
+                
+            is_today = (v.fecha_viaje == hoy)
+            
+            if is_today and v.horario:
                 if v.horario.hora_salida < hora_actual:
                     continue
             
@@ -4579,13 +4818,18 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
                     empresa_nombre = v.empresa.nombre
                 elif v.bus and v.bus.empresa:
                     empresa_nombre = v.bus.empresa.nombre
-                else:
-                    empresa_nombre = "Sin Empresa"
-                    
-                label = f"{v.fecha_viaje.strftime('%d/%m/%Y')} - {empresa_nombre} - {v.itinerario.nombre} - Bus: {v.bus.placa} ({hora_str})"
+                # Determinar el nombre del bus mostrando el número si lo tiene
+                bus_info = f"Nº {v.bus.numero_bus} ({v.bus.placa})" if v.bus and v.bus.numero_bus else (v.bus.placa if v.bus else "Sin Bus")
+                
+                label = f"{v.fecha_viaje.strftime('%d/%m/%Y')} - {empresa_nombre} - {v.itinerario.nombre} - Bus: {bus_info} ({hora_str})"
                 viajes_data.append({
                     'id': v.id,
-                    'label': label
+                    'label': label,
+                    'fecha': v.fecha_viaje.strftime('%d/%m/%Y'),
+                    'hora': hora_str,
+                    'empresa': empresa_nombre,
+                    'itinerario': v.itinerario.nombre,
+                    'bus': bus_info
                 })
             except Exception:
                 continue

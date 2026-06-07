@@ -128,6 +128,13 @@ class Bus(models.Model):
         related_name='buses',
         verbose_name="Empresa"
     )
+    numero_bus = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name="Número de bus",
+        help_text="Número o código identificador del bus (ej: 05, C-12)"
+    )
     placa = models.CharField(
         max_length=20, 
         unique=True, 
@@ -168,6 +175,8 @@ class Bus(models.Model):
         ordering = ['empresa', 'placa']
 
     def __str__(self):
+        if self.numero_bus:
+            return f"Nº {self.numero_bus} ({self.placa}) - {self.marca} {self.modelo}"
         return f"{self.placa} - {self.marca} {self.modelo}"
 
     def get_absolute_url(self):

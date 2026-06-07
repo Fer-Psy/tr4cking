@@ -2,6 +2,8 @@
 
 {% block title %}Mi Panel - TR4CKING{% endblock %}
 
+{% block page_header %}{% endblock %}
+
 {% block extra_css %}
 <style>
     .hero-gradient {
@@ -78,12 +80,12 @@
         </a>
     </div>
     <div class="col-6 col-md-3">
-        <a href="{% url 'operations:buscar_viajes' %}" class="quick-action card stat-card">
+        <a href="{% url 'operations:mis_pasajes_cliente' %}" class="quick-action card stat-card">
             <div class="icon-circle" style="background: linear-gradient(135deg, #2fb344, #69db7c);">
                 <i class="bi bi-ticket-perforated text-white"></i>
             </div>
-            <h4 class="fw-bold mb-0">Reservar Pasaje</h4>
-            <small class="text-muted">Elige tu asiento</small>
+            <h4 class="fw-bold mb-0">Mis Pasajes</h4>
+            <small class="text-muted">Historial y estado</small>
         </a>
     </div>
     <div class="col-6 col-md-3">
@@ -113,7 +115,10 @@
         <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Reservas</h3>
-                <span class="badge bg-blue-lt">Pasajes</span>
+                <div>
+                    <span class="badge bg-blue-lt me-2">Pasajes</span>
+                    <a href="{% url 'operations:mis_pasajes_cliente' %}" class="btn btn-sm btn-outline-primary">Ver todos</a>
+                </div>
             </div>
             <div class="list-group list-group-flush">
                 {% for pasaje in pasajes_recientes %}
@@ -160,7 +165,10 @@
         <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Envíos</h3>
-                <span class="badge bg-green-lt">Encomiendas</span>
+                <div>
+                    <span class="badge bg-green-lt me-2">Encomiendas</span>
+                    <a href="{% url 'operations:mis_encomiendas_cliente' %}" class="btn btn-sm btn-outline-success">Ver todas</a>
+                </div>
             </div>
             <div class="list-group list-group-flush">
                 {% for enc in encomiendas_recientes %}
@@ -193,7 +201,11 @@
                                     {% elif enc.estado == 'registrado' %}bg-warning-lt
                                     {% elif enc.estado == 'cancelado' %}bg-danger-lt
                                     {% else %}bg-secondary-lt{% endif %}">
-                                    {{ enc.get_estado_display }}
+                                    {% if enc.estado == 'registrado' and enc.factura %}
+                                        Registrado y Pagado
+                                    {% else %}
+                                        {{ enc.get_estado_display }}
+                                    {% endif %}
                                 </span>
                             </div>
                             <div class="text-muted small fw-bold">Gs. {{ enc.precio|floatformat:0 }}</div>

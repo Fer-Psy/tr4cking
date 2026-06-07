@@ -92,7 +92,7 @@
 </style>
 {% endblock %}
 
-{% block title_content %}Buscar Viajes Disponibles{% endblock %}
+{% block page_header %}{% endblock %}
 
 {% block content %}
 <!-- Hero de búsqueda -->
@@ -143,10 +143,15 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <label class="form-label fw-bold">
-                    <i class="bi bi-calendar-event me-1 text-primary"></i>¿Cuándo viajas?
+                <label class="form-label fw-bold text-primary">
+                    <i class="bi bi-calendar-event me-1"></i>¿Cuándo viajas?
                 </label>
-                <input type="date" name="fecha" class="form-control" value="{{ fecha_seleccionada|default:'' }}" required>
+                <div class="input-group input-group-flat border border-primary rounded" style="box-shadow: 0 0 10px rgba(32, 107, 196, 0.25); background-color: #f8fafc;">
+                    <span class="input-group-text bg-primary-lt text-primary border-0 px-3">
+                        <i class="bi bi-calendar3" style="font-size: 1.1rem;"></i>
+                    </span>
+                    <input type="date" name="fecha" class="form-control border-0 fw-bold text-primary ps-2" value="{{ fecha_seleccionada|default:'' }}" required style="font-size: 1rem; min-height: 40px; cursor: pointer;">
+                </div>
             </div>
             <div class="col-md-3">
                 <button type="submit" class="btn btn-primary w-100" style="margin-top: auto;">
@@ -228,7 +233,7 @@
             </div>
             <div class="col-md-2 text-end">
                 {% if info.asientos_libres > 0 %}
-                    {% if request.user.is_superuser or request.user.persona.es_empleado or request.user.persona.es_agente or request.user.persona.es_ayudante %}
+                    {% if request.user.is_superuser or request.user.persona.es_agente or request.user.persona.es_ayudante %}
                     <a href="{% url 'operations:pasaje_venta' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
                        class="btn btn-success btn-sm px-4 rounded-pill">
                         <i class="bi bi-cash-coin me-1"></i>Vender

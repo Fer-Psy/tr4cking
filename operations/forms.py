@@ -49,7 +49,6 @@ class ViajeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from crispy_forms.helper import FormHelper
-        from crispy_forms.layout import Layout, Row, Column, HTML, Field
 
         # Filtrar solo itinerarios activos
         self.fields['itinerario'].queryset = Itinerario.objects.filter(activo=True)
@@ -145,80 +144,23 @@ class ViajeForm(forms.ModelForm):
             except (ValueError, TypeError, Itinerario.DoesNotExist):
                 pass
         
-        # Atributos HTMX para actualizar horarios y otros recursos dinámicamente
-        viaje_id_val = f"'{self.instance.pk}'" if self.instance and self.instance.pk else "''"
+        # Widgets: todos los selects con form-select, sin Select2 (modales se manejan en template)
+        self.fields['empresa'].widget.attrs['class'] = 'form-select'
+        self.fields['empresa'].widget.attrs['id'] = 'id_empresa'
+        self.fields['horario'].widget.attrs['class'] = 'form-select'
+        self.fields['horario'].widget.attrs['id'] = 'id_horario'
         
-        self.fields['itinerario'].widget.attrs.update({
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_horario',
-            'hx-trigger': 'change',
-            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
-        })
+        # Los campos itinerario, bus, chofer, ayudantes se renderizan como hidden en el template
+        # (la selección se hace via modal). Pero necesitan estar en el form para validación.
+        for field_name in ['itinerario', 'bus', 'chofer']:
+            self.fields[field_name].widget = forms.HiddenInput()
+        self.fields['ayudantes'].widget = forms.MultipleHiddenInput()
         
-        self.fields['fecha_viaje'].widget.attrs.update({
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_horario',
-            'hx-trigger': 'change, input',
-            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
-        })
-        
-        self.fields['horario'].widget.attrs.update({
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_horario',
-            'hx-trigger': 'change',
-            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
-        })
-        
-        self.fields['empresa'].widget.attrs.update({
-            'hx-get': '/operations/obtener-horarios/',
-            'hx-target': '#id_horario',
-            'hx-trigger': 'change',
-            'hx-include': '#id_empresa, #id_fecha_viaje, #id_itinerario, #id_horario'
-        })
-        
-        # Aplicar clases Bootstrap
-        for field_name, field in self.fields.items():
-            if field_name == 'empresa':
-                # empresa se maneja con JS propio, no Select2
-                field.widget.attrs['class'] = 'form-select'
-                continue
-            if not isinstance(field.widget, forms.Textarea):
-                if isinstance(field, forms.ModelMultipleChoiceField):
-                    field.widget.attrs['class'] = 'form-select select2-multiple'
-                else:
-                    field.widget.attrs['class'] = 'form-select select2' if isinstance(
-                        field, forms.ModelChoiceField
-                    ) else 'form-control'
-
-        # Layout Crispy Forms para mejor distribución
+        # Minimal crispy helper (no layout - template handles it)
         self.helper = FormHelper()
         self.helper.form_tag = False
-        self.helper.layout = Layout(
-            HTML('<div class="mb-3"><h6 class="fw-bold text-primary text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">1. Planificación del Viaje</h6><hr class="my-2"></div>'),
-            Row(
-                Column('empresa', css_class='col-md-4'),
-                Column('itinerario', css_class='col-md-4'),
-                Column('horario', css_class='col-md-4'),
-                css_class='mb-2'
-            ),
-            Row(
-                Column('fecha_viaje', css_class='col-md-4'),
-                Column(
-                    HTML('<div class="alert alert-info py-2 px-3 mb-0 mt-md-4" style="font-size: 0.85rem;"><i class="bi bi-info-circle me-1"></i> Se programarán 8 días a partir de esta fecha</div>'),
-                    css_class='col-md-8'
-                ),
-                css_class='mb-4'
-            ),
-            HTML('<div class="mb-3 mt-2"><h6 class="fw-bold text-success text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">2. Asignación de Recursos</h6><hr class="my-2"></div>'),
-            Row(
-                Column('bus', css_class='col-md-4'),
-                Column('chofer', css_class='col-md-4'),
-                Column('ayudantes', css_class='col-md-4'),
-                css_class='mb-4'
-            ),
-            HTML('<div class="mb-2 mt-2"><h6 class="fw-bold text-secondary text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">3. Otros Detalles</h6><hr class="my-2"></div>'),
-            'observaciones',
-        )
+        self.helper.disable_csrf = True
+
 
     def clean(self):
         cleaned_data = super().clean()
@@ -454,8 +396,7 @@ class PasajeVentaForm(forms.ModelForm):
             persona_vendedor = getattr(self.user, 'persona', None) if self.user else None
             puede_overbooking = self.user and (
                 self.user.is_superuser or 
-                (persona_vendedor and (persona_vendedor.es_agente or persona_vendedor.es_empleado) 
-                 and not persona_vendedor.es_ayudante and not persona_vendedor.es_chofer)
+                (persona_vendedor and persona_vendedor.es_agente and not persona_vendedor.es_ayudante and not persona_vendedor.es_chofer)
             )
             
             if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):

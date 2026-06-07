@@ -69,11 +69,15 @@
                     </td>
                     <td>
                         <div>{{ enc.remitente.nombre_completo }}</div>
+                        {% if enc.remitente.cedula %}
                         <small class="text-muted">{{ enc.remitente.cedula }}</small>
+                        {% endif %}
                     </td>
                     <td>
                         <div>{{ enc.destinatario.nombre_completo }}</div>
+                        {% if enc.destinatario.cedula %}
                         <small class="text-muted">{{ enc.destinatario.cedula }}</small>
+                        {% endif %}
                     </td>
                     <td>{{ enc.parada_origen.nombre }}</td>
                     <td>{{ enc.parada_destino.nombre }}</td>

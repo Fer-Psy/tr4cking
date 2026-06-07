@@ -1,0 +1,132 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Mis Pasajes - TR4CKING{% endblock %}
+{% block page_header %}{% endblock %}
+
+{% block content %}
+<div class="row row-cards">
+    <!-- Resumen -->
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="avatar avatar-lg bg-blue-lt me-3">
+                        <i class="bi bi-ticket-perforated"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">Hola, {{ persona.nombre }}</h3>
+                        <p class="text-muted mb-0">Aquí puedes ver el estado y detalle de todos tus pasajes reservados y comprados.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Listado Detallado</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Código / Fecha Compra</th>
+                            <th>Relación</th>
+                            <th>Origen / Destino</th>
+                            <th>Estado</th>
+                            <th>Monto</th>
+                            <th class="text-end">Opciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pasaje in pasajes %}
+                        <tr>
+                            <td>
+                                <div><strong>{{ pasaje.codigo }}</strong></div>
+                                <small class="text-muted">{{ pasaje.fecha_venta|date:"d/m/Y H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if pasaje.pasajero == persona and pasaje.cliente == persona %}
+                                    <span class="badge bg-blue-lt">Tú viajas y pagas</span>
+                                {% elif pasaje.pasajero == persona %}
+                                    <span class="badge bg-purple-lt">Tú viajas</span>
+                                    <div class="small mt-1 text-muted">Pago: {{ pasaje.cliente.nombre_completo|default:"-" }}</div>
+                                {% elif pasaje.cliente == persona %}
+                                    <span class="badge bg-cyan-lt">Tú pagas</span>
+                                    <div class="small mt-1 text-muted">Viaja: {{ pasaje.pasajero.nombre_completo }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted">{{ pasaje.parada_origen.nombre }}</span>
+                                    <i class="bi bi-arrow-right text-muted small"></i>
+                                    <span>{{ pasaje.parada_destino.nombre }}</span>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    Viaje: {{ pasaje.viaje.fecha_viaje|date:"d/m/Y" }} - Asiento {{ pasaje.asiento.numero_asiento }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if pasaje.estado == 'vendido' %}bg-green
+                                    {% elif pasaje.estado == 'reservado' %}bg-yellow
+                                    {% elif pasaje.estado == 'abordado' %}bg-blue
+                                    {% else %}bg-red{% endif %}">
+                                    {{ pasaje.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>Gs. {{ pasaje.precio|floatformat:0 }}</strong>
+                            </td>
+                            <td class="text-end">
+                                {% if pasaje.viaje and pasaje.estado != 'cancelado' %}
+                                <a href="{% url 'operations:rastreo_publico' %}?viaje_id={{ pasaje.viaje.id }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-geo-alt me-1"></i> Rastrear
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">No disponible</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-ticket-perforated h1 opacity-25"></i>
+                                <p class="mb-0">Aún no tienes registros de pasajes.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+            <div class="card-footer d-flex justify-content-center">
+                <ul class="pagination mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

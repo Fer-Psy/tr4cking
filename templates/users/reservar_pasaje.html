@@ -327,7 +327,7 @@
                     {% if not forloop.first %}
                     <div class="parada-line"></div>
                     {% endif %}
-                    <div class="parada-item" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}" data-lat="{{ detalle.parada.latitud_gps|default:'' }}" data-lng="{{ detalle.parada.longitud_gps|default:'' }}">
+                    <div class="parada-item" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}" data-hora="{{ detalle.hora_llegada_estimada }}" data-lat="{{ detalle.parada.latitud_gps|default:'' }}" data-lng="{{ detalle.parada.longitud_gps|default:'' }}">
                         <div class="parada-orden">{{ detalle.orden }}</div>
                         <div class="flex-fill">
                             <div class="fw-bold">{{ detalle.parada.nombre }}</div>
@@ -601,6 +601,7 @@
             const paradaId = this.dataset.paradaId;
             const orden = parseInt(this.dataset.orden);
             const nombre = this.dataset.nombre;
+            const hora = this.dataset.hora;
 
             // Verificar proximidad del bus
             const lat = this.dataset.lat ? parseFloat(this.dataset.lat) : null;
@@ -639,7 +640,7 @@
                 origenNombre = nombre;
                 this.classList.add('selected-origen');
                 document.getElementById('origen-nombre').textContent = nombre;
-                document.getElementById('resumen-origen').textContent = nombre;
+                document.getElementById('resumen-origen').innerHTML = nombre + ' <span class="text-muted fw-normal ms-1">(' + hora + ')</span>';
 
                 // Deshabilitar paradas anteriores al origen (visual únicamente)
                 document.querySelectorAll('.parada-item').forEach(p => {
@@ -662,7 +663,7 @@
                 destinoNombre = nombre;
                 this.classList.add('selected-destino');
                 document.getElementById('destino-nombre').textContent = nombre;
-                document.getElementById('resumen-destino').textContent = nombre;
+                document.getElementById('resumen-destino').innerHTML = nombre + ' <span class="text-muted fw-normal ms-1">(' + hora + ')</span>';
 
                 // Bloquear otros cambios para evitar errores de secuencia
                 // Ocultar las otras paradas como solicitó el usuario
@@ -702,10 +703,11 @@
         origenId    = itemOrigen.dataset.paradaId;
         origenOrden = parseInt(itemOrigen.dataset.orden);
         origenNombre = itemOrigen.dataset.nombre;
+        const horaOrigen = itemOrigen.dataset.hora;
 
         itemOrigen.classList.add('selected-origen');
         document.getElementById('origen-nombre').textContent = origenNombre;
-        document.getElementById('resumen-origen').textContent = origenNombre;
+        document.getElementById('resumen-origen').innerHTML = origenNombre + (horaOrigen ? ` <span class="text-muted fw-normal ms-1">(${horaOrigen})</span>` : '');
 
         // Deshabilitar paradas anteriores al origen
         document.querySelectorAll('.parada-item').forEach(p => {
@@ -721,10 +723,11 @@
         destinoId    = itemDestino.dataset.paradaId;
         destinoOrden = parseInt(itemDestino.dataset.orden);
         destinoNombre = itemDestino.dataset.nombre;
+        const horaDestino = itemDestino.dataset.hora;
 
         itemDestino.classList.add('selected-destino');
         document.getElementById('destino-nombre').textContent = destinoNombre;
-        document.getElementById('resumen-destino').textContent = destinoNombre;
+        document.getElementById('resumen-destino').innerHTML = destinoNombre + (horaDestino ? ` <span class="text-muted fw-normal ms-1">(${horaDestino})</span>` : '');
 
         // Ocultar paradas no seleccionadas
         document.querySelectorAll('.parada-item').forEach(p => {

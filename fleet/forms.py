@@ -138,8 +138,9 @@ class BusForm(forms.ModelForm):
     
     class Meta:
         model = Bus
-        fields = ['empresa', 'placa', 'marca', 'modelo', 'capacidad_pisos', 'capacidad_asientos', 'estado']
+        fields = ['empresa', 'numero_bus', 'placa', 'marca', 'modelo', 'capacidad_pisos', 'capacidad_asientos', 'estado']
         widgets = {
+            'numero_bus': forms.TextInput(attrs={'placeholder': 'Ej: 05 o C-12'}),
             'placa': forms.TextInput(attrs={'placeholder': 'Ej: ABC-123'}),
             'marca': forms.TextInput(attrs={'placeholder': 'Ej: Mercedes-Benz'}),
             'modelo': forms.TextInput(attrs={'placeholder': 'Ej: O500 RSD'}),
@@ -159,8 +160,9 @@ class BusForm(forms.ModelForm):
             Fieldset(
                 'Información del Bus',
                 Row(
-                    Column('empresa', css_class='col-md-6'),
-                    Column('placa', css_class='col-md-6'),
+                    Column('empresa', css_class='col-md-4'),
+                    Column('numero_bus', css_class='col-md-4'),
+                    Column('placa', css_class='col-md-4'),
                 ),
                 Row(
                     Column('marca', css_class='col-md-6'),

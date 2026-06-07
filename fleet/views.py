@@ -231,7 +231,8 @@ class BusListView(AdminOnlyMixin, ListView):
             queryset = queryset.filter(
                 Q(placa__icontains=search) |
                 Q(marca__icontains=search) |
-                Q(modelo__icontains=search)
+                Q(modelo__icontains=search) |
+                Q(numero_bus__icontains=search)
             )
         
         empresa = self.request.GET.get('empresa', '')

@@ -4,6 +4,98 @@
 {% block title %}{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} Viaje - TR4CKING{% endblock %}
 {% block title_content %}{% if form.instance.pk %}Editar Viaje{% else %}Programar Nuevo Viaje{% endif %}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .modal-search-table {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .modal-search-table table {
+        font-size: 0.875rem;
+    }
+    .modal-search-table tr.selectable-row {
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+    .modal-search-table tr.selectable-row:hover {
+        background-color: rgba(32, 107, 196, 0.08);
+    }
+    .modal-search-table tr.selectable-row.selected-row {
+        background-color: rgba(32, 107, 196, 0.15);
+    }
+    .field-display {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .field-display .display-value {
+        flex: 1;
+        padding: 0.4375rem 0.75rem;
+        font-size: 0.875rem;
+        border: 1px solid #dadfe5;
+        border-radius: 4px;
+        background-color: #f6f8fb;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        color: #1d273b;
+    }
+    .field-display .display-value.empty {
+        color: #929dab;
+        font-style: italic;
+    }
+    .field-display .btn-search-modal {
+        white-space: nowrap;
+    }
+    .field-display .btn-clear {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    .ayudantes-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        min-height: 38px;
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #dadfe5;
+        border-radius: 4px;
+        background-color: #f6f8fb;
+        align-items: center;
+    }
+    .ayudantes-badges .badge {
+        font-size: 0.8rem;
+        font-weight: 500;
+        padding: 0.3em 0.6em;
+    }
+    .ayudantes-badges .badge .btn-remove-ayudante {
+        border: none;
+        background: transparent;
+        color: inherit;
+        padding: 0 0 0 0.3rem;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.7;
+    }
+    .ayudantes-badges .badge .btn-remove-ayudante:hover {
+        opacity: 1;
+    }
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .modal-search-input {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: white;
+        padding-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-10">
@@ -33,16 +125,170 @@
                 </div>
                 {% endif %}
 
-                <form method="post">
+                <form method="post" id="viaje-form">
                     {% csrf_token %}
                     
-                    {% crispy form %}
+                    {# Hidden fields from the form (itinerario, bus, chofer, ayudantes) #}
+                    {{ form.itinerario }}
+                    {{ form.bus }}
+                    {{ form.chofer }}
+                    {{ form.ayudantes }}
 
                     {% if form.non_field_errors %}
                     <div class="alert alert-danger">
                         {{ form.non_field_errors }}
                     </div>
                     {% endif %}
+
+                    {# ============== SECCIÓN 1: Planificación ============== #}
+                    <div class="mb-3">
+                        <h6 class="section-title text-primary">1. Planificación del Viaje</h6>
+                        <hr class="my-2">
+                    </div>
+
+                    <div class="row mb-2">
+                        {# Empresa - select estándar #}
+                        <div class="col-md-4 mb-3">
+                            <label for="id_empresa" class="form-label fw-semibold">Empresa</label>
+                            {{ form.empresa }}
+                            {% if form.empresa.errors %}
+                            <div class="invalid-feedback d-block">{{ form.empresa.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# Itinerario - modal de búsqueda #}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Itinerario <span class="text-danger">*</span></label>
+                            <div class="field-display">
+                                <span id="display_itinerario" class="display-value {% if not form.itinerario.value %}empty{% endif %}">
+                                    {% if form.itinerario.value %}
+                                        <span class="spinner-border spinner-border-sm me-1 d-none" id="itinerario-loading"></span>
+                                        <span id="itinerario-name">Cargando...</span>
+                                    {% else %}
+                                        -- Seleccione --
+                                    {% endif %}
+                                </span>
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-search-modal" data-bs-toggle="modal" data-bs-target="#modalItinerario">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-clear d-none" id="btn_clear_itinerario" title="Limpiar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            {% if form.itinerario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.itinerario.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# Horario - select dinámico #}
+                        <div class="col-md-4 mb-3">
+                            <label for="id_horario" class="form-label fw-semibold">Horario de salida <span class="text-danger">*</span></label>
+                            {{ form.horario }}
+                            {% if form.horario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.horario.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-4 mb-3">
+                            <label for="id_fecha_viaje" class="form-label fw-semibold">Fecha del viaje <span class="text-danger">*</span></label>
+                            {{ form.fecha_viaje }}
+                            {% if form.fecha_viaje.errors %}
+                            <div class="invalid-feedback d-block">{{ form.fecha_viaje.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            {% if not form.instance.pk %}
+                            <div class="alert alert-info py-2 px-3 mb-0 mt-md-4" style="font-size: 0.85rem;">
+                                <i class="bi bi-info-circle me-1"></i> Se programarán 8 días a partir de esta fecha
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# ============== SECCIÓN 2: Recursos ============== #}
+                    <div class="mb-3 mt-2">
+                        <h6 class="section-title text-success">2. Asignación de Recursos</h6>
+                        <hr class="my-2">
+                    </div>
+
+                    <div class="row mb-4">
+                        {# Bus - modal de búsqueda #}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Bus <span class="text-danger">*</span></label>
+                            <div class="field-display">
+                                <span id="display_bus" class="display-value {% if not form.bus.value %}empty{% endif %}">
+                                    {% if form.bus.value %}
+                                        <span id="bus-name">Cargando...</span>
+                                    {% else %}
+                                        -- Seleccione --
+                                    {% endif %}
+                                </span>
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-search-modal" data-bs-toggle="modal" data-bs-target="#modalBus">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-clear d-none" id="btn_clear_bus" title="Limpiar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            {% if form.bus.errors %}
+                            <div class="invalid-feedback d-block">{{ form.bus.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# Chofer - modal de búsqueda #}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Chofer <span class="text-danger">*</span></label>
+                            <div class="field-display">
+                                <span id="display_chofer" class="display-value {% if not form.chofer.value %}empty{% endif %}">
+                                    {% if form.chofer.value %}
+                                        <span id="chofer-name">Cargando...</span>
+                                    {% else %}
+                                        -- Seleccione --
+                                    {% endif %}
+                                </span>
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-search-modal" data-bs-toggle="modal" data-bs-target="#modalChofer">
+                                    <i class="bi bi-search"></i> Buscar
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-clear d-none" id="btn_clear_chofer" title="Limpiar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            {% if form.chofer.errors %}
+                            <div class="invalid-feedback d-block">{{ form.chofer.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# Ayudantes - modal de búsqueda con selección múltiple #}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Ayudantes</label>
+                            <div class="field-display flex-column align-items-stretch">
+                                <div class="d-flex gap-2 mb-1">
+                                    <div class="ayudantes-badges flex-grow-1" id="display_ayudantes">
+                                        <span class="text-muted fst-italic" id="ayudantes-placeholder">Sin ayudantes</span>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm btn-search-modal align-self-start" data-bs-toggle="modal" data-bs-target="#modalAyudante">
+                                        <i class="bi bi-search"></i> Buscar
+                                    </button>
+                                </div>
+                            </div>
+                            {% if form.ayudantes.errors %}
+                            <div class="invalid-feedback d-block">{{ form.ayudantes.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# ============== SECCIÓN 3: Otros ============== #}
+                    <div class="mb-2 mt-2">
+                        <h6 class="section-title text-secondary">3. Otros Detalles</h6>
+                        <hr class="my-2">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_observaciones" class="form-label">Observaciones</label>
+                        {{ form.observaciones }}
+                    </div>
 
                     <div class="d-flex justify-content-between mt-4">
                         <a href="{% url 'operations:viaje_list' %}" class="btn btn-outline-secondary">
@@ -58,38 +304,631 @@
         </div>
     </div>
 </div>
+
+{# ==================== MODALES ==================== #}
+
+{# Modal Itinerario #}
+<div class="modal modal-lg fade" id="modalItinerario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-signpost-2 me-2"></i>Buscar Itinerario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-search-input">
+                    <input type="text" class="form-control" id="search_itinerario" placeholder="Buscar por nombre, ruta, empresa..." autocomplete="off">
+                </div>
+                <div class="modal-search-table mt-2">
+                    <table class="table table-vcenter table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Ruta</th>
+                                <th>Origen</th>
+                                <th>Destino</th>
+                                <th>Días</th>
+                                <th class="text-center">Horarios</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_itinerario">
+                            <tr><td colspan="6" class="text-center text-muted">Seleccione una empresa primero</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal Bus #}
+<div class="modal modal-lg fade" id="modalBus" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bus-front me-2"></i>Buscar Bus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-search-input">
+                    <input type="text" class="form-control" id="search_bus" placeholder="Buscar por placa, marca, modelo..." autocomplete="off">
+                </div>
+                <div class="modal-search-table mt-2">
+                    <table class="table table-vcenter table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nº Bus</th>
+                                <th>Placa</th>
+                                <th>Marca</th>
+                                <th>Modelo</th>
+                                <th class="text-center">Capacidad</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_bus">
+                            <tr><td colspan="6" class="text-center text-muted">Seleccione una empresa primero</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal Chofer #}
+<div class="modal modal-lg fade" id="modalChofer" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i>Buscar Chofer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-search-input">
+                    <input type="text" class="form-control" id="search_chofer" placeholder="Buscar por nombre, apellido, cédula..." autocomplete="off">
+                </div>
+                <div class="modal-search-table mt-2">
+                    <table class="table table-vcenter table-hover">
+                        <thead>
+                            <tr>
+                                <th>Cédula</th>
+                                <th>Apellido</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_chofer">
+                            <tr><td colspan="5" class="text-center text-muted">Seleccione una empresa primero</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal Ayudante #}
+<div class="modal modal-lg fade" id="modalAyudante" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-people me-2"></i>Buscar Ayudantes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-search-input">
+                    <input type="text" class="form-control" id="search_ayudante" placeholder="Buscar por nombre, apellido, cédula..." autocomplete="off">
+                </div>
+                <div class="modal-search-table mt-2">
+                    <table class="table table-vcenter table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;">
+                                    <input type="checkbox" class="form-check-input" id="check_all_ayudantes" title="Seleccionar todos">
+                                </th>
+                                <th>Cédula</th>
+                                <th>Apellido</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody_ayudante">
+                            <tr><td colspan="5" class="text-center text-muted">Seleccione una empresa primero</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_confirm_ayudantes">
+                    <i class="bi bi-check-lg me-1"></i> Confirmar Selección
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var empresaSelect = document.getElementById('id_empresa');
-    var itinerarioSelect = document.getElementById('id_itinerario');
-    var horarioSelect = document.getElementById('id_horario');
+    // ===== REFERENCES =====
+    const empresaSelect = document.getElementById('id_empresa');
+    const horarioSelect = document.getElementById('id_horario');
+    const fechaInput = document.querySelector('[name="fecha_viaje"]');
+    const itinerarioHidden = document.querySelector('[name="itinerario"]');
+    const busHidden = document.querySelector('[name="bus"]');
+    const choferHidden = document.querySelector('[name="chofer"]');
+    
+    // Display elements
+    const displayItinerario = document.getElementById('display_itinerario');
+    const displayBus = document.getElementById('display_bus');
+    const displayChofer = document.getElementById('display_chofer');
+    const displayAyudantes = document.getElementById('display_ayudantes');
+    
+    // Clear buttons
+    const btnClearItinerario = document.getElementById('btn_clear_itinerario');
+    const btnClearBus = document.getElementById('btn_clear_bus');
+    const btnClearChofer = document.getElementById('btn_clear_chofer');
 
-    if (!empresaSelect || !itinerarioSelect) return;
+    // State
+    let selectedAyudantes = {}; // {cedula: label}
+    let searchTimers = {};
 
-    // HTMX se encarga ahora de actualizar itinerarios, horarios, buses, choferes y ayudantes
-    // cuando cambia la empresa, el itinerario o la fecha, gracias a hx-get.
+    // ===== API URLs =====
+    const API_URLS = {
+        itinerarios: '/operations/api/buscar-itinerarios/',
+        buses: '/operations/api/buscar-buses/',
+        choferes: '/operations/api/buscar-choferes/',
+        ayudantes: '/operations/api/buscar-ayudantes/',
+        horarios: '/operations/api/horarios-por-itinerario/',
+    };
 
-    // Reinicializar Select2 después de cada petición HTMX (se destruye primero para que lea el nuevo HTML)
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (window.jQuery) {
-            $('#id_itinerario, #id_horario, #id_bus, #id_chofer, #id_ayudantes').each(function() {
-                try {
-                    if ($(this).hasClass('select2-hidden-accessible')) {
-                        $(this).select2('destroy');
-                    }
-                    $(this).select2({
-                        width: '100%',
-                        allowClear: true,
-                        placeholder: $(this).attr('data-placeholder') || '-- Seleccione --'
-                    });
-                } catch(e) {}
-            });
+    // ===== UTILITY =====
+    function getEmpresaId() {
+        return empresaSelect ? empresaSelect.value : '';
+    }
+
+    function fetchJSON(url, params) {
+        const searchParams = new URLSearchParams(params);
+        return fetch(url + '?' + searchParams.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json());
+    }
+
+    // ===== SET DISPLAY VALUE =====
+    function setFieldDisplay(displayEl, clearBtn, text) {
+        if (text) {
+            displayEl.textContent = text;
+            displayEl.classList.remove('empty');
+            if (clearBtn) clearBtn.classList.remove('d-none');
+        } else {
+            displayEl.textContent = '-- Seleccione --';
+            displayEl.classList.add('empty');
+            if (clearBtn) clearBtn.classList.add('d-none');
         }
+    }
+
+    // ===== LOAD HORARIOS =====
+    function loadHorarios(itinerarioId) {
+        if (!itinerarioId) {
+            horarioSelect.innerHTML = '<option value="">-- Seleccione un horario --</option>';
+            return;
+        }
+        horarioSelect.innerHTML = '<option value="">Cargando...</option>';
+        fetchJSON(API_URLS.horarios, { itinerario_id: itinerarioId }).then(data => {
+            let html = '<option value="">-- Seleccione un horario --</option>';
+            (data.horarios || []).forEach(h => {
+                html += `<option value="${h.id}">${h.hora}</option>`;
+            });
+            horarioSelect.innerHTML = html;
+        }).catch(() => {
+            horarioSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
+        });
+    }
+
+    // ===== EMPRESA CHANGE =====
+    if (empresaSelect) {
+        empresaSelect.addEventListener('change', function() {
+            // Clear all selections when empresa changes
+            clearItinerario();
+            clearBus();
+            clearChofer();
+            clearAyudantes();
+        });
+    }
+
+    // ===== ITINERARIO MODAL =====
+    function loadItinerarios(search) {
+        const tbody = document.getElementById('tbody_itinerario');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando...</td></tr>';
+        
+        fetchJSON(API_URLS.itinerarios, { 
+            empresa_id: getEmpresaId(), 
+            search: search || '' 
+        }).then(data => {
+            if (!data.results || data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No se encontraron itinerarios</td></tr>';
+                return;
+            }
+            let html = '';
+            data.results.forEach(it => {
+                html += `<tr class="selectable-row" data-id="${it.id}" data-name="${it.nombre}">
+                    <td><strong>${it.nombre}</strong></td>
+                    <td>${it.ruta}</td>
+                    <td>${it.origen}</td>
+                    <td>${it.destino}</td>
+                    <td><small>${it.dias}</small></td>
+                    <td class="text-center"><span class="badge bg-blue-lt">${it.horarios_count}</span></td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            
+            // Click handlers
+            tbody.querySelectorAll('.selectable-row').forEach(row => {
+                row.addEventListener('click', function() {
+                    selectItinerario(this.dataset.id, this.dataset.name);
+                    bootstrap.Modal.getInstance(document.getElementById('modalItinerario')).hide();
+                });
+            });
+        }).catch(() => {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar datos</td></tr>';
+        });
+    }
+
+    // When modal opens, load data
+    document.getElementById('modalItinerario').addEventListener('shown.bs.modal', function() {
+        const searchInput = document.getElementById('search_itinerario');
+        searchInput.value = '';
+        loadItinerarios('');
+        searchInput.focus();
     });
 
+    // Search with debounce
+    document.getElementById('search_itinerario').addEventListener('input', function() {
+        clearTimeout(searchTimers.itinerario);
+        const val = this.value;
+        searchTimers.itinerario = setTimeout(() => loadItinerarios(val), 300);
+    });
+
+    function selectItinerario(id, name) {
+        itinerarioHidden.value = id;
+        setFieldDisplay(displayItinerario, btnClearItinerario, name);
+        // Load horarios for this itinerario
+        loadHorarios(id);
+    }
+
+    function clearItinerario() {
+        itinerarioHidden.value = '';
+        setFieldDisplay(displayItinerario, btnClearItinerario, '');
+        horarioSelect.innerHTML = '<option value="">-- Seleccione un horario --</option>';
+    }
+
+    btnClearItinerario.addEventListener('click', clearItinerario);
+
+    // ===== BUS MODAL =====
+    function loadBuses(search) {
+        const tbody = document.getElementById('tbody_bus');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando...</td></tr>';
+        
+        fetchJSON(API_URLS.buses, {
+            empresa_id: getEmpresaId(),
+            search: search || ''
+        }).then(data => {
+            if (!data.results || data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No se encontraron buses</td></tr>';
+                return;
+            }
+            let html = '';
+            data.results.forEach(b => {
+                html += `<tr class="selectable-row" data-id="${b.id}" data-label="${b.label}">
+                    <td>${b.numero_bus}</td>
+                    <td><strong>${b.placa}</strong></td>
+                    <td>${b.marca}</td>
+                    <td>${b.modelo}</td>
+                    <td class="text-center"><span class="badge bg-green-lt">${b.capacidad} asientos</span></td>
+                    <td><button type="button" class="btn btn-sm btn-primary">Seleccionar</button></td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            
+            tbody.querySelectorAll('.selectable-row').forEach(row => {
+                row.addEventListener('click', function() {
+                    selectBus(this.dataset.id, this.dataset.label);
+                    bootstrap.Modal.getInstance(document.getElementById('modalBus')).hide();
+                });
+            });
+        }).catch(() => {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar datos</td></tr>';
+        });
+    }
+
+    document.getElementById('modalBus').addEventListener('shown.bs.modal', function() {
+        const searchInput = document.getElementById('search_bus');
+        searchInput.value = '';
+        loadBuses('');
+        searchInput.focus();
+    });
+
+    document.getElementById('search_bus').addEventListener('input', function() {
+        clearTimeout(searchTimers.bus);
+        const val = this.value;
+        searchTimers.bus = setTimeout(() => loadBuses(val), 300);
+    });
+
+    function selectBus(id, label) {
+        busHidden.value = id;
+        setFieldDisplay(displayBus, btnClearBus, label);
+    }
+
+    function clearBus() {
+        busHidden.value = '';
+        setFieldDisplay(displayBus, btnClearBus, '');
+    }
+
+    btnClearBus.addEventListener('click', clearBus);
+
+    // ===== CHOFER MODAL =====
+    function loadChoferes(search) {
+        const tbody = document.getElementById('tbody_chofer');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando...</td></tr>';
+        
+        fetchJSON(API_URLS.choferes, {
+            empresa_id: getEmpresaId(),
+            search: search || ''
+        }).then(data => {
+            if (!data.results || data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No se encontraron choferes</td></tr>';
+                return;
+            }
+            let html = '';
+            data.results.forEach(c => {
+                html += `<tr class="selectable-row" data-cedula="${c.cedula}" data-label="${c.label}">
+                    <td><strong>${c.cedula}</strong></td>
+                    <td>${c.apellido}</td>
+                    <td>${c.nombre}</td>
+                    <td>${c.telefono}</td>
+                    <td><button type="button" class="btn btn-sm btn-primary">Seleccionar</button></td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            
+            tbody.querySelectorAll('.selectable-row').forEach(row => {
+                row.addEventListener('click', function() {
+                    selectChofer(this.dataset.cedula, this.dataset.label);
+                    bootstrap.Modal.getInstance(document.getElementById('modalChofer')).hide();
+                });
+            });
+        }).catch(() => {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar datos</td></tr>';
+        });
+    }
+
+    document.getElementById('modalChofer').addEventListener('shown.bs.modal', function() {
+        const searchInput = document.getElementById('search_chofer');
+        searchInput.value = '';
+        loadChoferes('');
+        searchInput.focus();
+    });
+
+    document.getElementById('search_chofer').addEventListener('input', function() {
+        clearTimeout(searchTimers.chofer);
+        const val = this.value;
+        searchTimers.chofer = setTimeout(() => loadChoferes(val), 300);
+    });
+
+    function selectChofer(cedula, label) {
+        choferHidden.value = cedula;
+        setFieldDisplay(displayChofer, btnClearChofer, label);
+    }
+
+    function clearChofer() {
+        choferHidden.value = '';
+        setFieldDisplay(displayChofer, btnClearChofer, '');
+    }
+
+    btnClearChofer.addEventListener('click', clearChofer);
+
+    // ===== AYUDANTES MODAL (multi-select) =====
+    function loadAyudantes(search) {
+        const tbody = document.getElementById('tbody_ayudante');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Buscando...</td></tr>';
+        
+        fetchJSON(API_URLS.ayudantes, {
+            empresa_id: getEmpresaId(),
+            search: search || ''
+        }).then(data => {
+            if (!data.results || data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No se encontraron ayudantes</td></tr>';
+                return;
+            }
+            let html = '';
+            data.results.forEach(a => {
+                const isChecked = selectedAyudantes[a.cedula] ? 'checked' : '';
+                html += `<tr class="selectable-row" data-cedula="${a.cedula}" data-label="${a.label}">
+                    <td><input type="checkbox" class="form-check-input ayudante-check" value="${a.cedula}" data-label="${a.label}" ${isChecked}></td>
+                    <td><strong>${a.cedula}</strong></td>
+                    <td>${a.apellido}</td>
+                    <td>${a.nombre}</td>
+                    <td>${a.telefono}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            
+            // Toggle checkbox on row click
+            tbody.querySelectorAll('.selectable-row').forEach(row => {
+                row.addEventListener('click', function(e) {
+                    if (e.target.type !== 'checkbox') {
+                        const cb = this.querySelector('.ayudante-check');
+                        cb.checked = !cb.checked;
+                        cb.dispatchEvent(new Event('change'));
+                    }
+                });
+            });
+            
+            // Checkbox change
+            tbody.querySelectorAll('.ayudante-check').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    if (this.checked) {
+                        selectedAyudantes[this.value] = this.dataset.label;
+                        this.closest('tr').classList.add('selected-row');
+                    } else {
+                        delete selectedAyudantes[this.value];
+                        this.closest('tr').classList.remove('selected-row');
+                    }
+                });
+            });
+        }).catch(() => {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar datos</td></tr>';
+        });
+    }
+
+    document.getElementById('modalAyudante').addEventListener('shown.bs.modal', function() {
+        const searchInput = document.getElementById('search_ayudante');
+        searchInput.value = '';
+        loadAyudantes('');
+        searchInput.focus();
+    });
+
+    document.getElementById('search_ayudante').addEventListener('input', function() {
+        clearTimeout(searchTimers.ayudante);
+        const val = this.value;
+        searchTimers.ayudante = setTimeout(() => loadAyudantes(val), 300);
+    });
+
+    // Check all toggle
+    document.getElementById('check_all_ayudantes').addEventListener('change', function() {
+        const checks = document.querySelectorAll('#tbody_ayudante .ayudante-check');
+        checks.forEach(cb => {
+            cb.checked = this.checked;
+            cb.dispatchEvent(new Event('change'));
+        });
+    });
+
+    // Confirm button
+    document.getElementById('btn_confirm_ayudantes').addEventListener('click', function() {
+        renderAyudantesBadges();
+        syncAyudantesHidden();
+        bootstrap.Modal.getInstance(document.getElementById('modalAyudante')).hide();
+    });
+
+    function renderAyudantesBadges() {
+        const container = displayAyudantes;
+        container.innerHTML = '';
+        const entries = Object.entries(selectedAyudantes);
+        if (entries.length === 0) {
+            container.innerHTML = '<span class="text-muted fst-italic" id="ayudantes-placeholder">Sin ayudantes</span>';
+            return;
+        }
+        entries.forEach(([cedula, label]) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-cyan-lt';
+            badge.innerHTML = `${label} <button type="button" class="btn-remove-ayudante" data-cedula="${cedula}">&times;</button>`;
+            container.appendChild(badge);
+        });
+        
+        // Remove handlers
+        container.querySelectorAll('.btn-remove-ayudante').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                delete selectedAyudantes[this.dataset.cedula];
+                renderAyudantesBadges();
+                syncAyudantesHidden();
+            });
+        });
+    }
+
+    function syncAyudantesHidden() {
+        // Remove all existing hidden inputs for ayudantes
+        document.querySelectorAll('input[name="ayudantes"]').forEach(el => el.remove());
+        
+        const form = document.getElementById('viaje-form');
+        Object.keys(selectedAyudantes).forEach(cedula => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ayudantes';
+            input.value = cedula;
+            form.appendChild(input);
+        });
+    }
+
+    function clearAyudantes() {
+        selectedAyudantes = {};
+        renderAyudantesBadges();
+        syncAyudantesHidden();
+    }
+
+    // ===== INIT: Load display values for edit mode =====
+    {% if form.instance.pk %}
+    (function initEditMode() {
+        // Itinerario
+        {% if form.instance.itinerario %}
+        setFieldDisplay(displayItinerario, btnClearItinerario, '{{ form.instance.itinerario.nombre|escapejs }}');
+        {% endif %}
+        
+        // Bus
+        {% if form.instance.bus %}
+        setFieldDisplay(displayBus, btnClearBus, '{{ form.instance.bus|escapejs }}');
+        {% endif %}
+        
+        // Chofer
+        {% if form.instance.chofer %}
+        setFieldDisplay(displayChofer, btnClearChofer, '{{ form.instance.chofer|escapejs }}');
+        {% endif %}
+        
+        // Ayudantes
+        {% for a in form.instance.ayudantes.all %}
+        selectedAyudantes['{{ a.cedula }}'] = '{{ a.apellido|escapejs }}, {{ a.nombre|escapejs }} ({{ a.cedula }})';
+        {% endfor %}
+        renderAyudantesBadges();
+        syncAyudantesHidden();
+    })();
+    {% else %}
+    {# Init mode for create with initial values #}
+    (function initCreateMode() {
+        {% if form.itinerario.value %}
+        // Load itinerario name via API
+        fetchJSON(API_URLS.itinerarios, { empresa_id: '', search: '' }).then(data => {
+            const match = (data.results || []).find(it => it.id == {{ form.itinerario.value|default:"0" }});
+            if (match) {
+                setFieldDisplay(displayItinerario, btnClearItinerario, match.nombre);
+                loadHorarios(match.id);
+            }
+        });
+        {% endif %}
+
+        {% if form.bus.value %}
+        fetchJSON(API_URLS.buses, { empresa_id: '', search: '' }).then(data => {
+            const match = (data.results || []).find(b => b.id == {{ form.bus.value|default:"0" }});
+            if (match) setFieldDisplay(displayBus, btnClearBus, match.label);
+        });
+        {% endif %}
+
+        {% if form.chofer.value %}
+        fetchJSON(API_URLS.choferes, { empresa_id: '', search: '' }).then(data => {
+            const match = (data.results || []).find(c => c.cedula == {{ form.chofer.value|default:"0" }});
+            if (match) setFieldDisplay(displayChofer, btnClearChofer, match.label);
+        });
+        {% endif %}
+
+        {% with ayudantes_val=form.initial.ayudantes %}
+        {% if ayudantes_val %}
+        {% for aid in ayudantes_val %}
+        fetchJSON(API_URLS.ayudantes, { empresa_id: '', search: '{{ aid }}' }).then(data => {
+            const match = (data.results || []).find(a => a.cedula == {{ aid }});
+            if (match) {
+                selectedAyudantes[match.cedula] = match.label;
+                renderAyudantesBadges();
+                syncAyudantesHidden();
+            }
+        });
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    })();
+    {% endif %}
 });
 </script>
 {% endblock %}
