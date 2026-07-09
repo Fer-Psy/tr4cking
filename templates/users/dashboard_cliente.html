@@ -157,6 +157,47 @@
                 </div>
                 {% endfor %}
             </div>
+            {% if pasajes_recientes.has_other_pages %}
+            <div class="card-footer d-flex align-items-center bg-transparent border-top-0">
+                <ul class="pagination m-0 ms-auto">
+                    {% if pasajes_recientes.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page_pasajes={{ pasajes_recientes.previous_page_number }}{% if request.GET.page_encomiendas %}&page_encomiendas={{ request.GET.page_encomiendas }}{% endif %}" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for i in pasajes_recientes.paginator.page_range %}
+                        {% if pasajes_recientes.number == i %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page_pasajes={{ i }}{% if request.GET.page_encomiendas %}&page_encomiendas={{ request.GET.page_encomiendas }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if pasajes_recientes.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page_pasajes={{ pasajes_recientes.next_page_number }}{% if request.GET.page_encomiendas %}&page_encomiendas={{ request.GET.page_encomiendas }}{% endif %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -219,6 +260,47 @@
                 </div>
                 {% endfor %}
             </div>
+            {% if encomiendas_recientes.has_other_pages %}
+            <div class="card-footer d-flex align-items-center bg-transparent border-top-0">
+                <ul class="pagination m-0 ms-auto">
+                    {% if encomiendas_recientes.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page_encomiendas={{ encomiendas_recientes.previous_page_number }}{% if request.GET.page_pasajes %}&page_pasajes={{ request.GET.page_pasajes }}{% endif %}" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for i in encomiendas_recientes.paginator.page_range %}
+                        {% if encomiendas_recientes.number == i %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?page_encomiendas={{ i }}{% if request.GET.page_pasajes %}&page_pasajes={{ request.GET.page_pasajes }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if encomiendas_recientes.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page_encomiendas={{ encomiendas_recientes.next_page_number }}{% if request.GET.page_pasajes %}&page_pasajes={{ request.GET.page_pasajes }}{% endif %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

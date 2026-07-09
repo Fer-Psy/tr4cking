@@ -10,11 +10,11 @@ urlpatterns = [
     # Personas
     path('personas/', views.PersonaListView.as_view(), name='persona_list'),
     path('personas/nuevo/', views.PersonaCreateView.as_view(), name='persona_create'),
-    path('personas/<int:pk>/', views.PersonaDetailView.as_view(), name='persona_detail'),
-    path('personas/<int:pk>/editar/', views.PersonaUpdateView.as_view(), name='persona_update'),
-    path('personas/<int:pk>/eliminar/', views.PersonaDeleteView.as_view(), name='persona_delete'),
-    path('personas/<int:pk>/dar-de-baja/', views.PersonaDarDeBajaView.as_view(), name='persona_dar_de_baja'),
-    path('personas/<int:pk>/activar/', views.PersonaActivarView.as_view(), name='persona_activar'),
+    path('personas/<str:pk>/', views.PersonaDetailView.as_view(), name='persona_detail'),
+    path('personas/<str:pk>/editar/', views.PersonaUpdateView.as_view(), name='persona_update'),
+    path('personas/<str:pk>/eliminar/', views.PersonaDeleteView.as_view(), name='persona_delete'),
+    path('personas/<str:pk>/dar-de-baja/', views.PersonaDarDeBajaView.as_view(), name='persona_dar_de_baja'),
+    path('personas/<str:pk>/activar/', views.PersonaActivarView.as_view(), name='persona_activar'),
     
     # Localidades
     path('localidades/', views.LocalidadListView.as_view(), name='localidad_list'),

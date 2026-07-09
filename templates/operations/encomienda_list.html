@@ -75,9 +75,6 @@
                     </td>
                     <td>
                         <div>{{ enc.destinatario.nombre_completo }}</div>
-                        {% if enc.destinatario.cedula %}
-                        <small class="text-muted">{{ enc.destinatario.cedula }}</small>
-                        {% endif %}
                     </td>
                     <td>{{ enc.parada_origen.nombre }}</td>
                     <td>{{ enc.parada_destino.nombre }}</td>
@@ -101,13 +98,11 @@
                             
                             {% if not request.user.persona.es_ayudante %}
                             {% if enc.estado == 'registrado' %}
-                            <form method="post" action="{% url 'operations:cancelar_encomienda_rapida' enc.pk %}"
-                                class="d-inline" onsubmit="return confirm('¿Está seguro de cancelar esta encomienda?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Cancelar"
+                                data-bs-toggle="modal" data-bs-target="#cancelModal"
+                                data-url="{% url 'operations:cancelar_encomienda_rapida' enc.pk %}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                             {% endif %}
 
                             {% if enc.estado == 'en_destino' %}
@@ -155,4 +150,46 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Modal Confirmar Cancelación -->
+<div class="modal modal-blur fade" id="cancelModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-body text-center py-4">
+        <i class="bi bi-exclamation-triangle text-warning h1 mb-3" style="font-size: 3rem;"></i>
+        <h3>El Sistema Tr4cking dice:</h3>
+        <div class="text-muted">¿Desea cancelar la encomienda?</div>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col"><button type="button" class="btn w-100" data-bs-dismiss="modal">No</button></div>
+            <div class="col">
+              <form id="cancelForm" method="post" action="">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger w-100">Sí, cancelar</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var cancelModal = document.getElementById('cancelModal');
+    if (cancelModal) {
+      cancelModal.addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var url = button.getAttribute('data-url');
+        var form = document.getElementById('cancelForm');
+        form.action = url;
+      });
+    }
+  });
+</script>
+{% endblock %}
 {% endblock %}

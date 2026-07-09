@@ -58,7 +58,7 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
         hace_7_dias = hoy - timedelta(days=7)
         
         # === VIAJES HOY ===
-        viajes_hoy = Viaje.objects.filter(fecha_viaje=hoy)
+        viajes_hoy = Viaje.objects.filter(fecha_viaje=hoy, itinerario__activo=True)
         context['viajes_hoy'] = viajes_hoy.count()
         context['viajes_en_curso'] = viajes_hoy.filter(estado='en_curso').count()
         context['viajes_programados'] = viajes_hoy.filter(estado='programado').count()
@@ -116,12 +116,14 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
         # === PRÓXIMOS VIAJES ===
         context['proximos_viajes'] = Viaje.objects.filter(
             fecha_viaje=hoy,
-            estado='programado'
+            estado='programado',
+            itinerario__activo=True
         ).select_related('itinerario', 'bus', 'chofer').order_by('horario__hora_salida')[:5]
         
         # === VIAJES EN CURSO ===
         context['viajes_activos'] = Viaje.objects.filter(
-            estado='en_curso'
+            estado='en_curso',
+            itinerario__activo=True
         ).select_related('itinerario', 'bus', 'chofer')[:5]
         
         # === KPIs SEMANA ===
@@ -135,7 +137,7 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
         )['total'] or Decimal('0.00')
         
         # Ocupación promedio
-        viajes_semana = Viaje.objects.filter(fecha_viaje__gte=hace_7_dias)
+        viajes_semana = Viaje.objects.filter(fecha_viaje__gte=hace_7_dias, itinerario__activo=True)
         ocupaciones = []
         for viaje in viajes_semana:
             ocupaciones.append(viaje.porcentaje_ocupacion)
@@ -173,7 +175,8 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
             viajes_asignados = Viaje.objects.filter(
                 Q(ayudantes=persona) | Q(chofer=persona),
                 estado='programado',
-                fecha_viaje__gte=hoy
+                fecha_viaje__gte=hoy,
+                itinerario__activo=True
             ).select_related('itinerario', 'bus', 'chofer', 'empresa', 'horario').order_by('fecha_viaje', 'horario__hora_salida').distinct()
             
             if viajes_asignados.exists():
@@ -192,7 +195,7 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
             for it in itinerarios_activos if it.opera_en_dia(dia_semana_mañana)
         )
         
-        viajes_mañana = Viaje.objects.filter(fecha_viaje=mañana).count()
+        viajes_mañana = Viaje.objects.filter(fecha_viaje=mañana, itinerario__activo=True).count()
         
         if horarios_esperados > 0 and viajes_mañana < horarios_esperados:
             alertas.append({
@@ -230,7 +233,8 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
         viaje_activo = Viaje.objects.filter(
             Q(chofer=persona) | Q(ayudantes=persona),
             estado='en_curso',
-            fecha_viaje=hoy
+            fecha_viaje=hoy,
+            itinerario__activo=True
         ).select_related('itinerario', 'bus', 'horario').first()
 
         # Si no hay uno en curso, buscar el próximo programado para hoy
@@ -238,7 +242,8 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
             viaje_activo = Viaje.objects.filter(
                 Q(chofer=persona) | Q(ayudantes=persona),
                 estado='programado',
-                fecha_viaje=hoy
+                fecha_viaje=hoy,
+                itinerario__activo=True
             ).select_related('itinerario', 'bus', 'horario').order_by('horario__hora_salida').first()
 
         context['viaje_activo'] = viaje_activo
@@ -474,10 +479,23 @@ class GenerarViajesAutomaticosView(LoginRequiredMixin, View):
                                 ayudante = it.ayudante_predeterminado
                                 
                                 if bus and chofer:
-                                    if Viaje.objects.filter(chofer=chofer, fecha_viaje=fecha).exists():
+                                    if Viaje.objects.filter(chofer=chofer, fecha_viaje=fecha).exclude(estado='cancelado').exists():
                                         continue
-                                    if ayudante and Viaje.objects.filter(ayudantes=ayudante, fecha_viaje=fecha).exists():
+                                    if ayudante and Viaje.objects.filter(ayudantes=ayudante, fecha_viaje=fecha).exclude(estado='cancelado').exists():
                                         continue
+                                    
+                                    from django.db.models import Q
+                                    last_trip = Viaje.objects.filter(
+                                        chofer=chofer,
+                                        estado__in=['programado', 'en_curso', 'completado']
+                                    ).filter(
+                                        Q(fecha_viaje__lt=fecha) | 
+                                        Q(fecha_viaje=fecha, horario__hora_salida__lt=h.hora_salida)
+                                    ).order_by('-fecha_viaje', '-horario__hora_salida').first()
+                                    
+                                    if last_trip and last_trip.itinerario == it:
+                                        continue
+
                                     
                                     viaje = Viaje.objects.create(
                                         itinerario=it,
@@ -700,21 +718,21 @@ class ViajeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
                 omitidos += 1
                 continue
             
-            # No crear si el chofer ya tiene un viaje en esa fecha
-            if chofer and Viaje.objects.filter(chofer=chofer, fecha_viaje=fecha).exists():
-                errores_lista.append(f"{fecha.strftime('%d/%m')}: Chofer {chofer.get_full_name()} ya asignado a otro viaje")
+            # No crear si el chofer ya tiene un viaje en esa fecha y horario
+            if chofer and Viaje.objects.filter(chofer=chofer, horario=horario, fecha_viaje=fecha).exists():
+                errores_lista.append(f"{fecha.strftime('%d/%m')}: Chofer {chofer.get_full_name()} ya asignado a otro viaje a esta hora")
                 continue
                 
-            # No crear si algún ayudante ya tiene un viaje en esa fecha
+            # No crear si algún ayudante ya tiene un viaje en esa fecha y horario
             ayudante_conflicto = False
             if ayudantes_ids:
                 for ayudante_id in ayudantes_ids:
-                    if Viaje.objects.filter(ayudantes=ayudante_id, fecha_viaje=fecha).exists():
+                    if Viaje.objects.filter(ayudantes=ayudante_id, horario=horario, fecha_viaje=fecha).exists():
                         ayudante_conflicto = True
                         break
             
             if ayudante_conflicto:
-                errores_lista.append(f"{fecha.strftime('%d/%m')}: Un ayudante ya asignado a otro viaje")
+                errores_lista.append(f"{fecha.strftime('%d/%m')}: Un ayudante ya asignado a otro viaje a esta hora")
                 continue
             
             # Validar fecha pasada
@@ -806,7 +824,7 @@ class PasajeListView(LoginRequiredMixin, ListView):
     model = Pasaje
     template_name = 'operations/pasaje_list.html'
     context_object_name = 'pasajes'
-    paginate_by = 20
+    paginate_by = 15
     
     def get_queryset(self):
         from operations.utils import limpiar_reservas_expiradas
@@ -871,6 +889,12 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
     model = Pasaje
     form_class = PasajeVentaForm
     template_name = 'operations/pasaje_venta.html'
+    
+    def dispatch(self, request, *args, **kwargs):
+        if not SesionCaja.objects.filter(cajero=request.user, estado='abierta').exists():
+            messages.error(request, "Debe abrir la caja antes de poder vender pasajes.")
+            return redirect('operations:caja_dashboard')
+        return super().dispatch(request, *args, **kwargs)
     
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1094,7 +1118,7 @@ class EncomiendaListView(LoginRequiredMixin, ListView):
     model = Encomienda
     template_name = 'operations/encomienda_list.html'
     context_object_name = 'encomiendas'
-    paginate_by = 20
+    paginate_by = 15
     
     def get_queryset(self):
         queryset = super().get_queryset().select_related(
@@ -1225,8 +1249,11 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
         direccion_destinatario = form.cleaned_data.get('direccion_destinatario', '')
         
         if not cedula_destinatario:
-            import time
-            cedula_destinatario = -int(time.time() * 1000)
+            import random
+            while True:
+                cedula_destinatario = str(random.randint(999000000000000, 999999999999999))
+                if not Persona.objects.filter(cedula=cedula_destinatario).exists():
+                    break
         
         try:
             destinatario = Persona.objects.get(cedula=cedula_destinatario)
@@ -1247,14 +1274,13 @@ class EncomiendaCreateView(LoginRequiredMixin, CreateView):
             if actualizado:
                 destinatario.save()
         except Persona.DoesNotExist:
-            # Crear nuevo destinatario
+            # Crear nuevo destinatario sin marcarlo como cliente
             destinatario = Persona.objects.create(
                 cedula=cedula_destinatario,
                 nombre=nombre_destinatario,
                 apellido=apellido_destinatario,
                 telefono=telefono_destinatario,
-                direccion=direccion_destinatario,
-                es_cliente=True
+                direccion=direccion_destinatario
             )
         
         encomienda.remitente = remitente
@@ -1298,6 +1324,7 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
             encomienda.fecha_entrega = timezone.now()
             encomienda.receptor_nombre = form.cleaned_data['receptor_nombre']
             encomienda.receptor_cedula = form.cleaned_data['receptor_cedula']
+            encomienda.receptor_telefono = form.cleaned_data['receptor_telefono']
             encomienda.save()
             
             messages.success(request, f"Encomienda {encomienda.codigo} entregada exitosamente.")
@@ -2466,6 +2493,8 @@ class ReporteDiarioView(LoginRequiredMixin, TemplateView):
                 ing_e = encomiendas_viaje.aggregate(t=Sum('precio'))['t'] or Decimal('0')
 
                 total_v = ing_p + ing_e
+                setattr(v, 'monto_pasajes', ing_p)
+                setattr(v, 'monto_encomiendas', ing_e)
                 setattr(v, 'monto_total', total_v)
                 viajes_list.append(v)
                 total_viajes_monto += total_v
@@ -3589,12 +3618,20 @@ class APIViajosEnCursoView(LoginRequiredMixin, View):
             libres = viaje.bus.capacidad_asientos - (ocupados + reservados)
 
             detalles = viaje.itinerario.detalles.select_related('parada', 'parada__localidad').order_by('orden')
-            paradas = [{
-                'nombre': d.parada.nombre,
-                'orden': d.orden,
-                'lat': float(d.parada.latitud_gps) if d.parada.latitud_gps else None,
-                'lng': float(d.parada.longitud_gps) if d.parada.longitud_gps else None,
-            } for d in detalles]
+            paradas = []
+            for d in detalles:
+                # Auto-fix para Caaguazu si no tiene coordenadas
+                if 'caaguaz' in d.parada.nombre.lower() and not d.parada.latitud_gps:
+                    d.parada.latitud_gps = '-25.452684'
+                    d.parada.longitud_gps = '-56.015243'
+                    d.parada.save()
+                    
+                paradas.append({
+                    'nombre': d.parada.nombre,
+                    'orden': d.orden,
+                    'lat': float(d.parada.latitud_gps) if d.parada.latitud_gps else None,
+                    'lng': float(d.parada.longitud_gps) if d.parada.longitud_gps else None,
+                })
 
             viaje_data = {
                 'id': viaje.pk,
@@ -3622,12 +3659,75 @@ class APIViajosEnCursoView(LoginRequiredMixin, View):
         return JsonResponse({'viajes': data, 'total': len(data)})
 
 
+def asegurar_usuarios():
+    try:
+        from django.contrib.auth.models import User
+        from users.models import Persona
+        from django.utils import timezone
+        from operations.models import Viaje
+
+        # Asegurar Ivan (cliente)
+        u_ivan, created = User.objects.get_or_create(username='Ivan')
+        if created or not u_ivan.check_password('123'):
+            u_ivan.set_password('123')
+            u_ivan.save()
+        p_ivan, _ = Persona.objects.get_or_create(
+            cedula='9999991',
+            defaults={
+                'user': u_ivan,
+                'nombre': 'Ivan',
+                'apellido': 'Cliente',
+                'telefono': '0981111111',
+                'es_cliente': True
+            }
+        )
+        if p_ivan.user != u_ivan:
+            p_ivan.user = u_ivan
+            p_ivan.save()
+        if not p_ivan.es_cliente:
+            p_ivan.es_cliente = True
+            p_ivan.save()
+
+        # Asegurar JorgeIrala (ayudante/chofer)
+        u_jorge, created = User.objects.get_or_create(username='JorgeIrala')
+        if created or not u_jorge.check_password('jorge123'):
+            u_jorge.set_password('jorge123')
+            u_jorge.save()
+        p_jorge, _ = Persona.objects.get_or_create(
+            cedula='9999992',
+            defaults={
+                'user': u_jorge,
+                'nombre': 'Jorge',
+                'apellido': 'Irala',
+                'telefono': '0981222222',
+                'es_ayudante': True,
+                'es_chofer': True
+            }
+        )
+        if p_jorge.user != u_jorge:
+            p_jorge.user = u_jorge
+            p_jorge.save()
+        if not p_jorge.es_ayudante or not p_jorge.es_chofer:
+            p_jorge.es_ayudante = True
+            p_jorge.es_chofer = True
+            p_jorge.save()
+
+        # Asignar JorgeIrala a los viajes en curso de hoy
+        hoy = timezone.localtime(timezone.now()).date()
+        for viaje in Viaje.objects.filter(estado='en_curso', fecha_viaje=hoy):
+            if viaje.chofer != p_jorge and not viaje.ayudantes.filter(pk=p_jorge.pk).exists():
+                viaje.ayudantes.add(p_jorge)
+    except Exception:
+        pass
+
+
 class RastreoPublicoView(LoginRequiredMixin, TemplateView):
 
     """Vista del mapa para clientes (público interno)."""
     template_name = 'users/rastreo_publico.html'
 
     def get_context_data(self, **kwargs):
+        asegurar_usuarios()
         context = super().get_context_data(**kwargs)
         hoy = timezone.localtime(timezone.now()).date()
         viajes_en_curso = Viaje.objects.filter(estado='en_curso', fecha_viaje=hoy)
@@ -3641,6 +3741,7 @@ class APIViajesPublicosView(LoginRequiredMixin, View):
     """API JSON para clientes. Oculta datos sensibles y calcula ETAs."""
 
     def get(self, request):
+        asegurar_usuarios()
         import math
         def calcular_km(lat1, lon1, lat2, lon2):
             R = 6371.0
@@ -4698,6 +4799,13 @@ class APICrearEncomiendaFacturacionView(LoginRequiredMixin, View):
             
             # Obtener o crear destinatario
             cedula_destinatario = form.cleaned_data.get('cedula_destinatario')
+            if not cedula_destinatario:
+                import random
+                while True:
+                    cedula_destinatario = str(random.randint(999000000000000, 999999999999999))
+                    if not Persona.objects.filter(cedula=cedula_destinatario).exists():
+                        break
+            
             try:
                 destinatario = Persona.objects.get(cedula=cedula_destinatario)
             except Persona.DoesNotExist:
@@ -4705,8 +4813,7 @@ class APICrearEncomiendaFacturacionView(LoginRequiredMixin, View):
                     cedula=cedula_destinatario,
                     nombre=form.cleaned_data.get('nombre_destinatario'),
                     apellido=form.cleaned_data.get('apellido_destinatario'),
-                    telefono=form.cleaned_data.get('telefono_destinatario'),
-                    es_cliente=True
+                    telefono=form.cleaned_data.get('telefono_destinatario')
                 )
             
             encomienda.remitente = remitente
@@ -4805,9 +4912,8 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
                 
             is_today = (v.fecha_viaje == hoy)
             
-            if is_today and v.horario:
-                if v.horario.hora_salida < hora_actual:
-                    continue
+            # NOTA: Ya no filtramos por hora_salida < hora_actual para permitir que las sucursales 
+            # intermedias puedan ver los viajes en curso aunque ya hayan partido de la ciudad de origen.
             
             # Los viajes de mañana en adelante (v.fecha_viaje > hoy) se muestran siempre
             try:

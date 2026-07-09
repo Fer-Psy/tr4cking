@@ -2,11 +2,12 @@
 Views for itineraries app.
 """
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, FormView
+from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from base.mixins import AdminOnlyMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse_lazy, reverse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.db.models.deletion import ProtectedError
@@ -39,11 +40,13 @@ class ItinerarioListView(AdminOnlyMixin, ListView):
                 Q(ruta__icontains=search)
             )
         
-        activo = self.request.GET.get('activo', '')
-        if activo == '1':
-            queryset = queryset.filter(activo=True)
-        elif activo == '0':
+        estado = self.request.GET.get('estado', 'activos')
+        if estado == 'inactivos':
             queryset = queryset.filter(activo=False)
+        elif estado == 'todos':
+            pass
+        else:
+            queryset = queryset.filter(activo=True)
         
         empresa_id = self.request.GET.get('empresa', '')
         if empresa_id:
@@ -54,7 +57,7 @@ class ItinerarioListView(AdminOnlyMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['search'] = self.request.GET.get('search', '')
-        context['activo_filter'] = self.request.GET.get('activo', '')
+        context['estado'] = self.request.GET.get('estado', 'activos')
         context['empresa_filter'] = self.request.GET.get('empresa', '')
         
         from fleet.models import Empresa
@@ -223,16 +226,57 @@ class ItinerarioDeleteView(AdminOnlyMixin, DeleteView):
         try:
             return super().post(request, *args, **kwargs)
         except ProtectedError:
-            messages.error(
-                request, 
-                f"No se puede eliminar el itinerario '{self.get_object().nombre}' porque tiene registros "
-                "relacionados protegidos (ej. viajes o ventas)."
-            )
-            return self.get(request, *args, **kwargs)
+            self.object = self.get_object()
+            if request.user.is_superuser or request.user.is_staff:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar el itinerario '{self.object.nombre}' porque tiene registros "
+                    "relacionados protegidos (ej. viajes o ventas). "
+                    "Como administrador, puedes dar de baja este itinerario para inactivarlo del sistema."
+                )
+                context = self.get_context_data(object=self.object, show_deactivate=True)
+                return self.render_to_response(context)
+            else:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar el itinerario '{self.object.nombre}' porque tiene registros "
+                    "relacionados protegidos (ej. viajes o ventas)."
+                )
+                return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
         messages.success(self.request, f"Itinerario {self.object.nombre} eliminado exitosamente.")
         return super().form_valid(form)
+
+
+class ItinerarioDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Dar de baja a un itinerario."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        itinerario = get_object_or_404(Itinerario, pk=pk)
+        itinerario.activo = False
+        itinerario.save()
+            
+        messages.success(request, f"Itinerario '{itinerario.nombre}' ha sido dado de baja exitosamente.")
+        return redirect('itineraries:itinerario_list')
+
+
+class ItinerarioActivarView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Reactivar a un itinerario dado de baja."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        itinerario = get_object_or_404(Itinerario, pk=pk)
+        itinerario.activo = True
+        itinerario.save()
+            
+        messages.success(request, f"Itinerario '{itinerario.nombre}' ha sido reactivado exitosamente.")
+        return redirect('itineraries:itinerario_list')
 
 
 # =============================================================================

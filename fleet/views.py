@@ -110,6 +110,15 @@ class ParadaListView(AdminOnlyMixin, ListView):
     def get_queryset(self):
         queryset = super().get_queryset().select_related('empresa', 'localidad')
         
+        estado = self.request.GET.get('estado', 'activos')
+        
+        if estado == 'inactivos':
+            queryset = queryset.filter(activo=False)
+        elif estado == 'todos':
+            pass
+        else:  # default 'activos'
+            queryset = queryset.filter(activo=True)
+            
         search = self.request.GET.get('search', '')
         if search:
             queryset = queryset.filter(
@@ -127,6 +136,7 @@ class ParadaListView(AdminOnlyMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['search'] = self.request.GET.get('search', '')
         context['empresa_filter'] = self.request.GET.get('empresa', '')
+        context['estado'] = self.request.GET.get('estado', 'activos')
         context['empresas'] = Empresa.objects.all()
         
         # Datos para el mapa del dashboard
@@ -198,16 +208,57 @@ class ParadaDeleteView(AdminOnlyMixin, DeleteView):
         try:
             return super().post(request, *args, **kwargs)
         except ProtectedError:
-            messages.error(
-                request, 
-                f"No se puede eliminar la parada '{self.get_object().nombre}' porque está siendo utilizada "
-                "en otras partes del sistema (ej. precios o itinerarios)."
-            )
-            return self.get(request, *args, **kwargs)
+            self.object = self.get_object()
+            if request.user.is_superuser or request.user.is_staff:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar la parada '{self.object.nombre}' porque está siendo utilizada "
+                    "en otras partes del sistema (ej. precios o itinerarios). "
+                    "Como administrador, puedes dar de baja esta parada para inactivarla del sistema."
+                )
+                context = self.get_context_data(object=self.object, show_deactivate=True)
+                return self.render_to_response(context)
+            else:
+                messages.error(
+                    request, 
+                    f"No se puede eliminar la parada '{self.object.nombre}' porque está siendo utilizada "
+                    "en otras partes del sistema."
+                )
+                return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
         messages.success(self.request, f"Parada {self.object.nombre} eliminada exitosamente.")
         return super().form_valid(form)
+
+
+class ParadaDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Dar de baja a una parada."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        parada = get_object_or_404(Parada, pk=pk)
+        parada.activo = False
+        parada.save()
+            
+        messages.success(request, f"Parada '{parada.nombre}' ha sido dada de baja exitosamente.")
+        return redirect('fleet:parada_list')
+
+
+class ParadaActivarView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Reactivar a una parada dada de baja."""
+    
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_staff
+        
+    def post(self, request, pk, *args, **kwargs):
+        parada = get_object_or_404(Parada, pk=pk)
+        parada.activo = True
+        parada.save()
+            
+        messages.success(request, f"Parada '{parada.nombre}' ha sido reactivada exitosamente.")
+        return redirect('fleet:parada_list')
 
 
 # =============================================================================
@@ -567,9 +618,14 @@ def paradas_autocomplete_ajax(request):
     import unicodedata
     def normalize_key(text):
         if not text: return ""
+        import re
         # Normalizar: quitar acentos, pasar a minúsculas y quitar palabras comunes
         text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
-        return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
+        # Reemplazar paréntesis por espacios
+        text = text.replace('(', ' ').replace(')', ' ')
+        # Quitar términos comunes de paradas
+        text = re.sub(r'\b(terminal|parada|de)\b', ' ', text)
+        return ' '.join(text.split())
 
     paradas = Parada.objects.filter(
         Q(nombre__icontains=query) | Q(localidad__nombre__icontains=query)

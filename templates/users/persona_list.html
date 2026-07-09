@@ -49,11 +49,12 @@
                     
                     <div class="col-12 col-md-2 col-lg-2">
                         <select name="rol" class="form-select" aria-label="Filtrar por rol">
-                            <option value="">Todos los roles</option>
+                            <option value="">Todos los roles (excluye referencias)</option>
                             <option value="chofer" {% if rol == 'chofer' %}selected{% endif %}>Choferes</option>
                             <option value="ayudante" {% if rol == 'ayudante' %}selected{% endif %}>Ayudantes</option>
                             <option value="cliente" {% if rol == 'cliente' %}selected{% endif %}>Clientes</option>
                             <option value="agente" {% if rol == 'agente' %}selected{% endif %}>Agentes de Ventas</option>
+                            <option value="referencia" {% if rol == 'referencia' %}selected{% endif %}>Solo Referencias (Sin Rol)</option>
                         </select>
                     </div>
 

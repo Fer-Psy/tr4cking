@@ -489,10 +489,8 @@
             <div class="persona-titulo">DESTINATARIO</div>
             <div class="persona-nombre">{{ encomienda.destinatario.nombre_completo }}</div>
             <div class="info-row">
-                {% if encomienda.destinatario.cedula %}
+                {% if not encomienda.destinatario.es_cedula_autogenerada %}
                 <span>C.I.: {{ encomienda.destinatario.cedula }}</span>
-                {% else %}
-                <span></span>
                 {% endif %}
                 <span>Tel: {{ encomienda.destinatario.telefono|default:"-" }}</span>
             </div>

@@ -12,9 +12,13 @@ def normalize_search(text):
     """
     if not text: return ""
     # Quitar acentos (NFD normalize)
+    import re
     text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
+    # Reemplazar paréntesis por espacios
+    text = text.replace('(', ' ').replace(')', ' ')
     # Quitar términos comunes de paradas
-    return text.replace('terminal de ', '').replace('terminal ', '').replace('parada ', '').strip()
+    text = re.sub(r'\b(terminal|parada|de)\b', ' ', text)
+    return ' '.join(text.split())
 
 
 def get_similar_paradas_ids(parada_obj, base_id=None):

@@ -79,6 +79,23 @@ class PersonaListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(es_ayudante=True)
         elif rol == 'agente':
             queryset = queryset.filter(es_agente=True)
+        elif rol == 'referencia':
+            queryset = queryset.filter(
+                es_cliente=False,
+                es_chofer=False,
+                es_ayudante=False,
+                es_agente=False
+            )
+        elif not search:
+            # Si no hay busqueda ni filtro de rol, ocultamos los destinatarios de referencia (sin roles)
+            # para no ensuciar la lista principal.
+            queryset = queryset.filter(
+                Q(es_cliente=True) | 
+                Q(es_chofer=True) | 
+                Q(es_ayudante=True) | 
+                Q(es_agente=True) |
+                Q(es_empleado=True)
+            )
         
         return queryset
     
@@ -366,11 +383,21 @@ class DashboardClienteView(LoginRequiredMixin, TemplateView):
             
         # Estadísticas del cliente
         from operations.models import Pasaje, Encomienda, Viaje
+        from django.core.paginator import Paginator
         
-        context['pasajes_recientes'] = Pasaje.objects.filter(pasajero=persona).order_by('-precio')[:5]
-        context['encomiendas_recientes'] = Encomienda.objects.filter(
+        pasajes_qs = Pasaje.objects.filter(
+            Q(pasajero=persona) | Q(cliente=persona)
+        ).order_by('-id')
+        paginator_pasajes = Paginator(pasajes_qs, 5)
+        page_pasajes = self.request.GET.get('page_pasajes')
+        context['pasajes_recientes'] = paginator_pasajes.get_page(page_pasajes)
+
+        encomiendas_qs = Encomienda.objects.filter(
             Q(remitente=persona) | Q(destinatario=persona)
-        ).select_related('parada_origen', 'parada_destino', 'destinatario', 'remitente').order_by('-fecha_registro')[:10]
+        ).select_related('parada_origen', 'parada_destino', 'destinatario', 'remitente').order_by('-fecha_registro')
+        paginator_encomiendas = Paginator(encomiendas_qs, 5)
+        page_encomiendas = self.request.GET.get('page_encomiendas')
+        context['encomiendas_recientes'] = paginator_encomiendas.get_page(page_encomiendas)
         
         ahora = timezone.now()
         hoy = ahora.date()

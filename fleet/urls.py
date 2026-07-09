@@ -22,7 +22,8 @@ urlpatterns = [
     path('paradas/<int:pk>/editar/', views.ParadaUpdateView.as_view(), name='parada_update'),
     path('paradas/autocomplete/', views.paradas_autocomplete_ajax, name='parada_autocomplete'),
     path('paradas/<int:pk>/eliminar/', views.ParadaDeleteView.as_view(), name='parada_delete'),
-    
+    path('paradas/<int:pk>/dar-de-baja/', views.ParadaDarDeBajaView.as_view(), name='parada_dar_de_baja'),
+    path('paradas/<int:pk>/activar/', views.ParadaActivarView.as_view(), name='parada_activar'),
     # Buses
     path('buses/', views.BusListView.as_view(), name='bus_list'),
     path('buses/nuevo/', views.BusCreateView.as_view(), name='bus_create'),

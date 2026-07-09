@@ -5,7 +5,9 @@ Gestión de viajes, pasajes, encomiendas, facturación y caja.
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.db.models import UniqueConstraint, Q
 from django.utils import timezone
+
 from decimal import Decimal
 import uuid
 
@@ -105,16 +107,19 @@ class Viaje(models.Model):
             # Un itinerario+horario solo puede tener un viaje por fecha
             models.UniqueConstraint(
                 fields=['itinerario', 'horario', 'fecha_viaje'],
+                condition=~Q(estado='cancelado'),
                 name='unique_viaje_por_horario_dia'
             ),
             # Un bus solo puede estar en un viaje por horario/fecha
             models.UniqueConstraint(
                 fields=['bus', 'horario', 'fecha_viaje'],
+                condition=~Q(estado='cancelado'),
                 name='unique_bus_por_horario_dia'
             ),
             # Un chofer solo puede hacer un viaje por itinerario en el día
             models.UniqueConstraint(
                 fields=['chofer', 'itinerario', 'fecha_viaje'],
+                condition=~Q(estado='cancelado'),
                 name='unique_chofer_por_itinerario_dia'
             ),
         ]
@@ -581,6 +586,11 @@ class Encomienda(models.Model):
         max_length=20,
         blank=True, null=True,
         verbose_name="Cédula de quien recibe"
+    )
+    receptor_telefono = models.CharField(
+        max_length=20,
+        blank=True, null=True,
+        verbose_name="Teléfono de quien recibe"
     )
 
     class Meta:

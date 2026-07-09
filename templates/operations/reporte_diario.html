@@ -124,12 +124,10 @@
     -webkit-print-color-adjust: economy !important;
   }
 
-  /* Ocultar gráficos, tarjetas de estadísticas y contenedores vacíos o secundarios */
-  .chart-container, canvas, .chart, .stat-card,
-  .row-deck, 
+  /* Ocultar gráficos y contenedores vacíos o secundarios */
+  .chart-container, canvas, .chart,
   .card:has(canvas), 
-  .card:has(.chart-container), 
-  .col-md-4:has(.card) {
+  .card:has(.chart-container) {
     display: none !important;
   }
 
@@ -178,11 +176,9 @@ body.exporting-pdf .print-footer {
 }
 body.exporting-pdf .no-print { display: none !important; }
 
-body.exporting-pdf .chart-container, body.exporting-pdf canvas, body.exporting-pdf .chart, body.exporting-pdf .stat-card,
-body.exporting-pdf .row-deck,
+body.exporting-pdf .chart-container, body.exporting-pdf canvas, body.exporting-pdf .chart,
 body.exporting-pdf .card:has(canvas),
-body.exporting-pdf .card:has(.chart-container),
-body.exporting-pdf .col-md-4:has(.card) {
+body.exporting-pdf .card:has(.chart-container) {
   display: none !important;
 }
 

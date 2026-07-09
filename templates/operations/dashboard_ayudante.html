@@ -185,7 +185,7 @@
                             <span class="tracking-pulse"></span> Transmitiendo coordenadas...
                         </div>
                         {% else %}
-                        Toca para simular la localización del bus.
+                        Toca para transmitir tu ubicacion.
                         {% endif %}
                     </div>
                 </div>
@@ -206,7 +206,7 @@
                             <div class="fw-bold">{{ viaje_activo.itinerario.nombre }}</div>
                             <div class="text-muted small">
                                 <i class="bi bi-calendar-event me-1"></i> {{ viaje_activo.fecha_viaje|date:"l, d/m/Y" }}<br>
-                                <i class="bi bi-bus-front me-1"></i> Bus: {{ viaje_activo.bus.placa }} | <i class="bi bi-clock me-1"></i> Hora: {{ viaje_activo.horario.hora_salida|time:"H:i" }}
+                                <i class="bi bi-bus-front me-1"></i> Bus: {% if viaje_activo.bus.numero_bus %}#{{ viaje_activo.bus.numero_bus }} - {% endif %}{{ viaje_activo.bus.placa }} | <i class="bi bi-clock me-1"></i> Hora: {{ viaje_activo.horario.hora_salida|time:"H:i" }}
                             </div>
                             <span id="viaje-estado-badge" class="badge {% if viaje_activo.estado == 'en_curso' %}bg-success{% else %}bg-blue-lt{% endif %} mt-1">{{ viaje_activo.get_estado_display }}</span>
                         </div>
@@ -311,7 +311,7 @@
                                         <span class="text-uppercase small fw-bold text-azure">{{ v.empresa.nombre }}</span>
                                     </td>
                                     <td>
-                                        <span class="badge bg-light text-dark border">{{ v.bus.placa }}</span>
+                                        <span class="badge bg-light text-dark border">{% if v.bus.numero_bus %}#{{ v.bus.numero_bus }} - {% endif %}{{ v.bus.placa }}</span>
                                     </td>
                                     <td>
                                         <div class="small">{{ v.chofer.nombre_completo }}</div>
@@ -583,6 +583,68 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Confirmación Personalizado -->
+<div class="modal modal-blur fade" id="modal-confirmacion-encomienda" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-primary"></div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-box-seam text-primary fs-1 mb-2"></i>
+                <h3>Sistema Tr4cking dice:</h3>
+                <div class="text-muted">¿Confirmar que la encomienda ya se subió al bus?</div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <a href="#" class="btn w-100" data-bs-dismiss="modal">
+                                Cancelar
+                            </a>
+                        </div>
+                        <div class="col">
+                            <button id="confirm-abordar-btn" class="btn btn-primary w-100">
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación Recibir en Terminal Personalizado -->
+<div class="modal modal-blur fade" id="modal-confirmacion-recibir" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-success"></div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-check2-circle text-success fs-1 mb-2"></i>
+                <h3>Sistema Tr4cking dice:</h3>
+                <div class="text-muted" id="confirmacion-recibir-texto">¿Confirmar que la encomienda fue entregada al encargado?</div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <a href="#" class="btn w-100" data-bs-dismiss="modal">
+                                Cancelar
+                            </a>
+                        </div>
+                        <div class="col">
+                            <button id="confirm-recibir-btn" class="btn btn-success w-100">
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -690,7 +752,7 @@
 
     function startTracking() {
         if (!navigator.geolocation) {
-            alert('Tu navegador no soporta geolocalización.');
+            alert('Geolocalización no disponible. Esto puede deberse a que no estás usando HTTPS (conexión segura) o tu navegador no lo soporta.');
             return;
         }
 
@@ -722,6 +784,11 @@
     }
 
     function sendLocation() {
+        if (!navigator.geolocation) {
+            alert('Geolocalización no disponible. Esto puede deberse a que no estás usando HTTPS (conexión segura) o tu navegador no lo soporta.');
+            stopTracking();
+            return;
+        }
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const data = {
@@ -752,8 +819,8 @@
             },
             (error) => {
                 console.error('Error de geolocalización:', error);
-                // Si falla por permisos, detener
-                if (error.code === 1) stopTracking();
+                alert('No se pudo obtener la ubicación: ' + error.message + ' (Código: ' + error.code + '). Verifica los permisos y que tengas el GPS activado.');
+                stopTracking();
             },
             { enableHighAccuracy: true }
         );
@@ -778,7 +845,7 @@
             text.textContent = 'Transmitir Ubicación';
             badge.classList.replace('bg-success', 'bg-secondary');
             badge.textContent = 'INACTIVO';
-            info.innerHTML = 'Toca para simular la localización del bus.';
+            info.innerHTML = 'Toca para transmitir tu ubicacion.';
         }
     }
 
@@ -828,8 +895,24 @@
             btn.innerHTML = originalContent;
         });
     }
+    let encomiendaIdConfirmar = null;
     function abordarEncomienda(encId) {
-        if (!confirm('¿Confirmar que la encomienda ya subió al bus?')) return;
+        encomiendaIdConfirmar = encId;
+        const myModal = new bootstrap.Modal(document.getElementById('modal-confirmacion-encomienda'));
+        myModal.show();
+    }
+
+    document.getElementById('confirm-abordar-btn').addEventListener('click', function() {
+        if (!encomiendaIdConfirmar) return;
+        const encId = encomiendaIdConfirmar;
+        encomiendaIdConfirmar = null;
+        
+        // Cerrar modal
+        const modalEl = document.getElementById('modal-confirmacion-encomienda');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
         
         const btn = document.getElementById(`btn-abordar-enc-${encId}`);
         const originalContent = btn.innerHTML;
@@ -859,10 +942,28 @@
             btn.disabled = false;
             btn.innerHTML = originalContent;
         });
-    }
+    });
+
+    let encomiendaIdRecibir = null;
     function recibirEnTerminal(encId, paradaNombre) {
-        if (!confirm(`¿Confirmar que la encomienda fue entregada al encargado en ${paradaNombre}?`)) return;
+        encomiendaIdRecibir = encId;
+        document.getElementById('confirmacion-recibir-texto').innerText = `¿Confirmar que la encomienda fue entregada al encargado en ${paradaNombre}?`;
+        const myModal = new bootstrap.Modal(document.getElementById('modal-confirmacion-recibir'));
+        myModal.show();
+    }
+
+    document.getElementById('confirm-recibir-btn').addEventListener('click', function() {
+        if (!encomiendaIdRecibir) return;
+        const encId = encomiendaIdRecibir;
+        encomiendaIdRecibir = null;
         
+        // Cerrar modal
+        const modalEl = document.getElementById('modal-confirmacion-recibir');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
         const btn = document.getElementById(`btn-recibir-${encId}`);
         const originalContent = btn.innerHTML;
         btn.disabled = true;
@@ -891,6 +992,6 @@
             btn.disabled = false;
             btn.innerHTML = originalContent;
         });
-    }
+    });
 </script>
 {% endblock %}

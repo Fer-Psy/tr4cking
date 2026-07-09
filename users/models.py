@@ -34,7 +34,12 @@ class Localidad(models.Model):
         return reverse('users:localidad_detail', kwargs={'pk': self.pk})
 
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
+
+cedula_validator = RegexValidator(
+    regex=r'^\d+(-\d)?$',
+    message="La cédula debe contener solo números, opcionalmente seguidos de un guion y un dígito (ej: 1234567 o 1234567-8)."
+)
 
 class Persona(models.Model):
     """
@@ -42,11 +47,12 @@ class Persona(models.Model):
     Representa a clientes, empleados y pasajeros del sistema.
     La cédula es la clave primaria (identificador único de Paraguay).
     """
-    cedula = models.BigIntegerField(
+    cedula = models.CharField(
+        max_length=20,
         primary_key=True, 
-        verbose_name="Cédula",
-        help_text="Número de cédula de identidad",
-        validators=[MinValueValidator(0)]
+        verbose_name="Cédula/RUC",
+        help_text="Número de cédula de identidad o RUC (ej: 1234567 o 1234567-8)",
+        validators=[cedula_validator]
     )
     user = models.OneToOneField(
         User, 
@@ -113,3 +119,9 @@ class Persona(models.Model):
     def get_full_name(self):
         """Retorna el nombre completo (alias para compatibilidad con auth.User)."""
         return self.nombre_completo
+
+    @property
+    def es_cedula_autogenerada(self):
+        """Indica si la cédula fue autogenerada por el sistema (empieza con 999 y tiene 15 caracteres)."""
+        c = str(self.cedula)
+        return len(c) >= 15 and c.startswith('999')

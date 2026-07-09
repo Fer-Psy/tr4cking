@@ -91,6 +91,11 @@ class Parada(models.Model):
         verbose_name="Es agencia",
         help_text="Indica si esta parada es una agencia de la empresa"
     )
+    activo = models.BooleanField(
+        default=True, 
+        verbose_name="Activa",
+        help_text="Indica si la parada está activa o inactiva"
+    )
 
     class Meta:
         verbose_name = "Parada"

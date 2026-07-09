@@ -519,16 +519,30 @@ class TicketService:
         ).all()
         
         primer_pasaje = None
+        hora_salida_origen_pasajero = None
+        hora_llegada_destino_pasajero = None
+
         for d in detalles:
             if d.pasaje:
                 primer_pasaje = d.pasaje
                 break
+                
+        if primer_pasaje and primer_pasaje.viaje.horario and primer_pasaje.viaje.horario.hora_salida:
+            hora_salida_viaje = primer_pasaje.viaje.horario.hora_salida
+            detalles_itinerario = list(primer_pasaje.viaje.itinerario.detalles.all())
+            for detalle_it in detalles_itinerario:
+                if detalle_it.parada_id == primer_pasaje.parada_origen_id:
+                    hora_salida_origen_pasajero = detalle_it.hora_estimada(hora_salida_viaje)
+                if detalle_it.parada_id == primer_pasaje.parada_destino_id:
+                    hora_llegada_destino_pasajero = detalle_it.hora_estimada(hora_salida_viaje)
         
         return {
             'factura': factura,
             'detalles': detalles,
             'empresa': factura.timbrado.empresa,
             'primer_detalle_pasaje': primer_pasaje,
+            'hora_salida_origen_pasajero': hora_salida_origen_pasajero,
+            'hora_llegada_destino_pasajero': hora_llegada_destino_pasajero,
             'total_letras': FacturacionService.numero_a_letras(int(factura.total)),
             'qr_image': FacturacionService.generar_qr_factura(factura),
         }

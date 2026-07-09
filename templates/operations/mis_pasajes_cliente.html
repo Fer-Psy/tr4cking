@@ -81,7 +81,7 @@
                                 <strong>Gs. {{ pasaje.precio|floatformat:0 }}</strong>
                             </td>
                             <td class="text-end">
-                                {% if pasaje.viaje and pasaje.estado != 'cancelado' %}
+                                {% if pasaje.viaje and pasaje.estado != 'cancelado' and pasaje.estado != 'abordado' %}
                                 <a href="{% url 'operations:rastreo_publico' %}?viaje_id={{ pasaje.viaje.id }}" 
                                    class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-geo-alt me-1"></i> Rastrear

@@ -218,9 +218,9 @@
                                     <i class="bi bi-person-vcard"></i>
                                 </div>
                                 <div>
-                                    <div class="fw-medium">{{ viaje.chofer.nombres }} {{ viaje.chofer.apellidos }}</div>
+                                    <div class="fw-medium">{{ viaje.chofer.nombre_completo }}</div>
                                     {% for ayudante in viaje.ayudantes.all %}
-                                        <small class="text-muted d-block">Ayd: {{ ayudante.nombres }}</small>
+                                        <small class="text-muted d-block">Ayd: {{ ayudante.nombre_completo }}</small>
                                     {% empty %}
                                         <small class="text-muted">Sin ayudante</small>
                                     {% endfor %}

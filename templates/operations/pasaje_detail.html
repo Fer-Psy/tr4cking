@@ -40,7 +40,12 @@
                             </tr>
                             <tr>
                                 <th>Bus:</th>
-                                <td>{{ pasaje.viaje.bus.placa }}</td>
+                                <td>
+                                    {% if pasaje.viaje.bus.numero_bus %}
+                                        Nº {{ pasaje.viaje.bus.numero_bus }} -
+                                    {% endif %}
+                                    {{ pasaje.viaje.bus.placa }}
+                                </td>
                             </tr>
                             <tr>
                                 <th>Asiento:</th>
@@ -108,7 +113,7 @@
                                 <td>
                                     {% if pasaje.vendedor and not pasaje.vendedor.persona.es_cliente %}
                                         {{ pasaje.vendedor.get_full_name|default:pasaje.vendedor.username }}
-                                    {% elif not pasaje.vendedor %}
+                                    {% else %}
                                         Sistema
                                     {% endif %}
                                 </td>

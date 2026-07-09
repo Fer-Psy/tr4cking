@@ -225,6 +225,60 @@ $(document).ready(function() {
     const modalNuevaEncomienda = new bootstrap.Modal(document.getElementById('modalNuevaEncomienda'));
     const formNuevaEncomienda = document.getElementById('form-nueva-encomienda-quick');
     const btnSaveEncomienda = document.getElementById('btn-save-encomienda-quick');
+
+    // Filtrado de Viajes en Modal Nueva Encomienda
+    const quickParadaOrigen = document.getElementById('id_parada_origen');
+    const quickParadaDestino = document.getElementById('id_parada_destino');
+    const quickFiltroFecha = document.getElementById('quick_filtro_fecha');
+    const quickViajeSelect = document.getElementById('id_viaje');
+
+    function filtrarViajesQuick() {
+        if (!quickViajeSelect) return;
+        
+        const origen = quickParadaOrigen ? quickParadaOrigen.value : '';
+        const destino = quickParadaDestino ? quickParadaDestino.value : '';
+        const fecha = quickFiltroFecha ? quickFiltroFecha.value : '';
+        
+        if (!origen || !destino) {
+            quickViajeSelect.innerHTML = '<option value="">-- Seleccione origen y destino --</option>';
+            return;
+        }
+        
+        const currentViaje = quickViajeSelect.value;
+        quickViajeSelect.innerHTML = '<option value="">-- Buscando viajes disponibles... --</option>';
+        
+        let url = `/operations/api/viajes-compatibles/?origen=${origen}&destino=${destino}`;
+        if (fecha) url += `&fecha_desde=${fecha}&fecha_hasta=${fecha}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                quickViajeSelect.innerHTML = '<option value="">-- Seleccione un viaje --</option>';
+                
+                if (data.viajes && data.viajes.length > 0) {
+                    data.viajes.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = v.label;
+                        if (currentViaje == v.id) opt.selected = true;
+                        quickViajeSelect.appendChild(opt);
+                    });
+                } else {
+                    quickViajeSelect.innerHTML = '<option value="">-- No hay buses para este tramo --</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error buscando viajes:', error);
+                quickViajeSelect.innerHTML = '<option value="">-- Error al buscar viajes --</option>';
+            });
+    }
+
+    if (quickParadaOrigen) quickParadaOrigen.addEventListener('change', filtrarViajesQuick);
+    if (quickParadaDestino) quickParadaDestino.addEventListener('change', filtrarViajesQuick);
+    if (quickFiltroFecha) quickFiltroFecha.addEventListener('change', filtrarViajesQuick);
+
+    document.getElementById('modalNuevaEncomienda').addEventListener('show.bs.modal', filtrarViajesQuick);
+
     const quickRemitenteId = document.getElementById('quick-remitente-id');
     const quickTipo = document.querySelector('#form-nueva-encomienda-quick [name="tipo"]');
     const quickPrecio = document.querySelector('#form-nueva-encomienda-quick [name="precio"]');
@@ -507,7 +561,10 @@ $(document).ready(function() {
             }
         }
         quickTipo.addEventListener('change', actualizarPrecioQuick);
-        document.getElementById('modalNuevaEncomienda').addEventListener('show.bs.modal', actualizarPrecioQuick);
+        document.getElementById('modalNuevaEncomienda').addEventListener('show.bs.modal', function() {
+            actualizarPrecioQuick();
+            filtrarViajesQuick();
+        });
     }
 
     if (btnNuevaEncomienda) {

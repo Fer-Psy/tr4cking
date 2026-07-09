@@ -913,11 +913,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         {% endif %}
 
-        {% with ayudantes_val=form.initial.ayudantes %}
+        {% with ayudantes_val=form.ayudantes.value %}
         {% if ayudantes_val %}
         {% for aid in ayudantes_val %}
         fetchJSON(API_URLS.ayudantes, { empresa_id: '', search: '{{ aid }}' }).then(data => {
-            const match = (data.results || []).find(a => a.cedula == {{ aid }});
+            const match = (data.results || []).find(a => String(a.cedula) === '{{ aid }}' || String(a.id) === '{{ aid }}');
             if (match) {
                 selectedAyudantes[match.cedula] = match.label;
                 renderAyudantesBadges();

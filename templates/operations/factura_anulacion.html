@@ -94,9 +94,8 @@
                         </tfoot>
                     </table>
                 </div>
-
                 <!-- Formulario de anulación -->
-                <form method="post">
+                <form method="post" id="form-anular-factura">
                     {% csrf_token %}
                     
                     <div class="mb-3">
@@ -131,8 +130,7 @@
                         <a href="{% url 'operations:factura_detail' factura.pk %}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left me-1"></i> Cancelar
                         </a>
-                        <button type="submit" class="btn btn-danger btn-lg" 
-                                onclick="return confirm('¿Está seguro de que desea anular esta factura?');">
+                        <button type="button" class="btn btn-danger btn-lg" id="btn-show-cancel-modal">
                             <i class="bi bi-x-circle me-2"></i> Confirmar Anulación
                         </button>
                     </div>
@@ -141,4 +139,49 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Confirmar Anulación -->
+<div class="modal modal-blur fade" id="cancelModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-body text-center py-4">
+        <i class="bi bi-exclamation-triangle text-warning h1 mb-3" style="font-size: 3rem;"></i>
+        <h3>El Sistema Tr4cking dice:</h3>
+        <div class="text-muted" id="cancelModalMessage">¿Está seguro de que desea anular esta factura? Esta acción es irreversible.</div>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col"><button type="button" class="btn w-100" data-bs-dismiss="modal">No</button></div>
+            <div class="col">
+              <button type="button" class="btn btn-danger w-100" id="btn-confirm-cancel">Sí, anular</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnShowModal = document.getElementById('btn-show-cancel-modal');
+    const btnConfirm = document.getElementById('btn-confirm-cancel');
+    const form = document.getElementById('form-anular-factura');
+    let modal;
+
+    if (btnShowModal && form) {
+        btnShowModal.addEventListener('click', function() {
+            modal = new bootstrap.Modal(document.getElementById('cancelModal'));
+            modal.show();
+        });
+
+        btnConfirm.addEventListener('click', function() {
+            form.submit();
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% load custom_filters %}
 <!-- FLUJO DE INGRESOS -->
-<div class="row row-deck row-cards mb-4 no-print">
+<div class="row row-deck row-cards mb-4">
 <div class="col-sm-6 col-lg-3">
 <div class="card stat-card"><div class="card-body">
 <div class="d-flex align-items-center mb-2"><div class="stat-icon bg-blue-lt text-blue"><i class="bi bi-bus-front"></i></div><div class="ms-3"><div class="subheader">Viajes</div><div class="h1 mb-0">{{ total_viajes }}</div></div></div>
@@ -19,7 +19,7 @@
 </div></div></div>
 </div>
 
-<div class="row mb-4 no-print">
+<div class="row mb-4">
 <div class="col-md-6"><div class="card stat-card"><div class="card-header"><h3 class="card-title"><i class="bi bi-ticket-perforated me-2 text-blue"></i>Ingresos por Pasajes</h3></div><div class="card-body"><div class="h2 text-green mb-1">Gs. {{ ingresos_pasajes|floatformat:0 }}</div><p class="text-muted mb-0">{{ total_pasajes }} pasajes vendidos</p></div></div></div>
 <div class="col-md-6"><div class="card stat-card"><div class="card-header"><h3 class="card-title"><i class="bi bi-box-seam me-2 text-yellow"></i>Ingresos por Encomiendas</h3></div><div class="card-body"><div class="h2 text-green mb-1">Gs. {{ ingresos_encomiendas|floatformat:0 }}</div><p class="text-muted mb-0">{{ total_encomiendas }} encomiendas</p></div></div></div>
 </div>
@@ -43,19 +43,23 @@ body.exporting-pdf #tabla-viajes .viaje-row { display: table-row !important; }
 body.exporting-pdf #tabla-viajes tfoot { display: table-row-group !important; }
 </style>
 <div class="table-responsive"><table class="table table-vcenter card-table table-striped" id="tabla-viajes">
-<thead><tr><th>ID</th><th>Fecha</th><th>Itinerario</th><th>Bus</th><th>Chofer</th><th class="text-center">Pasajes</th><th class="text-center">Ocupación</th><th class="text-end">Monto</th><th>Estado</th></tr></thead>
+<thead><tr><th>ID</th><th>Fecha</th><th>Itinerario</th><th>Bus</th><th>Chofer</th><th class="text-center">Pasajes</th><th class="text-center">Ocupación</th><th class="text-end">Ing. Pasajes</th><th class="text-end">Ing. Encom.</th><th class="text-end">Total</th><th>Estado</th></tr></thead>
 <tbody>
 {% for viaje in viajes %}
 <tr class="viaje-row"><td>#{{ viaje.pk }}</td><td>{{ viaje.fecha_viaje|date:"d/m/Y" }}</td><td>{{ viaje.itinerario.nombre }}</td><td>{{ viaje.bus.placa }}</td><td>{{ viaje.chofer.nombre_completo }}</td>
 <td class="text-center">{{ viaje.pasajes.count }}</td>
 <td class="text-center"><div class="d-flex align-items-center justify-content-center gap-2"><div class="progress" style="width:60px;height:6px"><div class="progress-bar {% if viaje.porcentaje_ocupacion > 75 %}bg-danger{% elif viaje.porcentaje_ocupacion > 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ viaje.porcentaje_ocupacion }}%"></div></div><small>{{ viaje.porcentaje_ocupacion }}%</small></div></td>
+<td class="text-end">Gs. {{ viaje.monto_pasajes|floatformat:0 }}</td>
+<td class="text-end">Gs. {{ viaje.monto_encomiendas|floatformat:0 }}</td>
 <td class="text-end text-green fw-medium">Gs. {{ viaje.monto_total|floatformat:0 }}</td>
 <td><span class="badge {% if viaje.estado == 'completado' %}bg-success{% elif viaje.estado == 'en_curso' %}bg-primary{% elif viaje.estado == 'programado' %}bg-info{% else %}bg-danger{% endif %}">{{ viaje.get_estado_display }}</span></td></tr>
-{% empty %}<tr><td colspan="9" class="text-center py-4 text-muted">No hubo viajes en este período</td></tr>{% endfor %}
+{% empty %}<tr><td colspan="11" class="text-center py-4 text-muted">No hubo viajes en este período</td></tr>{% endfor %}
 </tbody>
 <tfoot>
 <tr>
   <th colspan="7" class="text-end text-uppercase">Total General del Período:</th>
+  <th class="text-end fw-bold">Gs. {{ ingresos_pasajes|floatformat:0 }}</th>
+  <th class="text-end fw-bold">Gs. {{ ingresos_encomiendas|floatformat:0 }}</th>
   <th class="text-end text-green fs-3 fw-bold">Gs. {{ total_viajes_monto|floatformat:0 }}</th>
   <th></th>
 </tr>

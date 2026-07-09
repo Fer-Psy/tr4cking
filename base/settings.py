@@ -175,6 +175,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 ALLOWED_HOSTS = ['*']
 
+import os
+
 # Caja: hora límite para cerrar la caja diaria (24h format)
 # Después de esta hora, se fuerza el cierre al día siguiente
 CAJA_HORA_LIMITE_CIERRE = 23
+
+# Configuración para envío real de correos electrónicos (SMTP)
+# Actualmente configurado para usar Gmail.
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# Debes colocar tu correo real y la contraseña de aplicación de Gmail aquí
+# NOTA: No uses tu contraseña normal, genera una "Contraseña de aplicación" en tu cuenta de Google.
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'tu_correo@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'tu_contraseña_de_aplicacion')
+DEFAULT_FROM_EMAIL = 'TR4CKING <' + EMAIL_HOST_USER + '>'

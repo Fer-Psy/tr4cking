@@ -142,12 +142,13 @@
         margin-top: 2px;
     }
     .ruta-line {
-        stroke-dasharray: 8, 4;
+        stroke-dasharray: 10, 6;
         stroke-dashoffset: 0;
         animation: dash-move 1s linear infinite;
+        filter: drop-shadow(0px 0px 4px rgba(77, 171, 247, 0.8));
     }
     @keyframes dash-move {
-        to { stroke-dashoffset: -12; }
+        to { stroke-dashoffset: -25; }
     }
 </style>
 {% endblock %}
@@ -503,15 +504,15 @@
                             rutaLines[v.id].setLatLngs(paradasConCoords);
                         } else {
                             rutaLines[v.id] = L.polyline(paradasConCoords, {
-                                color: '#4dabf7',
-                                weight: 3,
-                                opacity: 0.6,
-                                dashArray: '8, 6',
+                                color: '#329af0', // Azul más brillante
+                                weight: 4,        // Un poco más fina
+                                opacity: 1.0,     // Totalmente opaca
+                                className: 'ruta-line'
                             }).addTo(map);
                         }
                         // Actualizar color de la ruta
                         rutaLines[v.id].setStyle({
-                            color: '#4dabf7',
+                            color: '#329af0',
                         });
                     }
                 });

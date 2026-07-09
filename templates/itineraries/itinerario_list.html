@@ -48,10 +48,10 @@
             </div>
             <div class="col-12 col-md-3 col-lg-2">
                 <label class="form-label">Estado</label>
-                <select name="activo" class="form-select">
-                    <option value="">Todos</option>
-                    <option value="1" {% if activo_filter == '1' %}selected{% endif %}>Activos</option>
-                    <option value="0" {% if activo_filter == '0' %}selected{% endif %}>Inactivos</option>
+                <select name="estado" class="form-select">
+                    <option value="activos" {% if estado == 'activos' or not estado %}selected{% endif %}>Activos</option>
+                    <option value="inactivos" {% if estado == 'inactivos' %}selected{% endif %}>Inactivos</option>
+                    <option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todos</option>
                 </select>
             </div>
             <div class="col-12 col-md-3 col-lg-3">
@@ -69,7 +69,7 @@
                 <button type="submit" class="btn btn-primary w-100">
                     <i class="bi bi-funnel me-1"></i>Filtrar
                 </button>
-                {% if search or activo_filter or empresa_filter %}
+                {% if search or estado != 'activos' or empresa_filter %}
                 <a href="{% url 'itineraries:itinerario_list' %}" class="btn btn-outline-secondary btn-icon" title="Limpiar filtros" data-bs-toggle="tooltip">
                     <i class="bi bi-x-lg"></i>
                 </a>
@@ -147,17 +147,18 @@
                         </td>
                         <td>
                             {% if itinerario.activo %}
-                            <span class="badge badge-success">Activo</span>
+                            <span class="badge bg-green text-green-fg">Activo</span>
                             {% else %}
-                            <span class="badge badge-secondary">Inactivo</span>
+                            <span class="badge bg-red text-red-fg">Inactivo</span>
                             {% endif %}
                         </td>
                         <td>
-                            <div class="table-actions justify-content-end">
+                            <div class="table-actions justify-content-end d-flex align-items-center gap-2">
                                 <a href="{% url 'itineraries:itinerario_detail' itinerario.pk %}"
                                     class="btn btn-ghost btn-icon btn-sm" title="Ver">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                {% if itinerario.activo %}
                                 <a href="{% url 'itineraries:itinerario_update' itinerario.pk %}"
                                     class="btn btn-ghost btn-icon btn-sm" title="Editar"
                                     hx-get="{% url 'itineraries:itinerario_update' itinerario.pk %}"
@@ -170,6 +171,16 @@
                                     class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
                                     <i class="bi bi-trash"></i>
                                 </a>
+                                {% else %}
+                                    {% if user.is_superuser or user.is_staff %}
+                                    <form action="{% url 'itineraries:itinerario_activar' itinerario.pk %}" method="post" class="d-inline m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-teal btn-sm px-2 py-1" title="Reactivar itinerario" data-bs-toggle="tooltip">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Reactivar
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -188,7 +199,7 @@
                     {% if page_obj.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                            href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">
+                            href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
@@ -198,7 +209,7 @@
                     {% if page_obj.number == num %}
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item">
-                        <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">{{ num }}</a>
+                        <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}">{{ num }}</a>
                         </li>
                         {% endif %}
                         {% endfor %}
@@ -206,7 +217,7 @@
                         {% if page_obj.has_next %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if activo_filter %}&activo={{ activo_filter }}{% endif %}">
+                                href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                         </li>
@@ -223,13 +234,13 @@
             </div>
             <h5 class="empty-state-title">No se encontraron itinerarios</h5>
             <p class="empty-state-text">
-                {% if search or activo_filter or empresa_filter %}
+                {% if search or estado != 'activos' or empresa_filter %}
                 No hay resultados para los filtros aplicados.
                 {% else %}
                 Comienza agregando el primer itinerario al sistema.
                 {% endif %}
             </p>
-            {% if not search and not activo_filter and not empresa_filter %}
+            {% if not search and estado == 'activos' and not empresa_filter %}
             <a href="{% url 'itineraries:itinerario_create' %}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-2"></i>
                 Agregar Itinerario

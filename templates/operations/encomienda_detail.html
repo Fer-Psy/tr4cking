@@ -70,8 +70,10 @@
                                 <td>
                                     <span class="badge bg-azure-lt">
                                         <i class="bi bi-truck me-1"></i>
+                                        {% if encomienda.viaje.bus.numero_bus %}
+                                            Nº {{ encomienda.viaje.bus.numero_bus }} - 
+                                        {% endif %}
                                         {{ encomienda.viaje.bus.placa }}
-                                        {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}
                                     </span>
                                 </td>
                             </tr>
@@ -127,7 +129,11 @@
                         <table class="table table-sm">
                             <tr>
                                 <th>Cédula:</th>
-                                <td>{{ encomienda.destinatario.cedula }}</td>
+                                <td>
+                                    {% if not encomienda.destinatario.es_cedula_autogenerada %}
+                                        {{ encomienda.destinatario.cedula }}
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr>
                                 <th>Nombre:</th>
@@ -148,6 +154,9 @@
                     <p class="mb-0">
                         <strong>Receptor:</strong> {{ encomienda.receptor_nombre }}<br>
                         <strong>Cédula:</strong> {{ encomienda.receptor_cedula }}<br>
+                        {% if encomienda.receptor_telefono %}
+                        <strong>Teléfono:</strong> {{ encomienda.receptor_telefono }}<br>
+                        {% endif %}
                         <strong>Fecha:</strong> {{ encomienda.fecha_entrega|date:"d/m/Y H:i" }}
                     </p>
                 </div>
@@ -257,7 +266,7 @@
                     {% if encomienda.eta_llegada %}
                     <div class="mb-1 text-azure fw-bold"><i class="bi bi-geo-alt me-1"></i> Llegada: {{ encomienda.eta_llegada|time:"H:i" }} hs.</div>
                     {% endif %}
-                    <div><i class="bi bi-truck me-1"></i> Bus: {{ encomienda.viaje.bus.placa }} {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}</div>
+                    <div><i class="bi bi-truck me-1"></i> Bus: {% if encomienda.viaje.bus.numero_bus %}Nº {{ encomienda.viaje.bus.numero_bus }} - {% endif %}{{ encomienda.viaje.bus.placa }}</div>
                 </div>
             </div>
         </div>
@@ -282,8 +291,7 @@
                         {% endif %}
                         {% if encomienda.viaje %}
                         <p class="text-muted small mb-0">
-                            Asignado al bus: <strong>{{ encomienda.viaje.bus.placa }}</strong>
-                            {% if encomienda.viaje.bus.numero %}({{ encomienda.viaje.bus.numero }}){% endif %}
+                            Asignado al bus: <strong>{% if encomienda.viaje.bus.numero_bus %}Nº {{ encomienda.viaje.bus.numero_bus }} - {% endif %}{{ encomienda.viaje.bus.placa }}</strong>
                         </p>
                         {% endif %}
                     </div>

@@ -62,7 +62,7 @@
 <div class="card mb-4">
     <div class="card-body py-3">
         <form method="get" class="row g-3 align-items-end">
-            <div class="col-12 col-md-5">
+            <div class="col-12 col-md-4">
                 <label class="form-label">Buscar</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -70,7 +70,7 @@
                         value="{{ search }}">
                 </div>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
                 <label class="form-label">Empresa</label>
                 <select name="empresa" class="form-select">
                     <option value="">Todas las empresas</option>
@@ -80,6 +80,14 @@
                 </select>
             </div>
             <div class="col-12 col-md-3">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="activos" {% if estado == 'activos' or not estado %}selected{% endif %}>Activos</option>
+                    <option value="inactivos" {% if estado == 'inactivos' %}selected{% endif %}>Inactivos</option>
+                    <option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todos</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
                 <button type="submit" class="btn btn-secondary w-100">
                     <i class="bi bi-funnel me-2"></i>Filtrar
                 </button>
@@ -121,6 +129,9 @@
                         </td>
                         <td>{{ parada.localidad.nombre }}</td>
                         <td>
+                            {% if not parada.activo %}
+                            <span class="badge bg-red text-red-fg">Inactivo</span>
+                            {% endif %}
                             {% if parada.es_agencia %}
                             <span class="badge badge-primary">Agencia</span>
                             {% else %}
@@ -143,7 +154,8 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div class="table-actions justify-content-end">
+                            <div class="table-actions justify-content-end d-flex align-items-center gap-2">
+                                {% if parada.activo %}
                                 <a href="{% url 'fleet:parada_update' parada.pk %}"
                                     class="btn btn-ghost btn-icon btn-sm" title="Editar">
                                     <i class="bi bi-pencil"></i>
@@ -152,6 +164,16 @@
                                     class="btn btn-ghost btn-icon btn-sm text-danger" title="Eliminar">
                                     <i class="bi bi-trash"></i>
                                 </a>
+                                {% else %}
+                                    {% if user.is_superuser or user.is_staff %}
+                                    <form action="{% url 'fleet:parada_activar' parada.pk %}" method="post" class="d-inline m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-teal btn-sm px-2 py-1" title="Reactivar parada" data-bs-toggle="tooltip">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Reactivar
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

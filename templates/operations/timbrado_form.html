@@ -35,7 +35,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Info de empresa (se actualiza dinámicamente) -->
                             <div id="empresa-info" class="row mt-2" style="display: none;">
                                 <div class="col-md-6">
@@ -206,7 +206,8 @@
                             </div>
                             <div class="form-text mt-3">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Desmarque esta opción si el timbrado ya no debe usarse (ej: por extravío o cancelación) aunque la fecha de vencimiento no haya llegado.
+                                Desmarque esta opción si el timbrado ya no debe usarse (ej: por extravío o cancelación)
+                                aunque la fecha de vencimiento no haya llegado.
                             </div>
                         </div>
                     </div>
@@ -240,25 +241,25 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const empresaSelect = document.getElementById('id_empresa');
-    const empresaInfo = document.getElementById('empresa-info');
-    const empresaRuc = document.getElementById('empresa-ruc');
-    const empresaRazon = document.getElementById('empresa-razon');
-    const numeroDesde = document.getElementById('id_numero_desde');
-    const numeroHasta = document.getElementById('id_numero_hasta');
-    const rangoDisplay = document.getElementById('rango-display');
-    
-    // Datos de empresas (se cargan del servidor)
-    const empresasData = {
+    document.addEventListener('DOMContentLoaded', function () {
+        const empresaSelect = document.getElementById('id_empresa');
+        const empresaInfo = document.getElementById('empresa-info');
+        const empresaRuc = document.getElementById('empresa-ruc');
+        const empresaRazon = document.getElementById('empresa-razon');
+        const numeroDesde = document.getElementById('id_numero_desde');
+        const numeroHasta = document.getElementById('id_numero_hasta');
+        const rangoDisplay = document.getElementById('rango-display');
+
+        // Datos de empresas (se cargan del servidor)
+        const empresasData = {
         {% for empresa in empresas %}
         "{{ empresa.pk }}": {
             "ruc": "{{ empresa.ruc }}",
-            "nombre": "{{ empresa.nombre }}"
-        }{% if not forloop.last %},{% endif %}
+                "nombre": "{{ empresa.nombre }}"
+        } {% if not forloop.last %}, {% endif %}
         {% endfor %}
     };
-    
+
     function actualizarEmpresaInfo() {
         const empresaId = empresaSelect.value;
         if (empresaId && empresasData[empresaId]) {
@@ -269,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
             empresaInfo.style.display = 'none';
         }
     }
-    
+
     function actualizarRango() {
         const desde = numeroDesde.value;
         const hasta = numeroHasta.value;
@@ -280,13 +281,13 @@ document.addEventListener('DOMContentLoaded', function() {
             rangoDisplay.textContent = 'Ingrese los números para ver el rango';
         }
     }
-    
+
     if (empresaSelect) {
         empresaSelect.addEventListener('change', actualizarEmpresaInfo);
         // Ejecutar al cargar si hay valor
         actualizarEmpresaInfo();
     }
-    
+
     if (numeroDesde && numeroHasta) {
         numeroDesde.addEventListener('input', actualizarRango);
         numeroHasta.addEventListener('input', actualizarRango);
@@ -296,9 +297,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Actualizar badge de estado en tiempo real
     const switchActivo = document.getElementById('id_activo');
     const statusTextDiv = document.getElementById('estado-status-text');
-    
+
     if (switchActivo && statusTextDiv) {
-        switchActivo.addEventListener('change', function() {
+        switchActivo.addEventListener('change', function () {
             if (this.checked) {
                 statusTextDiv.innerHTML = `
                     <span class="badge bg-success-lt">

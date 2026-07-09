@@ -15,8 +15,22 @@
                     <input type="hidden" name="remitente_id" id="quick-remitente-id">
                     
                     <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Origen *</label>
+                            {{ encomienda_form.parada_origen }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Parada Destino *</label>
+                            {{ encomienda_form.parada_destino }}
+                        </div>
+                        
                         <div class="col-md-12">
-                            <label class="form-label">Viaje *</label>
+                            <label class="form-label">Fecha</label>
+                            <input type="date" id="quick_filtro_fecha" class="form-control">
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">Viajes Disponibles *</label>
                             {{ encomienda_form.viaje }}
                             <script>
                                 window.viajesEmpresas = {
@@ -28,15 +42,6 @@
                                     {% endfor %}
                                 };
                             </script>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label">Parada Origen *</label>
-                            {{ encomienda_form.parada_origen }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Parada Destino *</label>
-                            {{ encomienda_form.parada_destino }}
                         </div>
 
                         <div class="col-12 py-2 border-bottom">

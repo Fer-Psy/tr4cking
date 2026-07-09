@@ -32,10 +32,47 @@
         font-size: 0.8rem;
         pointer-events: none;
     }
+    .map-search-wrapper {
+        position: relative;
+    }
+    .map-search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        display: none;
+    }
+    .map-search-results .search-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        border-bottom: 1px solid #f1f3f5;
+        transition: background .15s;
+    }
+    .map-search-results .search-item:last-child {
+        border-bottom: none;
+    }
+    .map-search-results .search-item:hover {
+        background: #e7f5ff;
+    }
+    .map-search-results .search-no-results {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+        color: #868e96;
+        text-align: center;
+    }
 </style>
 {% endblock %}
 
-{% block content %}
+{% block page_header %}
 <div class="page-header d-print-none">
     <div class="container-xl">
         <div class="row g-2 align-items-center">
@@ -48,6 +85,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block content %}
 
 <div class="page-body">
     <div class="container-xl">
@@ -82,6 +122,15 @@
                         <button type="button" class="btn btn-sm btn-outline-primary" id="btn-my-location" title="Usar mi ubicación actual">
                             <i class="bi bi-crosshair me-1"></i> Mi Ubicación
                         </button>
+                    </div>
+                    <div class="card-body p-2 pb-0">
+                        <div class="map-search-wrapper mb-2">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="map-search-input" placeholder="Buscar localidad o dirección..." autocomplete="off">
+                            </div>
+                            <div class="map-search-results" id="map-search-results"></div>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div id="map-container">
@@ -166,6 +215,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 updateCoords(pos);
             });
+        }
+    });
+
+    // --- Search location ---
+    const searchInput = document.getElementById('map-search-input');
+    const searchResults = document.getElementById('map-search-results');
+    let searchTimeout = null;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        if (query.length < 3) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        searchTimeout = setTimeout(function() {
+            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=py&limit=5&accept-language=es')
+                .then(r => r.json())
+                .then(data => {
+                    searchResults.innerHTML = '';
+                    if (data.length === 0) {
+                        searchResults.innerHTML = '<div class="search-no-results"><i class="bi bi-emoji-frown me-1"></i>Sin resultados</div>';
+                    } else {
+                        data.forEach(function(item) {
+                            const div = document.createElement('div');
+                            div.className = 'search-item';
+                            div.innerHTML = '<i class="bi bi-geo-alt me-1 text-primary"></i>' + item.display_name;
+                            div.addEventListener('click', function() {
+                                const lat = parseFloat(item.lat);
+                                const lng = parseFloat(item.lon);
+                                const pos = L.latLng(lat, lng);
+                                map.setView(pos, 16);
+                                if (marker) {
+                                    marker.setLatLng(pos);
+                                } else {
+                                    marker = L.marker(pos, {draggable: true}).addTo(map);
+                                    document.getElementById('map-instructions').style.display = 'none';
+                                    marker.on('dragend', function(e) {
+                                        updateCoords(e.target.getLatLng());
+                                    });
+                                }
+                                updateCoords(pos);
+                                searchResults.style.display = 'none';
+                                searchInput.value = item.display_name.split(',')[0];
+                            });
+                            searchResults.appendChild(div);
+                        });
+                    }
+                    searchResults.style.display = 'block';
+                })
+                .catch(() => {
+                    searchResults.style.display = 'none';
+                });
+        }, 400);
+    });
+
+    // Close results on click outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
         }
     });
 });

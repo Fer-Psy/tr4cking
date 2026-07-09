@@ -193,59 +193,105 @@ class ViajeForm(forms.ModelForm):
         # Ya no validamos que el horario pertenezca exclusivamente al itinerario
         # ya que los horarios son globales.
         
-        # Validaciones de unicidad solo al editar (no al crear, 
-        # porque la vista de creación maneja 8 días con su propia lógica)
+        # Validaciones de asignación de recursos
+        exclude_kwargs = {}
         if self.instance and self.instance.pk:
-            if itinerario and horario and fecha:
-                exists = Viaje.objects.filter(
-                    itinerario=itinerario,
-                    horario=horario,
-                    fecha_viaje=fecha
-                ).exclude(pk=self.instance.pk).exists()
-                
-                if exists:
-                    raise ValidationError(
-                        "Ya existe un viaje programado para este itinerario, horario y fecha."
-                    )
+            exclude_kwargs['pk'] = self.instance.pk
+
+        if itinerario and horario and fecha:
+            exists = Viaje.objects.filter(
+                itinerario=itinerario,
+                horario=horario,
+                fecha_viaje=fecha
+            ).exclude(**exclude_kwargs).exclude(estado='cancelado').exists()
             
-            if bus and horario and fecha:
-                bus_exists = Viaje.objects.filter(
-                    bus=bus,
-                    horario=horario,
-                    fecha_viaje=fecha
-                ).exclude(pk=self.instance.pk).exists()
-                
-                if bus_exists:
-                    raise ValidationError(
-                        "Este bus ya está asignado a otro viaje en este horario y fecha."
-                    )
-            
-            chofer = cleaned_data.get('chofer')
-            if chofer and fecha:
-                chofer_exists = Viaje.objects.filter(
-                    chofer=chofer,
-                    fecha_viaje=fecha
-                ).exclude(pk=self.instance.pk).exists()
-                
-                if chofer_exists:
-                    raise ValidationError(
-                        f"El chofer {chofer.get_full_name()} ya tiene asignado un viaje en esta fecha."
-                    )
-            
-            ayudantes = cleaned_data.get('ayudantes')
-            if ayudantes and fecha:
-                # ayudantes is a queryset from the form
-                for ayudante in ayudantes:
-                    ayudante_exists = Viaje.objects.filter(
-                        ayudantes=ayudante,
-                        fecha_viaje=fecha
-                    ).exclude(pk=self.instance.pk).exists()
-                    
-                    if ayudante_exists:
-                        raise ValidationError(
-                            f"El ayudante {ayudante.get_full_name()} ya tiene asignado un viaje en esta fecha."
-                        )
+            if exists:
+                raise ValidationError("Ya existe un viaje programado para este itinerario, horario y fecha.")
         
+        if bus and horario and fecha:
+            bus_exists = Viaje.objects.filter(
+                bus=bus,
+                horario=horario,
+                fecha_viaje=fecha
+            ).exclude(**exclude_kwargs).exclude(estado='cancelado').exists()
+            
+            if bus_exists:
+                raise ValidationError("Este bus ya está asignado a otro viaje en este horario y fecha.")
+        
+        chofer = cleaned_data.get('chofer')
+        if chofer and fecha and horario:
+            chofer_exists = Viaje.objects.filter(
+                chofer=chofer,
+                horario=horario,
+                fecha_viaje=fecha
+            ).exclude(**exclude_kwargs).exclude(estado='cancelado').exists()
+            
+            if chofer_exists:
+                raise ValidationError(f"El chofer {chofer.get_full_name()} ya tiene asignado un viaje en esta fecha y horario.")
+        
+        ayudantes = cleaned_data.get('ayudantes')
+        if ayudantes and fecha and horario:
+            for ayudante in ayudantes:
+                ayudante_exists = Viaje.objects.filter(
+                    ayudantes=ayudante,
+                    horario=horario,
+                    fecha_viaje=fecha
+                ).exclude(**exclude_kwargs).exclude(estado='cancelado').exists()
+                
+                if ayudante_exists:
+                    raise ValidationError(f"El ayudante {ayudante.get_full_name()} ya tiene asignado un viaje en esta fecha y horario.")
+
+        # Función auxiliar para validar secuencia lógica (descanso y ruta)
+        from datetime import datetime, timedelta
+        def validar_secuencia(recurso, campo, nombre_recurso):
+            if not recurso or not fecha or not horario or not itinerario:
+                return
+            
+            nuevo_salida_dt = timezone.make_aware(datetime.combine(fecha, horario.hora_salida))
+            
+            query = Viaje.objects.filter(estado__in=['programado', 'en_curso', 'completado']).exclude(**exclude_kwargs)
+            if campo == 'ayudantes':
+                query = query.filter(ayudantes=recurso)
+            else:
+                query = query.filter(**{campo: recurso})
+            
+            # Buscar el último viaje anterior a este
+            last_trip = query.filter(
+                Q(fecha_viaje__lt=fecha) | 
+                Q(fecha_viaje=fecha, horario__hora_salida__lt=horario.hora_salida)
+            ).order_by('-fecha_viaje', '-horario__hora_salida').first()
+            
+            if last_trip and last_trip.itinerario == itinerario:
+                raise ValidationError(f"{nombre_recurso} ({recurso}) acaba de realizar este mismo trayecto. Por lógica operativa, no puede hacer el mismo itinerario de ida dos veces seguidas sin haber hecho un viaje de regreso, ya que físicamente se encuentra en el destino.")
+            
+            # Viajes en el MISMO DÍA (fecha)
+            viajes_dia = query.filter(fecha_viaje=fecha).order_by('horario__hora_salida')
+            
+            if viajes_dia.exists():
+                if campo in ['chofer', 'ayudantes']:
+                    # Chofer y ayudante solo un viaje por día
+                    raise ValidationError(f"{nombre_recurso} ({recurso}) solo puede realizar un solo viaje en el día.")
+                elif campo == 'bus':
+                    # El bus puede hacer ida y vuelta (máximo 2 viajes en el día)
+                    if viajes_dia.count() >= 2:
+                        raise ValidationError(f"El bus ({recurso}) ya tiene programados 2 viajes (ida y vuelta) para este día.")
+                    
+                    # Validar que el segundo viaje sea DESPUÉS de 12 horas del otro viaje
+                    viaje_existente = viajes_dia.first()
+                    if viaje_existente.horario:
+                        salida_existente_dt = timezone.make_aware(datetime.combine(fecha, viaje_existente.horario.hora_salida))
+                        
+                        # Diferencia absoluta en horas
+                        diff = abs((nuevo_salida_dt - salida_existente_dt).total_seconds()) / 3600
+                        if diff < 12:
+                            raise ValidationError(f"El bus ({recurso}) debe esperar al menos 12 horas para realizar su viaje de retorno (El primer viaje es a las {salida_existente_dt.strftime('%H:%M')}).")
+
+        validar_secuencia(bus, 'bus', 'El bus')
+        validar_secuencia(chofer, 'chofer', 'El chofer')
+        if ayudantes:
+            for ayudante in ayudantes:
+                validar_secuencia(ayudante, 'ayudantes', 'El ayudante')
+
         return cleaned_data
 
 
@@ -602,14 +648,11 @@ class EncomiendaForm(forms.ModelForm):
             hoy = ahora.date()
             hora_actual = ahora.time()
             
-            # Mostrar solo viajes programados o en curso de hoy en adelante,
-            # excluyendo los de hoy que ya pasaron su hora de salida
+            # Mostrar viajes programados o en curso de hoy en adelante.
+            # No filtramos por la hora_salida exacta porque la hora_salida es del origen inicial,
+            # y las agencias intermedias (ej. Oviedo) necesitan ver el viaje aunque ya haya salido de Asunción.
             viajes_disponibles = Viaje.objects.filter(
-                Q(fecha_viaje__gt=hoy) |
-                (
-                    Q(fecha_viaje=hoy) &
-                    (Q(horario__isnull=True) | Q(horario__hora_salida__gte=hora_actual))
-                ),
+                fecha_viaje__gte=hoy,
                 estado__in=['programado', 'en_curso']
             ).select_related(
                 'itinerario', 'bus', 'horario'
@@ -694,8 +737,15 @@ class EncomiendaEntregaForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
     receptor_cedula = forms.CharField(
-        label="Cédula de quien recibe",
+        label="Cédula de quien recibe (Opcional)",
         max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    receptor_telefono = forms.CharField(
+        label="Teléfono de quien recibe (Opcional)",
+        max_length=20,
+        required=False,
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 

@@ -752,6 +752,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function normalizeParadaName(name) {
+        let normalized = name.toLowerCase();
+        // Remove accents
+        normalized = normalized.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // Replace parentheses with spaces
+        normalized = normalized.replace(/\(/g, ' ').replace(/\)/g, ' ');
+        // Remove common terms as whole words
+        normalized = normalized.replace(/\b(terminal|parada|de)\b/g, ' ');
+        // Remove extra spaces
+        return normalized.replace(/\s+/g, ' ').trim();
+    }
+    
     function renderizarParadas(filtro) {
         const selectId = tipoParadaActual === 'origen' ? 'id_parada_origen' : 'id_parada_destino';
         const selectEl = document.getElementById(selectId);
@@ -768,12 +780,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!opt.value) continue;
             
             const textoParada = opt.text;
+            const normName = normalizeParadaName(textoParada);
             
-            if (!filtro || textoParada.toLowerCase().includes(filtro)) {
-                if (nombresVistos.has(textoParada)) {
-                    continue; // Omitir paradas duplicadas con el mismo nombre
+            if (!filtro || normName.includes(normalizeParadaName(filtro)) || textoParada.toLowerCase().includes(filtro)) {
+                if (nombresVistos.has(normName)) {
+                    continue; // Omitir paradas duplicadas con el mismo nombre normalizado
                 }
-                nombresVistos.add(textoParada);
+                nombresVistos.add(normName);
                 
                 // Escapar comillas para la llamada a la funcion
                 const safeText = textoParada.replace(/'/g, "\\'").replace(/"/g, '&quot;');

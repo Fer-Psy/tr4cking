@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
   crossorigin=""/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 <style>
     #map-container {
         position: relative;
@@ -39,7 +40,7 @@
     }
     .map-instructions {
         position: absolute;
-        top: 10px;
+        bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 1000;
@@ -151,6 +152,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
   crossorigin=""></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const latInput = document.getElementById('id_latitud');
@@ -171,6 +173,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }).addTo(map);
 
     let marker;
+
+    // Agregar control de búsqueda (Geocoder)
+    L.Control.geocoder({
+        defaultMarkGeocode: false,
+        placeholder: 'Buscar ubicación...'
+    }).on('markgeocode', function(e) {
+        const latlng = e.geocode.center;
+        map.setView(latlng, 16);
+        if (marker) {
+            marker.setLatLng(latlng);
+        } else {
+            marker = L.marker(latlng, {draggable: true}).addTo(map);
+            document.getElementById('map-instructions').style.display = 'none';
+            marker.on('dragend', function(evt) {
+                updateCoords(evt.target.getLatLng());
+            });
+        }
+        updateCoords(latlng);
+    }).addTo(map);
 
     if (latInput.value && lngInput.value) {
         marker = L.marker([initLat, initLng], {draggable: true}).addTo(map);
@@ -217,6 +238,58 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Toggle User Account fields based on roles
+    const chkChofer = document.getElementById('id_es_chofer');
+    const chkAyudante = document.getElementById('id_es_ayudante');
+    const chkCliente = document.getElementById('id_es_cliente');
+    const chkAgente = document.getElementById('id_es_agente');
+    
+    const divUsername = document.getElementById('div_id_username');
+    const inputUsername = document.getElementById('id_username');
+    const inputPassword = document.getElementById('id_password');
+    const accountFieldset = divUsername ? divUsername.closest('fieldset') : null;
+
+    function toggleUserFields() {
+        if (!accountFieldset) return;
+
+        const isChofer = chkChofer && chkChofer.checked;
+        const isAyudante = chkAyudante && chkAyudante.checked;
+        const isCliente = chkCliente && chkCliente.checked;
+        const isAgente = chkAgente && chkAgente.checked;
+
+        const needsAccount = isAyudante || isCliente || isAgente;
+
+        if (isChofer && !needsAccount) {
+            // Si es solo chofer, ocultar y deshabilitar
+            accountFieldset.style.display = 'none';
+            if(inputUsername) inputUsername.disabled = true;
+            if(inputPassword) inputPassword.disabled = true;
+        } else {
+            // Mostrar y habilitar
+            accountFieldset.style.display = '';
+            if(inputUsername) inputUsername.disabled = false;
+            if(inputPassword) inputPassword.disabled = false;
+        }
+    }
+
+    const rolesCheckboxes = [chkChofer, chkAyudante, chkCliente, chkAgente];
+    rolesCheckboxes.forEach(chk => {
+        if (chk) {
+            chk.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    rolesCheckboxes.forEach(otherChk => {
+                        if (otherChk && otherChk !== e.target) {
+                            otherChk.checked = false;
+                        }
+                    });
+                }
+                toggleUserFields();
+            });
+        }
+    });
+
+    toggleUserFields();
 });
 </script>
 {% endblock %}

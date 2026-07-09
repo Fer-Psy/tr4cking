@@ -41,7 +41,7 @@ class PersonaForm(forms.ModelForm):
             'direccion', 'latitud', 'longitud', 'empresa', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user'
         ]
         widgets = {
-            'cedula': forms.NumberInput(attrs={'placeholder': 'Ej: 4567890', 'min': '0'}),
+            'cedula': forms.TextInput(attrs={'placeholder': 'Ej: 1234567 o 1234567-8'}),
             'nombre': forms.TextInput(attrs={'placeholder': 'Nombre'}),
             'apellido': forms.TextInput(attrs={'placeholder': 'Apellido'}),
             'telefono': forms.TextInput(attrs={'placeholder': 'Ej: 0981 123 456'}),
@@ -123,13 +123,26 @@ class PersonaForm(forms.ModelForm):
             Fieldset(
                 'Cuenta de Usuario',
                 Row(
-                    Column('user', css_class='col-md-4'),
-                    Column('username', css_class='col-md-4'),
-                    Column('password', css_class='col-md-4'),
+                    Column('username', css_class='col-md-6'),
+                    Column('password', css_class='col-md-6'),
                 ) if self.user_is_admin else HTML('<p class="text-muted">La vinculación de cuentas está restringida a administradores.</p>'),
-                HTML('<div class="alert alert-warning py-1 small mt-2"><i class="bi bi-info-circle me-1"></i> Puedes elegir un usuario existente O crear/actualizar uno nuevo usando los campos de usuario y contraseña.</div>') if self.user_is_admin else HTML(''),
+                HTML('<div class="alert alert-warning py-1 small mt-2"><i class="bi bi-info-circle me-1"></i> Ingresa un nombre de usuario y contraseña para crear la cuenta de acceso al sistema.</div>') if self.user_is_admin else HTML(''),
             ),
         )
+
+    def clean_cedula(self):
+        cedula = self.cleaned_data.get('cedula')
+        if cedula and str(cedula).strip().startswith('-'):
+            raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
+            
+        if cedula:
+            qs = Persona.objects.filter(cedula=cedula)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("Esta Cédula/RUC ya está registrada en el sistema.")
+                
+        return cedula
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
@@ -146,6 +159,27 @@ class PersonaForm(forms.ModelForm):
         
         return username
 
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        username = self.cleaned_data.get('username')
+        if password and len(password) < 6:
+            raise forms.ValidationError("La contraseña debe tener al menos 6 caracteres.")
+        if username and not self.instance.user and not password:
+            raise forms.ValidationError("Debes asignar una contraseña para el nuevo usuario.")
+        return password
+
+    def clean(self):
+        cleaned_data = super().clean()
+        roles = [
+            cleaned_data.get('es_chofer', False),
+            cleaned_data.get('es_ayudante', False),
+            cleaned_data.get('es_cliente', False),
+            cleaned_data.get('es_agente', False)
+        ]
+        if sum(bool(role) for role in roles) > 1:
+            raise forms.ValidationError("Una persona solo puede tener un único rol en el sistema.")
+        return cleaned_data
+
     def save(self, commit=True):
         persona = super().save(commit=False)
         username = self.cleaned_data.get('username')
@@ -159,14 +193,19 @@ class PersonaForm(forms.ModelForm):
             persona.es_agente = False
 
         if self.user_is_admin:
+            original_user = None
+            if persona.pk:
+                original_user = Persona.objects.get(pk=persona.pk).user
+
             if username:
-                # Crear o actualizar usuario vinculado
-                if persona.user:
-                    user = persona.user
+                # Crear o actualizar usuario
+                if original_user:
+                    user = original_user
                     user.username = username
                     if password:
                         user.set_password(password)
                     user.save()
+                    persona.user = user
                 else:
                     user = User.objects.create_user(
                         username=username,
@@ -239,14 +278,14 @@ class ClienteRegistroForm(forms.ModelForm):
     """Formulario para registro público de nuevos clientes."""
     
     username = forms.CharField(label="Nombre de Usuario", widget=forms.TextInput(attrs={'placeholder': 'Ej: juanperez'}))
-    password = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={'placeholder': '********'}))
+    password = forms.CharField(label="Contraseña", help_text="La contraseña debe tener al menos 6 caracteres.", widget=forms.PasswordInput(attrs={'placeholder': '********'}))
     password_confirm = forms.CharField(label="Confirmar Contraseña", widget=forms.PasswordInput(attrs={'placeholder': '********'}))
     
     class Meta:
         model = Persona
         fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion']
         widgets = {
-            'cedula': forms.NumberInput(attrs={'placeholder': 'Sin puntos ni espacios', 'min': '0'}),
+            'cedula': forms.TextInput(attrs={'placeholder': 'Ej: 1234567-8'}),
             'direccion': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Para entrega de encomiendas'}),
             'latitud': forms.HiddenInput(),
             'longitud': forms.HiddenInput(),
@@ -291,9 +330,17 @@ class ClienteRegistroForm(forms.ModelForm):
         if User.objects.filter(username=username).exists():
             raise forms.ValidationError("Este nombre de usuario ya está en uso.")
         return username
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if password and len(password) < 6:
+            raise forms.ValidationError("La contraseña debe tener al menos 6 caracteres.")
+        return password
     
     def clean_cedula(self):
         cedula = self.cleaned_data.get('cedula')
+        if cedula and str(cedula).strip().startswith('-'):
+            raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
         if Persona.objects.filter(cedula=cedula).exists():
             raise forms.ValidationError("Esta cédula ya está registrada en el sistema.")
         return cedula
@@ -349,7 +396,7 @@ class ClientePerfilForm(forms.ModelForm):
         model = Persona
         fields = ['cedula', 'nombre', 'apellido', 'telefono', 'email', 'direccion', 'latitud', 'longitud']
         widgets = {
-            'cedula': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'cedula': forms.TextInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
             'telefono': forms.TextInput(attrs={'class': 'form-control'}),
@@ -399,7 +446,19 @@ class ClientePerfilForm(forms.ModelForm):
         if User.objects.filter(username=username).exclude(pk=self.instance.user.pk).exists():
             raise forms.ValidationError("Este nombre de usuario ya está en uso.")
         return username
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if password and len(password) < 6:
+            raise forms.ValidationError("La contraseña debe tener al menos 6 caracteres.")
+        return password
     
+    def clean_cedula(self):
+        cedula = self.cleaned_data.get('cedula')
+        if cedula and str(cedula).strip().startswith('-'):
+            raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
+        return cedula
+
     def clean(self):
         cleaned_data = super().clean()
         p1 = cleaned_data.get('password')
@@ -414,7 +473,7 @@ class ClientePerfilForm(forms.ModelForm):
         
         # Actualizar datos del usuario de Django
         user.username = self.cleaned_data['username']
-        user.email = self.cleaned_data['email']
+        user.email = self.cleaned_data.get('email') or ''
         user.first_name = self.cleaned_data['nombre']
         user.last_name = self.cleaned_data['apellido']
         

@@ -182,7 +182,7 @@
         </div>
         <div class="col-md-4 text-md-end">
             <span class="badge bg-green-lt p-2 px-3">
-                <span class="stat-pulse me-2"></span> Actualizando cada 30 seg
+                <span class="stat-pulse me-2"></span> Actualizando cada 5 seg
             </span>
         </div>
     </div>
@@ -210,7 +210,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function() {
-    const REFRESH_INTERVAL = 30000; // 30 segundos
+    const REFRESH_INTERVAL = 5000; // 5 segundos
 
     const map = L.map('mapa-publico', {
         zoomControl: true,
@@ -223,6 +223,7 @@
     let paradaMarkers = {};
     let rutaLines = {};
     let firstLoad = true;
+    let selectedViajeId = null;
 
     const isStaff = "{{ request.user.is_superuser|yesno:'true,false' }}" === 'true' || 
                     "{{ request.user.persona.es_agente|yesno:'true,false' }}" === 'true' ||
@@ -235,9 +236,9 @@
         return L.divIcon({
             className: 'bus-marker-public',
             html: `
-                <div class="bus-marker-inner">
+                <div class="bus-marker-inner ${tieneGps ? '' : 'no-gps'}">
                     <i class="bi bi-bus-front-fill"></i>
-                    <div class="bus-badge" title="Asientos disponibles">${asientosLibres}</div>
+                    <div class="bus-badge ${tieneGps ? '' : 'sin-gps'}" title="Asientos disponibles">${asientosLibres}</div>
                 </div>`,
             iconSize: [44, 44],
             iconAnchor: [22, 22],
@@ -277,7 +278,9 @@
         let btnText = isStaff ? 'Vender Asiento' : 'Reservar Asiento';
         let reserveBtn = v.asientos_libres > 0 ? `<a href="${url}" class="btn-reserve-map">${btnText}</a>` : '<div class="alert alert-warning py-1 mt-2 mb-0 small text-center">Bus Lleno</div>';
         
-        const gpsBadge = '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>';
+        const gpsBadge = tieneGps 
+            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
+            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Sin GPS</span>';
 
         const velocidadHtml = tieneGps && v.ubicacion.velocidad
             ? `<div class="small mb-1"><i class="bi bi-speedometer2 me-1"></i>${v.ubicacion.velocidad.toFixed(0)} km/h</div>`
@@ -323,7 +326,9 @@
     // Generar card HTML del panel lateral
     function crearCardViaje(v) {
         const tieneGps = v.ubicacion != null;
-        const gpsBadge = '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>';
+        const gpsBadge = tieneGps 
+            ? '<span class="gps-status-badge on"><span class="gps-dot-mini on"></span> En vivo</span>'
+            : '<span class="gps-status-badge off"><span class="gps-dot-mini off"></span> Sin GPS</span>';
 
         let url = isStaff ? `/operations/viajes/${v.id}/vender-pasaje/` : `/operations/reservar/${v.id}/`;
         let btnText = isStaff ? 'Vender' : 'Reservar';
@@ -366,6 +371,39 @@
                 </div>` : ''}
             </div>
         </div>`;
+    }
+
+    function actualizarVisibilidadElementos() {
+        // Actualizar líneas de ruta
+        Object.keys(rutaLines).forEach(id => {
+            if (!selectedViajeId || id == selectedViajeId) {
+                rutaLines[id].setStyle({
+                    color: '#206bc4',
+                    weight: 5,
+                    opacity: 0.9,
+                    dashArray: null
+                });
+                rutaLines[id].bringToFront();
+            } else {
+                rutaLines[id].setStyle({
+                    color: '#94a3b8',
+                    weight: 2,
+                    opacity: 0.25,
+                    dashArray: '5, 5'
+                });
+            }
+        });
+
+        // Actualizar parada markers
+        Object.keys(paradaMarkers).forEach(key => {
+            const viajeId = key.split('-')[0];
+            const pm = paradaMarkers[key];
+            if (!selectedViajeId || viajeId == selectedViajeId) {
+                pm.setOpacity(1.0);
+            } else {
+                pm.setOpacity(0.2); // Difuminar paradas de otros viajes
+            }
+        });
     }
 
     function actualizar() {
@@ -442,6 +480,7 @@
                                 map.setView(latlng, 14);
                                 marker.openPopup();
                                 hasFocused = true;
+                                selectedViajeId = v.id;
                                 const card = document.getElementById(`card-viaje-${v.id}`);
                                 if (card) {
                                     card.classList.add('active');
@@ -455,6 +494,7 @@
                                 });
                                 map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
                                 hasFocused = true;
+                                selectedViajeId = v.id;
                             }
                         }
                     }
@@ -492,11 +532,11 @@
                                 dashArray: '8, 6',
                             }).addTo(map);
                         }
-                        rutaLines[v.id].setStyle({
-                            color: '#206bc4',
-                        });
                     }
                 });
+
+                // Actualizar estilos y visibilidad de rutas y paradas
+                actualizarVisibilidadElementos();
 
                 firstLoad = false;
             })
@@ -505,6 +545,7 @@
 
     // Centrar mapa en un viaje
     window.centrarViaje = function(viajeId) {
+        selectedViajeId = viajeId;
         if (markers[viajeId]) {
             map.setView(markers[viajeId].getLatLng(), 13, { animate: true });
             markers[viajeId].openPopup();
@@ -512,9 +553,11 @@
         document.querySelectorAll('.viaje-card-public').forEach(c => c.classList.remove('active'));
         const card = document.getElementById(`card-viaje-${viajeId}`);
         if (card) card.classList.add('active');
+
+        actualizarVisibilidadElementos();
     };
 
-    // Actualizar cada 10 segundos
+    // Actualizar cada 5 segundos
     actualizar();
     setInterval(actualizar, REFRESH_INTERVAL);
 })();

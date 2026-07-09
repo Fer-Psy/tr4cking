@@ -142,6 +142,22 @@
     
     <script>
         $(document).ready(function() {
+            // Prevenir números negativos en inputs numéricos (excepto coordenadas)
+            $(document).on('keydown', 'input[type="number"]', function(e) {
+                const name = $(this).attr('name') || '';
+                if (e.key === '-' && !name.toLowerCase().includes('latitud') && !name.toLowerCase().includes('longitud')) {
+                    e.preventDefault();
+                }
+            });
+            $(document).on('input', 'input[type="number"]', function() {
+                const name = $(this).attr('name') || '';
+                if (!name.toLowerCase().includes('latitud') && !name.toLowerCase().includes('longitud')) {
+                    if (this.value !== '' && parseFloat(this.value) < 0) {
+                        this.value = Math.abs(this.value);
+                    }
+                }
+            });
+
             function initSelect2() {
                 // Inicializar Select2
                 $('.form-select.select2').select2({
@@ -195,19 +211,19 @@
             }).catch(() => {});
         }
         
-        // Iniciar tracking
+        // Iniciar tracking en tiempo real (envía cada vez que el GPS detecta un cambio de posición)
         watchId = navigator.geolocation.watchPosition(
             enviarUbicacion,
             function(err) { console.log('GPS error:', err.message); },
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
         
-        // También enviar periódicamente
+        // Enviar periódicamente de forma constante cada 30 segundos como respaldo
         setInterval(function() {
             navigator.geolocation.getCurrentPosition(enviarUbicacion, function() {}, {
-                enableHighAccuracy: true, maximumAge: 10000
+                enableHighAccuracy: true, maximumAge: 0, timeout: 10000
             });
-        }, 15000);
+        }, 30000);
         
         // Al cerrar la sesión/pestaña, desactivar
         window.addEventListener('beforeunload', function() {
