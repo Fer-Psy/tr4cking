@@ -688,9 +688,27 @@
                     startTracking();
                 }
                 
-                alert(data.mensaje);
+                const alertHtml = `
+                    <div class="alert alert-success alert-dismissible" role="alert">
+                        <div class="d-flex">
+                            <div><i class="bi bi-check-circle-fill me-2"></i></div>
+                            <div>${data.mensaje}</div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                    </div>
+                `;
+                document.querySelector('.page-body .container-xl').insertAdjacentHTML('afterbegin', alertHtml);
             } else {
-                alert('Error: ' + data.error);
+                const errorHtml = `
+                    <div class="alert alert-danger alert-dismissible" role="alert">
+                        <div class="d-flex">
+                            <div><i class="bi bi-exclamation-triangle-fill me-2"></i></div>
+                            <div>Error: ${data.error}</div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                    </div>
+                `;
+                document.querySelector('.page-body .container-xl').insertAdjacentHTML('afterbegin', errorHtml);
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-play-circle-fill fs-2"></i> INICIAR VIAJE';
             }

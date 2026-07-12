@@ -983,10 +983,11 @@ class PasajeVentaView(LoginRequiredMixin, CreateView):
         
         pasaje.vendedor = self.request.user
         
-        # Si el vendedor es personal de bus, marcar como abordado directamente
+        # Si el vendedor es personal de bus, marcar como reservado inicialmente.
+        # Se marcará como abordado recién al generar la factura.
         persona_vendedor = getattr(self.request.user, 'persona', None)
         if persona_vendedor and (persona_vendedor.es_ayudante or persona_vendedor.es_chofer):
-            pasaje.estado = 'abordado'
+            pasaje.estado = 'reservado'
         else:
             pasaje.estado = 'vendido'
         

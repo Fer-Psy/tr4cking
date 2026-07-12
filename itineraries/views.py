@@ -245,8 +245,10 @@ class ItinerarioDeleteView(AdminOnlyMixin, DeleteView):
                 return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Itinerario {self.object.nombre} eliminado exitosamente.")
-        return super().form_valid(form)
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"Itinerario {nombre} eliminado exitosamente.")
+        return response
 
 
 class ItinerarioDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -394,8 +396,9 @@ class DetalleItinerarioDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        response = super().form_valid(form)
         messages.success(self.request, "Parada eliminada del itinerario.")
-        return super().form_valid(form)
+        return response
 
 
 # =============================================================================
@@ -460,8 +463,9 @@ class PrecioDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        response = super().form_valid(form)
         messages.success(self.request, "Precio eliminado exitosamente.")
-        return super().form_valid(form)
+        return response
 
 
 # =============================================================================
@@ -558,8 +562,9 @@ class HorarioDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        response = super().form_valid(form)
         messages.success(self.request, "Horario eliminado del itinerario.")
-        return super().form_valid(form)
+        return response
 
 
 class HorarioCreateAjaxView(AdminOnlyMixin, CreateView):

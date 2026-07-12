@@ -276,15 +276,15 @@ class ViajeForm(forms.ModelForm):
                     if viajes_dia.count() >= 2:
                         raise ValidationError(f"El bus ({recurso}) ya tiene programados 2 viajes (ida y vuelta) para este día.")
                     
-                    # Validar que el segundo viaje sea DESPUÉS de 12 horas del otro viaje
+                    # Validar que el segundo viaje sea DESPUÉS de 4 horas del otro viaje
                     viaje_existente = viajes_dia.first()
                     if viaje_existente.horario:
                         salida_existente_dt = timezone.make_aware(datetime.combine(fecha, viaje_existente.horario.hora_salida))
                         
                         # Diferencia absoluta en horas
                         diff = abs((nuevo_salida_dt - salida_existente_dt).total_seconds()) / 3600
-                        if diff < 12:
-                            raise ValidationError(f"El bus ({recurso}) debe esperar al menos 12 horas para realizar su viaje de retorno (El primer viaje es a las {salida_existente_dt.strftime('%H:%M')}).")
+                        if diff < 4:
+                            raise ValidationError(f"El bus ({recurso}) debe esperar al menos 4 horas para realizar su viaje de retorno (El primer viaje es a las {salida_existente_dt.strftime('%H:%M')}).")
 
         validar_secuencia(bus, 'bus', 'El bus')
         validar_secuencia(chofer, 'chofer', 'El chofer')

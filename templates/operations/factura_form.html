@@ -133,9 +133,15 @@
             {% endif %}
 
             <div class="d-flex justify-content-between">
+                {% if request.GET.pasaje %}
+                <button type="button" class="btn btn-outline-secondary" onclick="cancelarPasajeRapido('{{ request.GET.pasaje }}')">
+                    <i class="bi bi-arrow-left me-1"></i> Cancelar Venta
+                </button>
+                {% else %}
                 <a href="{% url 'operations:factura_list' %}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Cancelar
                 </a>
+                {% endif %}
                 <button type="submit" class="btn btn-primary btn-lg" id="btn-generar" disabled>
                     <i class="bi bi-receipt me-2"></i> Generar Factura
                 </button>
@@ -640,5 +646,23 @@ $(document).ready(function() {
         });
     }
 });
+
+function cancelarPasajeRapido(pasajeId) {
+    if (!confirm('¿Está seguro de cancelar esta venta?')) return;
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/operations/pasajes/${pasajeId}/cancelar-rapida/`;
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
 {% endblock %}

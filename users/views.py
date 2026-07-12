@@ -181,8 +181,10 @@ class PersonaDeleteView(LoginRequiredMixin, DeleteView):
                 return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Persona {self.object.nombre_completo} eliminada exitosamente.")
-        return super().form_valid(form)
+        nombre = self.object.nombre_completo
+        response = super().form_valid(form)
+        messages.success(self.request, f"Persona {nombre} eliminada exitosamente.")
+        return response
 
 
 class PersonaDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -295,8 +297,10 @@ class LocalidadDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Localidad {self.object.nombre} eliminada exitosamente.")
-        return super().form_valid(form)
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"Localidad {nombre} eliminada exitosamente.")
+        return response
 
 
 class LocalidadCreateAjaxView(AdminOnlyMixin, CreateView):

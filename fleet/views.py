@@ -92,8 +92,10 @@ class EmpresaDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Empresa {self.object.nombre} eliminada exitosamente.")
-        return super().form_valid(form)
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"Empresa {nombre} eliminada exitosamente.")
+        return response
 
 
 # =============================================================================
@@ -227,8 +229,10 @@ class ParadaDeleteView(AdminOnlyMixin, DeleteView):
                 return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Parada {self.object.nombre} eliminada exitosamente.")
-        return super().form_valid(form)
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"Parada {nombre} eliminada exitosamente.")
+        return response
 
 
 class ParadaDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -463,8 +467,10 @@ class BusDeleteView(AdminOnlyMixin, DeleteView):
                 return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Bus {self.object.placa} eliminado exitosamente.")
-        return super().form_valid(form)
+        placa = self.object.placa
+        response = super().form_valid(form)
+        messages.success(self.request, f"Bus {placa} eliminado exitosamente.")
+        return response
 
 
 class BusDarDeBajaView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -584,8 +590,10 @@ class AsientoDeleteView(AdminOnlyMixin, DeleteView):
             return self.get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, f"Asiento {self.object.numero_asiento} eliminado exitosamente.")
-        return super().form_valid(form)
+        numero = self.object.numero_asiento
+        response = super().form_valid(form)
+        messages.success(self.request, f"Asiento {numero} eliminado exitosamente.")
+        return response
 
 
 class ParadaCreateAjaxView(AdminOnlyMixin, CreateView):
