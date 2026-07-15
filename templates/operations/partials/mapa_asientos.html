@@ -12,6 +12,20 @@
             <small>Ocupado</small>
         </div>
         <div class="d-flex align-items-center gap-2">
+<!-- Partial: Mapa de asientos -->
+<div class="seat-map">
+    <div class="d-flex justify-content-center gap-4 mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 24px; height: 24px; background: #e8f5e9; border: 2px solid #4caf50; border-radius: 4px;">
+            </div>
+            <small>Disponible</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 24px; height: 24px; background: #ffebee; border: 2px solid #f44336; border-radius: 4px;">
+            </div>
+            <small>Ocupado</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
             <div style="width: 24px; height: 24px; background: #e3f2fd; border: 2px solid #2196f3; border-radius: 4px;">
             </div>
             <small>Seleccionado</small>
@@ -22,12 +36,12 @@
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 280px;">
             {% for asiento in asientos %}
             <button type="button"
-                class="seat-btn {% if asiento.pk in asientos_ocupados %}occupied{% else %}available{% endif %}" {% if
-                asiento.pk in asientos_ocupados %}disabled{% endif %} data-asiento-id="{{ asiento.pk }}"
+                class="seat-btn {% if asiento.pk in asientos_ocupados %}occupied{% else %}available{% endif %}" 
+                data-asiento-id="{{ asiento.pk }}"
                 data-asiento-numero="{{ asiento.numero_asiento }}"
                 style="width: 50px; height: 50px; border: 2px solid #dee2e6; border-radius: 8px; 
-                           {% if asiento.pk in asientos_ocupados %}background: #ffebee; border-color: #f44336; color: #c62828;{% else %}background: #e8f5e9; border-color: #4caf50; color: #2e7d32;{% endif %}
-                           font-weight: bold; cursor: {% if asiento.pk in asientos_ocupados %}not-allowed{% else %}pointer{% endif %};">
+                           {% if asiento.pk in asientos_ocupados %}background: #ffebee; border-color: #f44336; color: #c62828; cursor: not-allowed;{% else %}background: #e8f5e9; border-color: #4caf50; color: #2e7d32; cursor: pointer;{% endif %}
+                           font-weight: bold;">
                 {{ asiento.numero_asiento }}
             </button>
             {% endfor %}
@@ -43,6 +57,12 @@
 </div>
 
 <script>
+    const asientosOcupadosInfo = {
+        {% for asiento_id, info in asientos_ocupados_info.items %}
+        "{{ asiento_id }}": "{{ info }}",
+        {% endfor %}
+    };
+
     document.querySelectorAll('.seat-btn.available').forEach(btn => {
         btn.addEventListener('click', function () {
             // Deseleccionar otros
@@ -61,7 +81,28 @@
 
             // Actualizar input oculto
             const asientoId = this.dataset.asientoId;
-            document.querySelector('select[name="asiento"]').value = asientoId;
+            const asientoSelect = document.querySelector('select[name="asiento"]');
+            if (asientoSelect) {
+                asientoSelect.value = asientoId;
+            } else {
+                const asientoInput = document.getElementById('id_asiento');
+                if (asientoInput) asientoInput.value = asientoId;
+            }
+        });
+    });
+
+    document.querySelectorAll('.seat-btn.occupied').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const asientoId = this.dataset.asientoId;
+            const dest = asientosOcupadosInfo[asientoId];
+            if (dest) {
+                if (typeof toastr !== 'undefined') {
+                    toastr.info("Este asiento se desocupa en: " + dest, "Asiento Ocupado");
+                } else {
+                    alert("Este asiento se desocupa en: " + dest);
+                }
+            }
         });
     });
 </script>

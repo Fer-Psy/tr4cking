@@ -167,6 +167,24 @@ class OperationsDashboardView(LoginRequiredMixin, TemplateView):
                 'mensaje': f'Ocupación promedio baja: {context.get("ocupacion_promedio", 0)}%',
                 'icono': 'bi-graph-down'
             })
+            
+        # Timbrados por vencer (Avisa 7 días antes, ej. desde el 25 dic para fin de año)
+        from operations.models import Timbrado
+        timbrados_activos = Timbrado.objects.filter(activo=True).select_related('empresa')
+        for t in timbrados_activos:
+            dias_restantes = (t.fecha_fin - hoy).days
+            if 0 <= dias_restantes <= 7:
+                alertas.append({
+                    'tipo': 'warning',
+                    'mensaje': f'El timbrado {t.numero} de {t.empresa.nombre} vence en {dias_restantes} días',
+                    'icono': 'bi-receipt'
+                })
+            elif dias_restantes < 0:
+                alertas.append({
+                    'tipo': 'danger',
+                    'mensaje': f'El timbrado {t.numero} de {t.empresa.nombre} ha vencido',
+                    'icono': 'bi-receipt'
+                })
 
         # === MIS VIAJES ASIGNADOS ===
         # Se muestra a cualquier usuario que esté asignado como chofer o ayudante
@@ -312,10 +330,10 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
 
         # 6. Cliente Ocasional (para facturación rápida)
         try:
-            cliente_ocasional = Persona.objects.get(cedula=4444440)
+            cliente_ocasional = Persona.objects.get(cedula=99999999)
         except Persona.DoesNotExist:
             cliente_ocasional = Persona.objects.create(
-                cedula=4444440,
+                cedula=99999999,
                 nombre='Cliente',
                 apellido='Ocasional',
                 es_cliente=True
@@ -397,12 +415,22 @@ class ViajeCancelView(LoginRequiredMixin, View):
         
         if viaje.estado == 'completado':
             return JsonResponse({'error': 'No se puede cancelar un viaje completado'}, status=400)
+            
+        if viaje.estado == 'en_curso':
+            return JsonResponse({'error': 'No se puede cancelar un viaje que ya está en curso'}, status=400)
 
         # Verificar si hay pasajes vendidos/reservados
         pasajes_activos = viaje.pasajes.filter(estado__in=['vendido', 'reservado', 'abordado']).count()
         if pasajes_activos > 0:
             return JsonResponse({
                 'error': f'No se puede cancelar porque tiene {pasajes_activos} pasajes activos. Debe reubicarlos o cancelarlos primero.'
+            }, status=400)
+            
+        # Verificar si hay encomiendas asignadas
+        encomiendas_activas = viaje.encomiendas.exclude(estado='cancelado').count()
+        if encomiendas_activas > 0:
+            return JsonResponse({
+                'error': f'No se puede cancelar porque tiene {encomiendas_activas} encomiendas asignadas. Debe reubicarlas o cancelarlas primero.'
             }, status=400)
 
         viaje.estado = 'cancelado'
@@ -424,12 +452,17 @@ class ViajeBulkCancelView(LoginRequiredMixin, View):
         omitidos = 0
         
         for viaje in viajes:
-            if viaje.estado in ['cancelado', 'completado']:
+            if viaje.estado in ['cancelado', 'completado', 'en_curso']:
                 omitidos += 1
                 continue
                 
             # No cancelar si tiene pasajes activos
             if viaje.pasajes.filter(estado__in=['vendido', 'reservado', 'abordado']).exists():
+                omitidos += 1
+                continue
+                
+            # No cancelar si tiene encomiendas asignadas
+            if viaje.encomiendas.exclude(estado='cancelado').exists():
                 omitidos += 1
                 continue
                 
@@ -1304,6 +1337,9 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
             if not is_assigned:
                 messages.error(request, "No tienes permiso para ver o entregar encomiendas de otro bus.")
                 return redirect('operations:encomienda_list')
+            if encomienda.viaje.estado == 'programado':
+                messages.error(request, "No puedes entregar encomiendas si el viaje aún no ha iniciado.")
+                return redirect('operations:encomienda_detail', pk=encomienda.pk)
         form = EncomiendaEntregaForm()
         return render(request, 'operations/encomienda_entrega.html', {
             'encomienda': encomienda,
@@ -1318,6 +1354,9 @@ class EncomiendaEntregarView(LoginRequiredMixin, View):
             if not is_assigned:
                 messages.error(request, "No tienes permiso para entregar encomiendas de otro bus.")
                 return redirect('operations:encomienda_list')
+            if encomienda.viaje.estado == 'programado':
+                messages.error(request, "No puedes entregar encomiendas si el viaje aún no ha iniciado.")
+                return redirect('operations:encomienda_detail', pk=encomienda.pk)
         form = EncomiendaEntregaForm(request.POST)
         
         if form.is_valid():
@@ -1365,6 +1404,8 @@ class EncomiendaRecibirTerminalView(LoginRequiredMixin, View):
             is_assigned = (encomienda.viaje.chofer == persona) or (encomienda.viaje.ayudantes.filter(pk=persona.pk).exists())
             if not is_assigned:
                 return JsonResponse({'ok': False, 'error': 'No autorizado para esta encomienda.'}, status=403)
+            if encomienda.viaje.estado == 'programado':
+                return JsonResponse({'ok': False, 'error': 'No puedes entregar en destino si el viaje aún no ha iniciado.'}, status=400)
         if encomienda.estado == 'en_transito':
             encomienda.estado = 'en_destino'
             encomienda.fecha_en_destino = timezone.now()
@@ -1443,6 +1484,18 @@ class MisEncomiendasClienteView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         persona = getattr(self.request.user, 'persona', None)
         context['persona'] = persona
+        
+        # Evaluar si la encomienda puede ser rastreada (valida si origen/destino están en el itinerario)
+        from operations.utils import obtener_orden_parada
+        encomiendas = context.get('encomiendas', [])
+        for enc in encomiendas:
+            enc.puede_rastrearse = False
+            if enc.viaje and enc.viaje.estado == 'en_curso' and enc.factura and enc.estado not in ['entregado', 'en_destino', 'cancelado']:
+                orden_o = obtener_orden_parada(enc.viaje, enc.parada_origen)
+                orden_d = obtener_orden_parada(enc.viaje, enc.parada_destino)
+                if orden_o is not None and orden_d is not None and orden_o < orden_d:
+                    enc.puede_rastrearse = True
+                    
         return context
 
 
@@ -1617,6 +1670,26 @@ class CierreCajaView(LoginRequiredMixin, FormView):
                     f"Caja cerrada con faltante de Gs. {abs(sesion.diferencia):,.0f}"
                 )
             
+            # Finalizar automáticamente viajes en curso si el usuario es chofer o ayudante
+            if hasattr(self.request.user, 'persona'):
+                persona = self.request.user.persona
+                if persona.es_chofer or persona.es_ayudante:
+                    from operations.models import Viaje
+                    from django.db.models import Q
+                    from django.utils import timezone
+                    
+                    viajes_en_curso = Viaje.objects.filter(
+                        Q(chofer=persona) | Q(ayudantes=persona),
+                        estado='en_curso'
+                    ).distinct()
+                    
+                    for viaje in viajes_en_curso:
+                        viaje.estado = 'completado'
+                        if not viaje.hora_llegada_real:
+                            viaje.hora_llegada_real = timezone.localtime().time()
+                        viaje.save()
+                        messages.info(self.request, f"El viaje {viaje} se marcó como completado automáticamente al cerrar su caja.")
+
             return redirect('operations:sesion_caja_detail', pk=sesion.pk)
         except SesionCaja.DoesNotExist:
             messages.error(self.request, "No se encontró sesión de caja abierta.")
@@ -1639,6 +1712,17 @@ class MovimientoCajaCreateView(LoginRequiredMixin, CreateView):
         except SesionCaja.DoesNotExist:
             pass
         return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        try:
+            kwargs['sesion'] = SesionCaja.objects.get(
+                cajero=self.request.user,
+                estado='abierta'
+            )
+        except SesionCaja.DoesNotExist:
+            kwargs['sesion'] = None
+        return kwargs
     
     def form_valid(self, form):
         try:
@@ -1711,6 +1795,15 @@ class TimbradoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'operations/timbrado_form.html'
     success_url = reverse_lazy('operations:timbrado_list')
     success_message = "Timbrado actualizado exitosamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        timbrado = self.get_object()
+        if timbrado.facturas.exists():
+            from django.contrib import messages
+            from django.shortcuts import redirect
+            messages.error(request, "No se puede editar un timbrado que ya tiene facturaciones o movimientos asociados.")
+            return redirect('operations:timbrado_list')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2213,6 +2306,14 @@ class FacturaAnularView(LoginRequiredMixin, View):
     
     def get(self, request, pk):
         factura = get_object_or_404(Factura, pk=pk)
+        
+        from django.utils import timezone
+        import datetime
+        
+        if timezone.now() > factura.fecha_emision + datetime.timedelta(hours=1):
+            messages.error(request, "No se puede anular la factura. Ha pasado más de 1 hora desde su emisión.")
+            return redirect('operations:factura_detail', pk=pk)
+            
         form = FacturaAnulacionForm()
         
         # Verificar si hay caja abierta para revertir
@@ -2229,8 +2330,15 @@ class FacturaAnularView(LoginRequiredMixin, View):
     
     def post(self, request, pk):
         from .services import FacturacionService
+        from django.utils import timezone
+        import datetime
         
         factura = get_object_or_404(Factura, pk=pk)
+        
+        if timezone.now() > factura.fecha_emision + datetime.timedelta(hours=1):
+            messages.error(request, "No se puede anular la factura. Ha pasado más de 1 hora desde su emisión.")
+            return redirect('operations:factura_detail', pk=pk)
+            
         form = FacturaAnulacionForm(request.POST)
         
         if form.is_valid():
@@ -2829,17 +2937,26 @@ class AsientosDisponiblesView(LoginRequiredMixin, View):
     def get(self, request, viaje_pk):
         viaje = get_object_or_404(Viaje, pk=viaje_pk)
         
-        asientos_ocupados = Pasaje.objects.filter(
+        pasajes_ocupados = Pasaje.objects.filter(
             viaje=viaje,
             estado__in=['reservado', 'vendido', 'abordado']
-        ).values_list('asiento_id', flat=True)
+        ).select_related('parada_destino')
+        
+        asientos_ocupados_info = {}
+        for p in pasajes_ocupados:
+            dest = p.parada_destino.nombre
+            if p.asiento_id in asientos_ocupados_info:
+                asientos_ocupados_info[p.asiento_id] += f" / {dest}"
+            else:
+                asientos_ocupados_info[p.asiento_id] = dest
         
         asientos = viaje.bus.asientos.all().order_by('piso', 'numero_asiento')
         
         return render(request, 'operations/partials/mapa_asientos.html', {
             'viaje': viaje,
             'asientos': asientos,
-            'asientos_ocupados': list(asientos_ocupados)
+            'asientos_ocupados': list(asientos_ocupados_info.keys()),
+            'asientos_ocupados_info': asientos_ocupados_info
         })
 
 
@@ -2987,6 +3104,14 @@ class BuscarClientesRegistradosView(LoginRequiredMixin, View):
             Q(cedula__icontains=query) |
             Q(nombre__icontains=query) |
             Q(apellido__icontains=query)
+        ).filter(
+            activo=True
+        ).filter(
+            Q(es_cliente=True) |
+            Q(es_chofer=True) |
+            Q(es_ayudante=True) |
+            Q(es_agente=True) |
+            Q(es_empleado=True)
         ).order_by('apellido', 'nombre')[:30]
         
         clientes = []
@@ -3621,11 +3746,47 @@ class APIViajosEnCursoView(LoginRequiredMixin, View):
             detalles = viaje.itinerario.detalles.select_related('parada', 'parada__localidad').order_by('orden')
             paradas = []
             for d in detalles:
-                # Auto-fix para Caaguazu si no tiene coordenadas
-                if 'caaguaz' in d.parada.nombre.lower() and not d.parada.latitud_gps:
-                    d.parada.latitud_gps = '-25.452684'
-                    d.parada.longitud_gps = '-56.015243'
-                    d.parada.save()
+                # Auto-fix para paradas principales sin coordenadas
+                if not d.parada.latitud_gps or not d.parada.longitud_gps:
+                    coords_map = {
+                        'asunci': ('-25.312918', '-57.564998'),
+                        'san lorenzo': ('-25.3396', '-57.5097'),
+                        'capiat': ('-25.3615', '-57.4339'),
+                        'itaugu': ('-25.3854', '-57.3414'),
+                        'ypacara': ('-25.3995', '-57.2831'),
+                        'caacup': ('-25.3872', '-57.1420'),
+                        'eusebio': ('-25.3721', '-56.9634'),
+                        'san jos': ('-25.4054', '-56.5401'),
+                        'coronel oviedo': ('-25.4443', '-56.4428'),
+                        'oviedo': ('-25.4443', '-56.4428'),
+                        'aguapety': ('-25.5794', '-56.4542'),
+                        'caaguaz': ('-25.452684', '-56.015243'),
+                        'caazap': ('-26.1966', '-56.3679'),
+                        'nepomuceno': ('-26.1078', '-55.9411'),
+                        'yuty': ('-26.6194', '-56.2503'),
+                        'santa rosa del mi': ('-26.8892', '-56.8544'),
+                        'santa rosa': ('-26.8892', '-56.8544'),
+                        'coronel bogado': ('-27.1798', '-56.2581'),
+                        'bogado': ('-27.1798', '-56.2581'),
+                        'obligado': ('-27.2617', '-55.8417'),
+                        'fram': ('-27.0022', '-55.9739'),
+                        'encarnaci': ('-27.3358', '-55.8680'),
+                        'mbocayaty': ('-25.7289', '-56.4116'),
+                        'mbocajaty': ('-25.7289', '-56.4116'),
+                        'villarrica': ('-25.779770', '-56.444738'),
+                        'cde': ('-25.5097', '-54.6111'),
+                        'ciudad del este': ('-25.5097', '-54.6111'),
+                    }
+                    nombre_parada = d.parada.nombre.lower()
+                    if d.parada.localidad:
+                        nombre_parada += ' ' + d.parada.localidad.nombre.lower()
+                        
+                    for key, (lat, lng) in coords_map.items():
+                        if key in nombre_parada:
+                            d.parada.latitud_gps = lat
+                            d.parada.longitud_gps = lng
+                            d.parada.save()
+                            break
                     
                 paradas.append({
                     'nombre': d.parada.nombre,
@@ -3638,6 +3799,7 @@ class APIViajosEnCursoView(LoginRequiredMixin, View):
                 'id': viaje.pk,
                 'itinerario': viaje.itinerario.nombre,
                 'empresa': viaje.empresa.nombre if viaje.empresa else '',
+                'bus_numero': viaje.bus.numero_bus,
                 'bus_placa': viaje.bus.placa,
                 'bus_marca': f"{viaje.bus.marca or ''} {viaje.bus.modelo or ''}".strip(),
                 'chofer': viaje.chofer.nombre_completo,
@@ -3783,6 +3945,47 @@ class APIViajesPublicosView(LoginRequiredMixin, View):
             eta_minutos = None
 
             for d in detalles:
+                # Auto-fix coordenadas para paradas principales sin datos GPS
+                if not d.parada.latitud_gps or not d.parada.longitud_gps:
+                    coords_map = {
+                        'asunci': ('-25.312918', '-57.564998'),
+                        'san lorenzo': ('-25.3396', '-57.5097'),
+                        'capiat': ('-25.3615', '-57.4339'),
+                        'itaugu': ('-25.3854', '-57.3414'),
+                        'ypacara': ('-25.3995', '-57.2831'),
+                        'caacup': ('-25.3872', '-57.1420'),
+                        'eusebio': ('-25.3721', '-56.9634'),
+                        'san jos': ('-25.4054', '-56.5401'),
+                        'coronel oviedo': ('-25.4443', '-56.4428'),
+                        'oviedo': ('-25.4443', '-56.4428'),
+                        'aguapety': ('-25.5794', '-56.4542'),
+                        'caaguaz': ('-25.452684', '-56.015243'),
+                        'caazap': ('-26.1966', '-56.3679'),
+                        'nepomuceno': ('-26.1078', '-55.9411'),
+                        'yuty': ('-26.6194', '-56.2503'),
+                        'santa rosa del mi': ('-26.8892', '-56.8544'),
+                        'santa rosa': ('-26.8892', '-56.8544'),
+                        'coronel bogado': ('-27.1798', '-56.2581'),
+                        'bogado': ('-27.1798', '-56.2581'),
+                        'obligado': ('-27.2617', '-55.8417'),
+                        'fram': ('-27.0022', '-55.9739'),
+                        'encarnaci': ('-27.3358', '-55.8680'),
+                        'mbocayaty': ('-25.7289', '-56.4116'),
+                        'mbocajaty': ('-25.7289', '-56.4116'),
+                        'villarrica': ('-25.779770', '-56.444738'),
+                        'cde': ('-25.5097', '-54.6111'),
+                        'ciudad del este': ('-25.5097', '-54.6111'),
+                    }
+                    nombre_parada = d.parada.nombre.lower()
+                    if d.parada.localidad:
+                        nombre_parada += ' ' + d.parada.localidad.nombre.lower()
+                    for key, (lat, lng) in coords_map.items():
+                        if key in nombre_parada:
+                            d.parada.latitud_gps = lat
+                            d.parada.longitud_gps = lng
+                            d.parada.save()
+                            break
+
                 p_data = {
                     'nombre': d.parada.nombre,
                     'orden': d.orden,
@@ -4166,6 +4369,12 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
                         viaje_destino_id = d.parada_id
                         break
 
+            hora_estimada_origen = None
+            if viaje_origen_id and viaje.horario:
+                detalle = next((d for d in detalles if str(d.parada_id) == str(viaje_origen_id)), None)
+                if detalle:
+                    hora_estimada_origen = detalle.hora_estimada(viaje.horario.hora_salida)
+
             viajes_con_info.append({
                 'viaje': viaje,
                 'asientos_libres': viaje.bus.capacidad_asientos - pasajes_activos,
@@ -4173,6 +4382,7 @@ class BuscarViajesClienteView(LoginRequiredMixin, TemplateView):
                 'porcentaje_ocupacion': viaje.porcentaje_ocupacion,
                 'origen_id': viaje_origen_id,
                 'destino_id': viaje_destino_id,
+                'hora_estimada_origen': hora_estimada_origen,
             })
 
         context['viajes'] = viajes_con_info
@@ -4913,6 +5123,13 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
                 
             is_today = (v.fecha_viaje == hoy)
             
+            if is_today and origen_id and v.horario:
+                detalle_origen = v.itinerario.detalles.filter(parada_id__in=origen_ids).first()
+                if detalle_origen:
+                    hora_estimada_origen = detalle_origen.hora_estimada(v.horario.hora_salida)
+                    if hora_estimada_origen < hora_actual:
+                        continue
+            
             # NOTA: Ya no filtramos por hora_salida < hora_actual para permitir que las sucursales 
             # intermedias puedan ver los viajes en curso aunque ya hayan partido de la ciudad de origen.
             
@@ -4942,3 +5159,108 @@ class APIObtenerViajesCompatiblesView(LoginRequiredMixin, View):
                 continue
             
         return JsonResponse({'viajes': viajes_data})
+
+
+class FixCoordsParadasView(LoginRequiredMixin, View):
+    """Vista temporal (solo superusuarios) para cargar coordenadas GPS en paradas sin datos."""
+
+    COORDS_MAP = {
+        # Gran Asuncion
+        'asunci':               (-25.312918, -57.564998),
+        'san lorenzo':          (-25.339600, -57.509700),
+        'capiat':               (-25.361500, -57.433900),
+        'itaugu':               (-25.385400, -57.341400),
+        'ypacara':              (-25.399500, -57.283100),
+        'caacup':               (-25.387200, -57.142000),
+        'eusebio ayala':        (-25.372100, -56.963400),
+        'eusebio':              (-25.372100, -56.963400),
+        'san jos':              (-25.405400, -56.540100),
+        # Coronel Oviedo
+        'coronel oviedo':       (-25.444300, -56.442800),
+        'oviedo':               (-25.444300, -56.442800),
+        # Tramo Oviedo -> Encarnacion
+        'caaguaz':              (-25.452684, -56.015243),
+        'aguapety':             (-25.579400, -56.454200),
+        'juan nepomuceno':      (-26.107800, -55.941100),
+        'san juan nepomu':      (-26.107800, -55.941100),
+        'nepomuceno':           (-26.107800, -55.941100),
+        'caazap':               (-26.196600, -56.367900),
+        'yuty':                 (-26.619400, -56.250300),
+        'santa rosa del mi':    (-26.889200, -56.854400),
+        'santa rosa':           (-26.889200, -56.854400),
+        'coronel bogado':       (-27.179800, -56.258100),
+        'bogado':               (-27.179800, -56.258100),
+        'obligado':             (-27.261700, -55.841700),
+        'fram':                 (-27.002200, -55.973900),
+        'encarnaci':            (-27.335800, -55.868000),
+        # Tramo Este
+        'mbocayaty':            (-25.728900, -56.411600),
+        'mbocajaty':            (-25.728900, -56.411600),
+        'villarrica':           (-25.779770, -56.444738),
+        'cde':                  (-25.509700, -54.611100),
+        'ciudad del este':      (-25.509700, -54.611100),
+        'hernandarias':         (-25.397700, -54.619500),
+        'minga guazu':          (-25.480000, -54.730000),
+        # Norte
+        'concepci':             (-23.412300, -57.434200),
+        'pedro juan':           (-22.544700, -55.729100),
+        'horqueta':             (-23.344900, -57.055600),
+        # Sur / Misiones / Itapua
+        'natalio':              (-26.665800, -55.461400),
+        'bella vista sur':      (-27.042500, -55.581900),
+        'bella vista':          (-27.042500, -55.581900),
+        'ayolas':               (-27.372800, -56.897800),
+        'san cosme':            (-27.286100, -56.415300),
+        'pilar':                (-26.862000, -58.302800),
+        'san miguel':           (-26.475800, -57.098100),
+        'san juan bautista':    (-26.683000, -57.143000),
+        'san ignacio':          (-26.882900, -57.024700),
+        'santiago':             (-26.772700, -56.762800),
+        'coronel martinez':     (-25.694800, -56.060400),
+        # Canindeyu
+        'salto del guaira':     (-24.063700, -54.318000),
+        'curuguaty':            (-24.510200, -55.710300),
+    }
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Solo superusuarios.")
+
+        from fleet.models import Parada
+        actualizadas = []
+        sin_match = []
+
+        qs = Parada.objects.filter(activo=True, latitud_gps__isnull=True)
+        for parada in qs:
+            texto = parada.nombre.lower()
+            if parada.localidad:
+                texto += ' ' + parada.localidad.nombre.lower()
+
+            matched = False
+            for key, (lat, lng) in self.COORDS_MAP.items():
+                if key in texto:
+                    parada.latitud_gps = lat
+                    parada.longitud_gps = lng
+                    parada.save(update_fields=['latitud_gps', 'longitud_gps'])
+                    actualizadas.append(f"{parada.nombre} ({parada.localidad}) → ({lat}, {lng})")
+                    matched = True
+                    break
+
+            if not matched:
+                sin_match.append(f"{parada.nombre} ({parada.localidad})")
+
+        html = f"""
+        <!DOCTYPE html><html><head><meta charset='utf-8'>
+        <title>Fix Coordenadas</title>
+        <style>body{{font-family:monospace;padding:20px;}}
+        h2{{color:#206bc4;}} .ok{{color:green;}} .warn{{color:orange;}} .box{{background:#f8f9fa;padding:12px;border-radius:6px;margin:8px 0;}}</style>
+        </head><body>
+        <h2>✅ Coordenadas actualizadas: {len(actualizadas)}</h2>
+        {''.join(f'<div class="box ok">✓ {a}</div>' for a in actualizadas) if actualizadas else '<div class="box">Ninguna parada sin coordenadas (o todas ya las tenían).</div>'}
+        <h2 style="color:orange;">⚠️ Sin match ({len(sin_match)}) — cargar manualmente en Admin</h2>
+        {''.join(f'<div class="box warn">✗ {s}</div>' for s in sin_match) if sin_match else '<div class="box ok">Todas las paradas tienen coordenadas 🎉</div>'}
+        <br><a href="/operations/rastreo-mapa/">← Volver al mapa</a>
+        </body></html>"""
+        from django.http import HttpResponse
+        return HttpResponse(html)

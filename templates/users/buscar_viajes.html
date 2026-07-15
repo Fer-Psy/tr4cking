@@ -198,13 +198,22 @@
                     <i class="bi bi-calendar3 me-1 text-primary"></i>
                     <strong>{{ info.viaje.fecha_viaje|date:"d/m/Y" }}</strong>
                 </div>
-                <div class="mb-1">
-                    <i class="bi bi-clock me-1 text-primary"></i>
-                    {{ info.viaje.horario.hora_salida|time:"H:i" }} hs
+                <div class="mb-1 text-muted" style="font-size: 0.85rem;">
+                    <i class="bi bi-clock me-1"></i>
+                    Salida origen ({{ info.viaje.itinerario.nombre_origen|default:"Terminal" }}): {{ info.viaje.horario.hora_salida|time:"H:i" }} hs
                 </div>
+                {% if info.hora_estimada_origen %}
+                <div class="mb-1 text-primary fw-bold" style="font-size: 0.95rem;">
+                    <i class="bi bi-clock-history me-1"></i>
+                    Salida {{ origen_nombre|default:"tu parada" }}: {{ info.hora_estimada_origen|time:"H:i" }} hs
+                </div>
+                {% endif %}
                 <div>
                     <i class="bi bi-bus-front me-1 text-muted"></i>
                     <small class="text-muted">
+                        {% if info.viaje.bus.numero_bus %}
+                            Nº {{ info.viaje.bus.numero_bus }} - 
+                        {% endif %}
                         {{ info.viaje.bus.placa }} 
                         {% if info.viaje.bus.empresa %}
                             - {{ info.viaje.bus.empresa.nombre }}
@@ -235,20 +244,49 @@
                 {% if info.asientos_libres > 0 %}
                     {% if request.user.is_superuser or request.user.persona.es_agente or request.user.persona.es_ayudante %}
                     <a href="{% url 'operations:pasaje_venta' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
-                       class="btn btn-success btn-sm px-4 rounded-pill">
+                       class="btn btn-success btn-sm px-4 rounded-pill mb-2">
                         <i class="bi bi-cash-coin me-1"></i>Vender
                     </a>
                     {% else %}
                     <a href="{% url 'operations:reservar_pasaje' info.viaje.pk %}?origen={{ info.origen_id }}&destino={{ info.destino_id }}" 
-                       class="btn btn-primary btn-sm px-4 rounded-pill">
+                       class="btn btn-primary btn-sm px-4 rounded-pill mb-2">
                         <i class="bi bi-ticket-perforated me-1"></i>Reservar
                     </a>
                     {% endif %}
                 {% else %}
-                <button class="btn btn-outline-secondary btn-sm px-4 rounded-pill" disabled>
+                <button class="btn btn-outline-secondary btn-sm px-4 rounded-pill mb-2" disabled>
                     Agotado
                 </button>
                 {% endif %}
+                
+                <button class="btn btn-sm btn-link text-decoration-none w-100 p-0 text-center" type="button" data-bs-toggle="collapse" data-bs-target="#paradas-{{ info.viaje.pk }}" aria-expanded="false" style="font-size: 0.85rem;">
+                    <i class="bi bi-map me-1"></i>Ver paradas
+                </button>
+            </div>
+        </div>
+        
+        <!-- Lista de Paradas Desplegable -->
+        <div class="collapse mt-3" id="paradas-{{ info.viaje.pk }}">
+            <div class="card card-body bg-light border-0 p-3 shadow-sm rounded-3">
+                <h6 class="fw-bold mb-3 text-primary"><i class="bi bi-signpost-split me-2"></i>Ruta del Viaje</h6>
+                <div class="position-relative ms-2">
+                    <div class="position-absolute h-100" style="left: 5px; top: 0; width: 2px; background: #cce5ff; z-index: 1;"></div>
+                    <ul class="list-unstyled mb-0 position-relative" style="z-index: 2;">
+                        {% for detalle in info.viaje.itinerario.detalles.all %}
+                        <li class="d-flex align-items-center mb-2">
+                            <div class="rounded-circle {% if forloop.first %}bg-success{% elif forloop.last %}bg-danger{% else %}bg-primary{% endif %}" style="width: 12px; height: 12px; box-shadow: 0 0 0 2px white; margin-right: 15px;"></div>
+                            <div>
+                                <span class="{% if forloop.first or forloop.last %}fw-bold text-dark{% else %}text-muted{% endif %}">{{ detalle.parada.nombre }}</span>
+                                {% if detalle.tiempo_estimado_minutos %}
+                                <small class="text-muted ms-2" style="font-size: 0.75rem;"><i class="bi bi-clock"></i> +{{ detalle.tiempo_estimado_minutos }} min</small>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="text-muted small">No hay paradas definidas para este itinerario.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
         </div>
     </div>

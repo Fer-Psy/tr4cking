@@ -10,13 +10,13 @@ def normalize_search(text):
     """
     Limpia texto para búsqueda: quita acentos, minúsculas y términos comunes.
     """
-    if not text: return ""
-    # Quitar acentos (NFD normalize)
+    if not text: return ''
     import re
-    text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').lower()
-    # Reemplazar paréntesis por espacios
-    text = text.replace('(', ' ').replace(')', ' ')
-    # Quitar términos comunes de paradas
+    # Remove accents
+    text = unicodedata.normalize('NFD', text.lower()).encode('ascii', 'ignore').decode('utf-8')
+    # Remove punctuation completely (including parentheses)
+    text = re.sub(r'[^\w\s]', ' ', text)
+    # Remove stop words
     text = re.sub(r'\b(terminal|parada|de)\b', ' ', text)
     return ' '.join(text.split())
 

@@ -1,22 +1,25 @@
-import os
+"""Script para verificar paradas del itinerario Coronel Oviedo - Encarnacion."""
 import django
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'base.settings')
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tr4cking.settings')
 django.setup()
 
-from itineraries.models import Itinerario, DetalleItinerario
-from fleet.models import Parada
+from itineraries.models import Itinerario
 
-print("=== ITINERARIOS ===")
-for itinerario in Itinerario.objects.all():
-    print(f"\n{itinerario.nombre} (ID: {itinerario.id}):")
-    detalles = itinerario.detalles.all().select_related('parada')
-    if detalles.exists():
-        for d in detalles:
-            print(f"  - {d.orden}. {d.parada.nombre} (Parada ID: {d.parada.id})")
-    else:
-        print("  (Sin detalles de paradas)")
+# Buscar itinerarios con 'oviedo' o 'encarnacion'
+its = Itinerario.objects.filter(nombre__icontains='oviedo') | Itinerario.objects.filter(nombre__icontains='encarnaci')
+its = its.distinct()
 
-print("\n=== PARADAS ===")
-for parada in Parada.objects.all()[:10]:
-    print(f"- {parada.nombre} (ID: {parada.id})")
+for it in its:
+    print(f"\n=== Itinerario ID={it.id}: {it.nombre} ===")
+    detalles = it.detalles.select_related('parada', 'parada__localidad').order_by('orden')
+    sin_coords = 0
+    for d in detalles:
+        p = d.parada
+        tiene = bool(p.latitud_gps and p.longitud_gps)
+        estado = "✓" if tiene else "✗ SIN COORDS"
+        localidad = p.localidad.nombre if p.localidad else ''
+        print(f"  [{d.orden:02d}] {p.nombre} ({localidad}) | {estado}")
+        if not tiene:
+            sin_coords += 1
+    print(f"  -> Total sin coordenadas: {sin_coords}/{detalles.count()}")

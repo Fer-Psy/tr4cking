@@ -7,10 +7,12 @@ from django.contrib.auth import views as auth_views
 
 from django.views.generic.base import RedirectView
 
+from . import views
 from .views import DashboardView
 
 urlpatterns = [
-    # Favicon
+    path('debug-view/', views.debug_view),
+    path('debug-view-2/', views.debug_view_2),
     path('favicon.ico', RedirectView.as_view(url='/static/img/favicon.svg')),
 
     # Admin

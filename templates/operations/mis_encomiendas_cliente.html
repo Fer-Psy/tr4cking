@@ -84,7 +84,7 @@
                                 <strong>Gs. {{ enc.precio|floatformat:0 }}</strong>
                             </td>
                             <td class="text-end">
-                                {% if enc.viaje and enc.factura and enc.estado != 'entregado' and enc.estado != 'en_destino' and enc.estado != 'cancelado' %}
+                                {% if enc.puede_rastrearse %}
                                 <a href="{% url 'operations:rastreo_publico' %}?viaje_id={{ enc.viaje.id }}" 
                                    class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-geo-alt me-1"></i> Rastrear

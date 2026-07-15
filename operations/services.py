@@ -200,6 +200,14 @@ class FacturacionService:
                     estado='abierta'
                 )
                 
+                # Validar que haya saldo suficiente
+                if sesion.calcular_cierre() < factura.total:
+                    raise ValueError(
+                        f"No hay suficiente dinero en caja (Saldo: Gs. {sesion.calcular_cierre()}) "
+                        f"para anular esta factura (Gs. {factura.total}). "
+                        "Por favor, realice primero un ingreso (Depósito u Otro) en su caja."
+                    )
+                
                 # Crear movimiento de egreso para revertir
                 MovimientoCaja.objects.create(
                     sesion=sesion,

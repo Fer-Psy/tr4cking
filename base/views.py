@@ -12,6 +12,33 @@ from django.utils import timezone
 
 
 from django.shortcuts import redirect
+from django.http import HttpResponse
+
+def debug_view_2(request):
+    from operations.utils import normalize_search
+    from fleet.models import Parada
+    p9 = Parada.objects.filter(id=9).first()
+    p13 = Parada.objects.filter(id=13).first()
+    
+    out = [
+        f"P9 ({p9.nombre}): {normalize_search(p9.nombre)}",
+        f"P9 loc: {normalize_search(p9.localidad.nombre) if p9.localidad else 'None'}",
+        f"P13 ({p13.nombre}): {normalize_search(p13.nombre)}",
+        f"P13 loc: {normalize_search(p13.localidad.nombre) if p13.localidad else 'None'}"
+    ]
+    return HttpResponse('<br>'.join(out))
+
+def debug_view(request):
+    from operations.models import Viaje
+    from itineraries.models import DetalleItinerario, Precio
+    out = []
+    viaje = Viaje.objects.filter(id=197).first()
+    if viaje:
+        out.append(f"Viaje: 197, Itinerario: {viaje.itinerario.nombre}")
+        detalles = list(DetalleItinerario.objects.filter(itinerario=viaje.itinerario).order_by('orden'))
+        for d in detalles:
+            out.append(f"Orden: {d.orden}, ID: {d.parada_id}, Nombre: {d.parada.nombre}")
+    return HttpResponse('<br>'.join(out))
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -86,8 +113,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'itinerarios': Itinerario.objects.filter(activo=True).count(),
         }
         
-        # Recent items
-        context['ultimas_personas'] = Persona.objects.all()[:5]
+        from django.db.models import Q
+        context['ultimas_personas'] = Persona.objects.filter(
+            activo=True
+        ).filter(
+            Q(es_chofer=True) | Q(es_ayudante=True) | Q(es_agente=True) | Q(es_empleado=True)
+        )[:5]
         context['ultimos_buses'] = Bus.objects.select_related('empresa').order_by('-pk')[:5]
         context['ultimas_empresas'] = Empresa.objects.order_by('-pk')[:5]
         context['ultimos_itinerarios'] = Itinerario.objects.select_related('empresa').order_by('-pk')[:5]

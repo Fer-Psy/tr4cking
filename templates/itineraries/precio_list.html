@@ -31,6 +31,24 @@
 {% block content %}
 
 
+<!-- Search Form -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="d-flex gap-2">
+            <div class="input-icon flex-grow-1">
+                <span class="input-icon-addon">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" name="q" class="form-control" placeholder="Buscar por origen o destino..." value="{{ q }}">
+            </div>
+            <button type="submit" class="btn btn-primary">Buscar</button>
+            {% if q %}
+            <a href="{% url 'itineraries:precio_list' %}" class="btn btn-outline-secondary">Limpiar</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
 <!-- Results -->
 <div class="card">
     <div class="card-body p-0">
@@ -93,7 +111,7 @@
                     {% if page_obj.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                            href="?page={{ page_obj.previous_page_number }}">
+                            href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
@@ -104,7 +122,7 @@
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <li class="page-item">
                         <a class="page-link"
-                            href="?page={{ num }}">{{ num }}</a>
+                            href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}">{{ num }}</a>
                         </li>
                         {% endif %}
                         {% endfor %}
@@ -112,7 +130,7 @@
                         {% if page_obj.has_next %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.next_page_number }}">
+                                href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
                         </li>

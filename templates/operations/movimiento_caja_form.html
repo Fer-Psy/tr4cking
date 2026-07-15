@@ -68,3 +68,46 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const tipoField = document.getElementById("id_tipo");
+        const conceptoField = document.getElementById("id_concepto");
+
+        function updateConceptoOptions() {
+            if (!tipoField || !conceptoField) return;
+            const tipo = tipoField.value;
+            const options = conceptoField.options;
+
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                if (tipo === 'ingreso') {
+                    // Hide Gasto and Retiro
+                    if (opt.value === 'gasto' || opt.value === 'retiro') {
+                        opt.style.display = 'none';
+                        if (opt.selected) conceptoField.value = '';
+                    } else {
+                        opt.style.display = 'block';
+                    }
+                } else if (tipo === 'egreso') {
+                    // Hide Depósito
+                    if (opt.value === 'deposito') {
+                        opt.style.display = 'none';
+                        if (opt.selected) conceptoField.value = '';
+                    } else {
+                        opt.style.display = 'block';
+                    }
+                } else {
+                    opt.style.display = 'block';
+                }
+            }
+        }
+
+        if (tipoField && conceptoField) {
+            tipoField.addEventListener("change", updateConceptoOptions);
+            updateConceptoOptions(); // run on load
+        }
+    });
+</script>
+{% endblock %}

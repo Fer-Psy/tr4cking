@@ -149,7 +149,7 @@
                                 <i class="bi bi-pencil"></i>
                             </a>
 
-                            {% if viaje.estado != 'cancelado' and viaje.estado != 'completado' %}
+                            {% if viaje.estado != 'cancelado' and viaje.estado != 'completado' and viaje.estado != 'en_curso' %}
                             <button type="button" 
                                     class="btn btn-sm btn-outline-danger btn-cancelar-viaje" 
                                     data-url="{% url 'operations:viaje_cancel' viaje.pk %}"

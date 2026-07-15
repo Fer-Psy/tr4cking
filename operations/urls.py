@@ -134,6 +134,7 @@ urlpatterns = [
     path('api/viajes-en-curso/', views.APIViajosEnCursoView.as_view(), name='api_viajes_en_curso'),
     path('api/viajes-publico/', views.APIViajesPublicosView.as_view(), name='api_viajes_publico'),
     path('rastreo-publico/', views.RastreoPublicoView.as_view(), name='rastreo_publico'),
+    path('fix-coords-paradas/', views.FixCoordsParadasView.as_view(), name='fix_coords_paradas'),  # temporal
 
     path('api/actualizar-ubicacion/', views.APIActualizarUbicacionView.as_view(), name='api_actualizar_ubicacion'),
     path('api/desactivar-ubicacion/', views.APIDesactivarUbicacionView.as_view(), name='api_desactivar_ubicacion'),

@@ -142,7 +142,11 @@
                         </a>
                     </div>
                     <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        {% if request.user.username|lower == 'gabriel' or request.user.first_name|lower == 'gabriel' %}
+                        <a href="{% url 'operations:clientes_pendientes_factura' %}" class="btn btn-outline-primary w-100 py-3">
+                        {% else %}
                         <a href="{% url 'operations:factura_create' %}" class="btn btn-outline-primary w-100 py-3">
+                        {% endif %}
                             <i class="bi bi-receipt-cutoff d-block p-2 fs-2"></i>
                             Emitir Factura
                         </a>
@@ -178,7 +182,9 @@
                             <th>Itinerario</th>
                             <th>Empresa</th>
                             <th>Bus</th>
+                            {% if request.user.username|lower != 'gabriel' and request.user.first_name|lower != 'gabriel' %}
                             <th>Acciones</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -188,11 +194,13 @@
                             <td>{{ viaje.itinerario.nombre }}</td>
                             <td><span class="text-muted">{{ viaje.empresa.nombre }}</span></td>
                             <td>{{ viaje.bus.placa }}</td>
+                            {% if request.user.username|lower != 'gabriel' and request.user.first_name|lower != 'gabriel' %}
                             <td>
                                 <a href="{% url 'operations:pasaje_venta' viaje.id %}" class="btn btn-sm btn-primary">
                                     Vender Pasaje
                                 </a>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

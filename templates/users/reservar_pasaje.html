@@ -327,7 +327,7 @@
                     {% if not forloop.first %}
                     <div class="parada-line"></div>
                     {% endif %}
-                    <div class="parada-item" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}" data-hora="{{ detalle.hora_llegada_estimada }}" data-lat="{{ detalle.parada.latitud_gps|default:'' }}" data-lng="{{ detalle.parada.longitud_gps|default:'' }}">
+                    <div class="parada-item {% if forloop.last %}is-last{% endif %} {% if forloop.first %}is-first{% endif %}" data-parada-id="{{ detalle.parada.pk }}" data-orden="{{ detalle.orden }}" data-nombre="{{ detalle.parada.nombre }}" data-hora="{{ detalle.hora_llegada_estimada }}" data-lat="{{ detalle.parada.latitud_gps|default:'' }}" data-lng="{{ detalle.parada.longitud_gps|default:'' }}">
                         <div class="parada-orden">{{ detalle.orden }}</div>
                         <div class="flex-fill">
                             <div class="fw-bold">{{ detalle.parada.nombre }}</div>
@@ -624,6 +624,15 @@
             if (!origenId || (origenId && destinoId)) {
                 // Caso: No hay origen, o ya se ha completado tramo (reinicio)
                 // El clic define el NUEVO ORIGEN
+                
+                if (this.classList.contains('is-last')) {
+                    if (typeof showToast !== 'undefined') {
+                        showToast("No puede seleccionar la última parada como origen.", "warning");
+                    } else {
+                        alert("No puede seleccionar la última parada como origen.");
+                    }
+                    return;
+                }
                 
                 // Limpiar anterior si existia
                 document.querySelectorAll('.parada-item').forEach(p => p.classList.remove('selected-origen', 'selected-destino', 'disabled'));

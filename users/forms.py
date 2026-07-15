@@ -38,7 +38,7 @@ class PersonaForm(forms.ModelForm):
         model = Persona
         fields = [
             'cedula', 'nombre', 'apellido', 'telefono', 'email', 
-            'direccion', 'latitud', 'longitud', 'empresa', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user'
+            'direccion', 'latitud', 'longitud', 'empresa', 'es_chofer', 'es_ayudante', 'es_cliente', 'es_agente', 'user', 'activo'
         ]
         widgets = {
             'cedula': forms.TextInput(attrs={'placeholder': 'Ej: 1234567 o 1234567-8'}),
@@ -59,7 +59,7 @@ class PersonaForm(forms.ModelForm):
         # Ocultar roles administrativos si no es admin
         if not self.user_is_admin:
             # Los roles se ocultan del formulario
-            for field in ['es_chofer', 'es_ayudante', 'es_agente', 'empresa']:
+            for field in ['es_chofer', 'es_ayudante', 'es_agente', 'empresa', 'activo']:
                 if field in self.fields:
                     self.fields[field].disabled = True
                     self.fields[field].required = False
@@ -75,6 +75,18 @@ class PersonaForm(forms.ModelForm):
         
         # Agregar opción vacía
         self.fields['user'].empty_label = "-- Sin usuario vinculado --"
+
+        # Deshabilitar CI, Nombre y Apellido si ya tiene facturaciones (por integridad del sistema)
+        if self.instance and self.instance.pk:
+            # Check if the persona has facturas
+            from operations.models import Factura
+            if Factura.objects.filter(cliente=self.instance).exists():
+                self.fields['cedula'].disabled = True
+                self.fields['nombre'].disabled = True
+                self.fields['apellido'].disabled = True
+                self.fields['cedula'].help_text = "No editable (tiene facturaciones asociadas)"
+                self.fields['nombre'].help_text = "No editable (tiene facturaciones asociadas)"
+                self.fields['apellido'].help_text = "No editable (tiene facturaciones asociadas)"
         
         self.helper = FormHelper()
         self.helper.form_tag = False
@@ -87,9 +99,10 @@ class PersonaForm(forms.ModelForm):
         if self.user_is_admin:
             roles_layout_admin = [
                 Row(
-                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-4'),
-                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-4'),
-                    Column(Div('es_agente', css_class='form-check form-switch'), css_class='col-md-4'),
+                    Column(Div('es_chofer', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_ayudante', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('es_agente', css_class='form-check form-switch'), css_class='col-md-3'),
+                    Column(Div('activo', css_class='form-check form-switch'), css_class='col-md-3'),
                 )
             ]
         else:
@@ -136,11 +149,13 @@ class PersonaForm(forms.ModelForm):
             raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
             
         if cedula:
-            qs = Persona.objects.filter(cedula=cedula)
+            from django.db.models import Q
+            base_cedula = str(cedula).split('-')[0].strip()
+            qs = Persona.objects.filter(Q(cedula=base_cedula) | Q(cedula__startswith=f"{base_cedula}-"))
             if self.instance and self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
-                raise forms.ValidationError("Esta Cédula/RUC ya está registrada en el sistema.")
+                raise forms.ValidationError("Esta Cédula/RUC (o una variante de la misma persona) ya está registrada en el sistema.")
                 
         return cedula
 
@@ -194,8 +209,11 @@ class PersonaForm(forms.ModelForm):
 
         if self.user_is_admin:
             original_user = None
-            if persona.pk:
-                original_user = Persona.objects.get(pk=persona.pk).user
+            if not self.instance._state.adding:
+                try:
+                    original_user = Persona.objects.get(pk=persona.pk).user
+                except Persona.DoesNotExist:
+                    pass
 
             if username:
                 # Crear o actualizar usuario
@@ -341,8 +359,15 @@ class ClienteRegistroForm(forms.ModelForm):
         cedula = self.cleaned_data.get('cedula')
         if cedula and str(cedula).strip().startswith('-'):
             raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
-        if Persona.objects.filter(cedula=cedula).exists():
-            raise forms.ValidationError("Esta cédula ya está registrada en el sistema.")
+            
+        if cedula:
+            from django.db.models import Q
+            base_cedula = str(cedula).split('-')[0].strip()
+            qs = Persona.objects.filter(Q(cedula=base_cedula) | Q(cedula__startswith=f"{base_cedula}-"))
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("Esta Cédula/RUC (o una variante de la misma persona) ya está registrada en el sistema.")
         return cedula
 
     def clean(self):
@@ -411,6 +436,17 @@ class ClientePerfilForm(forms.ModelForm):
         if self.instance and self.instance.user:
             self.fields['username'].initial = self.instance.user.username
             
+        # Deshabilitar CI, Nombre y Apellido si ya tiene facturaciones
+        if self.instance and self.instance.pk:
+            from operations.models import Factura
+            if Factura.objects.filter(cliente=self.instance).exists():
+                self.fields['cedula'].disabled = True
+                self.fields['nombre'].disabled = True
+                self.fields['apellido'].disabled = True
+                self.fields['cedula'].help_text = "No editable (tiene facturaciones asociadas)"
+                self.fields['nombre'].help_text = "No editable (tiene facturaciones asociadas)"
+                self.fields['apellido'].help_text = "No editable (tiene facturaciones asociadas)"
+
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -457,6 +493,15 @@ class ClientePerfilForm(forms.ModelForm):
         cedula = self.cleaned_data.get('cedula')
         if cedula and str(cedula).strip().startswith('-'):
             raise forms.ValidationError("El campo Cédula/RUC no puede ser negativo.")
+            
+        if cedula:
+            from django.db.models import Q
+            base_cedula = str(cedula).split('-')[0].strip()
+            qs = Persona.objects.filter(Q(cedula=base_cedula) | Q(cedula__startswith=f"{base_cedula}-"))
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("Esta Cédula/RUC (o una variante de la misma persona) ya está registrada en el sistema.")
         return cedula
 
     def clean(self):

@@ -619,17 +619,16 @@ $(document).ready(function() {
     $('#cliente-autocomplete').on('select2:select', function (e) {
         const data = e.params.data.raw;
         
-        // Autocompletar campos
-        $('#id_cedula_pasajero').val(data.cedula);
-        $('#id_nombre_pasajero').val(data.nombre);
-        $('#id_apellido_pasajero').val(data.apellido);
+        // Autocompletar campos y ponerlos como solo lectura (salvo teléfono)
+        $('#id_cedula_pasajero').val(data.cedula).prop('readonly', true);
+        $('#id_nombre_pasajero').val(data.nombre).prop('readonly', true);
+        $('#id_apellido_pasajero').val(data.apellido).prop('readonly', true);
         $('#id_telefono_pasajero').val(data.telefono);
         
         // Limpiar buscador para permitir nueva búsqueda
         $(this).val(null).trigger('change');
         
-        // Disparar búsqueda de HTMX si es necesario (opcional ya que ya llenamos los campos)
-        // Pero es bueno que el campo de cédula tenga el foco o dispare el evento
+        // Disparar búsqueda de HTMX si es necesario
         $('#id_cedula_pasajero').trigger('blur');
         
         // Notificación opcional
@@ -646,10 +645,10 @@ $(document).ready(function() {
     $('#btn-cliente-ocasional').on('click', function(e) {
         e.preventDefault();
         
-        // Cargar datos de Cliente Ocasional
-        $('#id_cedula_pasajero').val('4444440');
-        $('#id_nombre_pasajero').val('Cliente');
-        $('#id_apellido_pasajero').val('Ocasional');
+        // Cargar datos de Cliente Ocasional y ponerlos como solo lectura
+        $('#id_cedula_pasajero').val('99999999').prop('readonly', true);
+        $('#id_nombre_pasajero').val('Cliente').prop('readonly', true);
+        $('#id_apellido_pasajero').val('Ocasional').prop('readonly', true);
         $('#id_telefono_pasajero').val('');
         
         // Limpiar autocomplete select2
@@ -661,10 +660,7 @@ $(document).ready(function() {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong><i class="bi bi-check-circle me-1"></i> Persona encontrada</strong>
-                        <br>
-                        <span>Cliente Ocasional</span>
                     </div>
-                    <span class="badge bg-success">4444440</span>
                 </div>
             </div>
         `);

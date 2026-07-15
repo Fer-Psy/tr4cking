@@ -112,7 +112,7 @@
 <div class="row row-cards">
     <!-- Mis Reservas -->
     <div class="col-lg-6">
-        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;" id="reservas-refresh" hx-get="{% url 'users:dashboard_cliente' %}" hx-select="#reservas-refresh" hx-target="this" hx-swap="outerHTML" hx-trigger="every 15s">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Reservas</h3>
                 <div>
@@ -203,7 +203,7 @@
 
     <!-- Mis Envíos -->
     <div class="col-lg-6">
-        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;" id="envios-refresh" hx-get="{% url 'users:dashboard_cliente' %}" hx-select="#envios-refresh" hx-target="this" hx-swap="outerHTML" hx-trigger="every 15s">
             <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center">
                 <h3 class="card-title fw-bold">Mis Envíos</h3>
                 <div>

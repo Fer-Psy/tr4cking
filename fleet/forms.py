@@ -25,6 +25,16 @@ class EmpresaForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Deshabilitar Nombre y RUC si la empresa ya tiene facturaciones
+        if self.instance and self.instance.pk:
+            from operations.models import Factura
+            if Factura.objects.filter(timbrado__empresa=self.instance).exists():
+                self.fields['nombre'].disabled = True
+                self.fields['ruc'].disabled = True
+                self.fields['nombre'].help_text = "No editable (la empresa tiene facturaciones asociadas)"
+                self.fields['ruc'].help_text = "No editable (la empresa tiene facturaciones asociadas)"
+
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
@@ -95,22 +105,20 @@ class ParadaForm(forms.ModelForm):
         cleaned_data = super().clean()
         empresa = cleaned_data.get('empresa')
         localidad = cleaned_data.get('localidad')
-        nombre = cleaned_data.get('nombre')
         
-        if empresa and localidad and nombre:
-            # Check for existing parada with same name in same locality for same company
+        if empresa and localidad:
+            # Check for any existing parada in the same locality for same company
             existe = Parada.objects.filter(
                 empresa=empresa, 
-                localidad=localidad, 
-                nombre__iexact=nombre
+                localidad=localidad
             )
             if self.instance.pk:
                 existe = existe.exclude(pk=self.instance.pk)
             
             if existe.exists():
                 raise forms.ValidationError(
-                    f"Ya existe una parada llamada '{nombre}' registrada para la empresa '{empresa}' "
-                    f"en '{localidad}'."
+                    f"Ya existe una parada registrada para la empresa '{empresa}' "
+                    f"en '{localidad}'. Solo se permite editar la existente."
                 )
         return cleaned_data
 
@@ -155,6 +163,13 @@ class BusForm(forms.ModelForm):
         
         # Si es edición, mostramos el campo para regenerar
         mostrar_regenerar = self.instance.pk is not None
+        
+        # Bloquear campos si el bus ya tiene viajes registrados
+        if self.instance.pk and self.instance.viajes.exists():
+            for field in ['empresa', 'numero_bus', 'placa', 'marca', 'modelo', 'capacidad_pisos', 'tipo_asiento']:
+                if field in self.fields:
+                    self.fields[field].disabled = True
+                    self.fields[field].help_text = "No se puede editar porque este bus ya tiene viajes registrados."
         
         self.helper.layout = Layout(
             Fieldset(

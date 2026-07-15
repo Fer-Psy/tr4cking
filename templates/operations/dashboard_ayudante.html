@@ -338,7 +338,7 @@
     </div>
 
     <!-- Mapa de Asientos -->
-    <div class="row row-cards mb-4">
+    <div class="row row-cards mb-4" id="mapa-asientos-refresh" hx-get="{% url 'operations:dashboard_ayudante' %}" hx-select="#mapa-asientos-refresh" hx-target="this" hx-swap="outerHTML" hx-trigger="every 15s">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -457,7 +457,7 @@
                     </div>
                     {% endif %}
 
-                    <div class="mt-4">
+                    <div class="mt-4" id="ventas-recientes-refresh" hx-get="{% url 'operations:dashboard_ayudante' %}" hx-select="#ventas-recientes-refresh" hx-target="this" hx-swap="outerHTML" hx-trigger="every 15s">
                         <h4 class="subheader mb-3">Ventas Recientes Hoy</h4>
                         <div class="table-responsive">
                             <table class="table table-vcenter">
@@ -538,7 +538,7 @@
                     
                     
                     <h4 class="subheader mb-2">Paquetes en el Bus</h4>
-                    <div id="encomiendas-list">
+                    <div id="encomiendas-list" hx-get="{% url 'operations:dashboard_ayudante' %}" hx-select="#encomiendas-list" hx-target="this" hx-swap="outerHTML" hx-trigger="every 15s">
                         {% for enc in encomiendas_viaje %}
                         <div class="encomienda-item p-2 shadow-sm mb-3">
                             <div class="d-flex justify-content-between align-items-start small mb-1">

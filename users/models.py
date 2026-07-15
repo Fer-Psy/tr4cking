@@ -105,6 +105,12 @@ class Persona(models.Model):
         verbose_name_plural = "Personas"
         ordering = ['apellido', 'nombre']
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.user and self.user.is_active != self.activo:
+            self.user.is_active = self.activo
+            self.user.save(update_fields=['is_active'])
+
     def __str__(self):
         return f"{self.apellido}, {self.nombre} ({self.cedula})"
 

@@ -413,7 +413,22 @@ class PrecioListView(AdminOnlyMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        return super().get_queryset().select_related('origen', 'destino')
+        qs = super().get_queryset().select_related('origen', 'destino', 'origen__localidad', 'destino__localidad')
+        q = self.request.GET.get('q')
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(origen__nombre__icontains=q) | 
+                Q(destino__nombre__icontains=q) |
+                Q(origen__localidad__nombre__icontains=q) |
+                Q(destino__localidad__nombre__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['q'] = self.request.GET.get('q', '')
+        return context
 
 
 class PrecioCreateView(AdminOnlyMixin, SuccessMessageMixin, CreateView):
@@ -551,20 +566,24 @@ class HorarioDeleteView(AdminOnlyMixin, DeleteView):
     def get_success_url(self):
         return reverse('itineraries:horario_list')
     
-    def post(self, request, *args, **kwargs):
+    def form_valid(self, form):
         try:
-            return super().post(request, *args, **kwargs)
+            self.object = self.get_object()
+            response = super().form_valid(form)
+            messages.success(self.request, "Horario eliminado del itinerario.")
+            return response
         except ProtectedError:
             messages.error(
-                request, 
+                self.request, 
                 "No se puede eliminar este horario porque hay viajes programados con él."
             )
-            return self.get(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, "Horario eliminado del itinerario.")
-        return response
+            return redirect(self.get_success_url())
+        except Exception as e:
+            messages.error(
+                self.request,
+                f"Ocurrió un error al intentar eliminar: {str(e)}"
+            )
+            return redirect(self.get_success_url())
 
 
 class HorarioCreateAjaxView(AdminOnlyMixin, CreateView):

@@ -36,6 +36,7 @@ class ViajeForm(forms.ModelForm):
         fields = ['empresa', 'itinerario', 'horario', 'fecha_viaje', 'bus', 'chofer', 'ayudantes', 'observaciones']
         widgets = {
             'fecha_viaje': forms.DateInput(
+                format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'form-control'}
             ),
             'ayudantes': forms.SelectMultiple(
@@ -65,7 +66,7 @@ class ViajeForm(forms.ModelForm):
         itinerario_id = None
         empresa_id = None
         
-        if self.instance.pk:
+        if self.instance and self.instance.pk:
             itinerario_id = self.instance.itinerario_id
             if self.instance.empresa_id:
                 empresa_id = self.instance.empresa_id
@@ -74,15 +75,13 @@ class ViajeForm(forms.ModelForm):
                 empresa_id = self.instance.itinerario.empresa_id
                 self.fields['empresa'].initial = empresa_id
         
-        if self.data.get('itinerario'):
-            itinerario_id = self.data.get('itinerario')
-        elif self.initial.get('itinerario'):
-            itinerario_id = self.initial.get('itinerario')
+        val_it = self.data.get('itinerario') or self.initial.get('itinerario')
+        if val_it:
+            itinerario_id = getattr(val_it, 'pk', val_it)
 
-        if self.data.get('empresa'):
-            empresa_id = self.data.get('empresa')
-        elif self.initial.get('empresa'):
-            empresa_id = self.initial.get('empresa')
+        val_emp = self.data.get('empresa') or self.initial.get('empresa')
+        if val_emp:
+            empresa_id = getattr(val_emp, 'pk', val_emp)
         
         # Si tenemos itinerario pero no empresa, intentar obtenerla del itinerario
         if itinerario_id and not empresa_id:
@@ -103,9 +102,12 @@ class ViajeForm(forms.ModelForm):
                     empresa_id=emp_id,
                     activo=True
                 )
-                self.fields['bus'].queryset = Bus.objects.filter(
-                    empresa_id=emp_id
-                ).order_by('placa')
+                bus_qs = Bus.objects.filter(empresa_id=emp_id)
+                if self.instance and self.instance.pk and self.instance.bus_id:
+                    bus_qs = bus_qs.filter(Q(estado='activo') | Q(id=self.instance.bus_id))
+                else:
+                    bus_qs = bus_qs.filter(estado='activo')
+                self.fields['bus'].queryset = bus_qs.order_by('placa')
                 self.fields['chofer'].queryset = Persona.objects.filter(
                     Q(es_chofer=True),
                     empresa_id=emp_id
@@ -123,16 +125,23 @@ class ViajeForm(forms.ModelForm):
                 itinerario_obj = Itinerario.objects.get(pk=it_id)
                 
                 # Permitir seleccionar horarios activos asignados al itinerario
-                self.fields['horario'].queryset = itinerario_obj.horarios.filter(
-                    activo=True
-                ).order_by('hora_salida')
+                horarios_qs = itinerario_obj.horarios.filter(activo=True)
+                
+                # Asegurar que el horario actual del viaje esté incluido (por si se desactivó)
+                if self.instance and self.instance.pk and self.instance.horario:
+                    horarios_qs = horarios_qs | Horario.objects.filter(pk=self.instance.horario.pk)
+                    
+                self.fields['horario'].queryset = horarios_qs.distinct().order_by('hora_salida')
                 self.fields['horario'].required = True
                 
                 # Si no se seleccionó empresa explícitamente, filtrar por la empresa del itinerario
                 if not empresa_id and itinerario_obj.empresa:
-                    self.fields['bus'].queryset = Bus.objects.filter(
-                        empresa=itinerario_obj.empresa
-                    ).order_by('placa')
+                    bus_qs = Bus.objects.filter(empresa=itinerario_obj.empresa)
+                    if self.instance and self.instance.pk and self.instance.bus_id:
+                        bus_qs = bus_qs.filter(Q(estado='activo') | Q(id=self.instance.bus_id))
+                    else:
+                        bus_qs = bus_qs.filter(estado='activo')
+                    self.fields['bus'].queryset = bus_qs.order_by('placa')
                     self.fields['chofer'].queryset = Persona.objects.filter(
                         Q(es_chofer=True),
                         empresa=itinerario_obj.empresa
@@ -208,6 +217,10 @@ class ViajeForm(forms.ModelForm):
             if exists:
                 raise ValidationError("Ya existe un viaje programado para este itinerario, horario y fecha.")
         
+        if bus and bus.estado != 'activo':
+            if not self.instance.pk or self.instance.bus_id != bus.id:
+                raise ValidationError({"bus": "El bus seleccionado no está activo (en mantenimiento o inactivo) y no puede ser asignado."})
+        
         if bus and horario and fecha:
             bus_exists = Viaje.objects.filter(
                 bus=bus,
@@ -261,7 +274,9 @@ class ViajeForm(forms.ModelForm):
                 Q(fecha_viaje=fecha, horario__hora_salida__lt=horario.hora_salida)
             ).order_by('-fecha_viaje', '-horario__hora_salida').first()
             
-            if last_trip and last_trip.itinerario == itinerario:
+            # Solo aplicamos esta validación estricta al crear un viaje nuevo, 
+            # para evitar que salte error al simplemente editar la hora de un viaje existente.
+            if not self.instance.pk and last_trip and last_trip.itinerario == itinerario:
                 raise ValidationError(f"{nombre_recurso} ({recurso}) acaba de realizar este mismo trayecto. Por lógica operativa, no puede hacer el mismo itinerario de ida dos veces seguidas sin haber hecho un viaje de regreso, ya que físicamente se encuentra en el destino.")
             
             # Viajes en el MISMO DÍA (fecha)
@@ -330,7 +345,7 @@ class PasajeVentaForm(forms.ModelForm):
             'hx-trigger': 'blur',
             'hx-target': '#info-pasajero',
             'hx-swap': 'innerHTML',
-            'hx-vals': 'js:{cedula: this.value}'
+            'hx-vals': 'js:{cedula: document.getElementById("id_cedula_pasajero").value}'
         })
     )
     
@@ -344,7 +359,7 @@ class PasajeVentaForm(forms.ModelForm):
             'hx-trigger': 'blur',
             'hx-target': '#info-cliente',
             'hx-swap': 'innerHTML',
-            'hx-vals': 'js:{cedula: this.value}'
+            'hx-vals': 'js:{cedula: document.getElementById("id_cedula_cliente").value}'
         })
     )
 
@@ -798,10 +813,26 @@ class TimbradoForm(forms.ModelForm):
         numero_hasta = cleaned_data.get('numero_hasta')
         
         if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+            from django.core.exceptions import ValidationError
             raise ValidationError("La fecha de inicio debe ser anterior a la fecha de fin.")
         
         if numero_desde and numero_hasta and numero_desde > numero_hasta:
+            from django.core.exceptions import ValidationError
             raise ValidationError("El número inicial debe ser menor al número final.")
+            
+        if empresa and fecha_inicio and fecha_fin:
+            from django.core.exceptions import ValidationError
+            existing = Timbrado.objects.filter(empresa=empresa)
+            if self.instance and self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+                
+            for t in existing:
+                if fecha_inicio <= t.fecha_fin and fecha_fin >= t.fecha_inicio:
+                    raise ValidationError(
+                        f"Las fechas de vigencia se superponen con el timbrado N° {t.numero} "
+                        f"válido desde {t.fecha_inicio.strftime('%d/%m/%Y')} "
+                        f"hasta {t.fecha_fin.strftime('%d/%m/%Y')}."
+                    )
         
         return cleaned_data
 
@@ -824,7 +855,7 @@ class FacturaForm(forms.ModelForm):
             'hx-trigger': 'blur',
             'hx-target': '#info-cliente-factura',
             'hx-swap': 'innerHTML',
-            'hx-vals': 'js:{cedula: this.value}'
+            'hx-vals': 'js:{cedula: document.getElementById("id_cedula_cliente").value}'
         })
     )
     
@@ -1071,7 +1102,8 @@ class MovimientoCajaForm(forms.ModelForm):
             'monto': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, sesion=None, **kwargs):
+        self.sesion = sesion
         super().__init__(*args, **kwargs)
         # Limitar conceptos para movimientos manuales
         self.fields['concepto'].choices = [
@@ -1085,6 +1117,25 @@ class MovimientoCajaForm(forms.ModelForm):
                 field.widget.attrs['class'] = 'form-select' if isinstance(
                     field, forms.ChoiceField
                 ) else 'form-control'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get('tipo')
+        concepto = cleaned_data.get('concepto')
+        monto = cleaned_data.get('monto')
+        
+        if tipo == 'ingreso' and concepto in ['gasto', 'retiro']:
+            self.add_error('concepto', "Un ingreso no puede ser un Gasto o Retiro.")
+        
+        if tipo == 'egreso' and concepto == 'deposito':
+            self.add_error('concepto', "Un egreso no puede ser un Depósito.")
+            
+        if tipo == 'egreso' and monto and self.sesion:
+            saldo_actual = self.sesion.calcular_cierre()
+            if saldo_actual < monto:
+                self.add_error('monto', f"No hay suficiente saldo en caja (Saldo actual: Gs. {saldo_actual}).")
+            
+        return cleaned_data
 
 
 # =============================================================================
