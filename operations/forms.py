@@ -640,6 +640,11 @@ class EncomiendaForm(forms.ModelForm):
                 'placeholder': 'Precio en Gs.'
             }),
         }
+        error_messages = {
+            'viaje': {
+                'required': "Debe seleccionar un bus/viaje disponible para registrar la encomienda.",
+            }
+        }
 
     def __init__(self, *args, viaje=None, empresa=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -651,11 +656,13 @@ class EncomiendaForm(forms.ModelForm):
             
             # Filtrar paradas del itinerario
             paradas_ids = viaje.itinerario.detalles.values_list('parada_id', flat=True)
-            paradas_queryset = Parada.objects.filter(id__in=list(paradas_ids)).order_by('nombre')
+            paradas_queryset = Parada.objects.filter(id__in=list(paradas_ids), es_agencia=True).order_by('nombre')
             self.fields['parada_origen'].queryset = paradas_queryset
             self.fields['parada_destino'].queryset = paradas_queryset
         else:
             # Si es creación directa, mostrar selector de viajes con info del bus
+            self.fields['parada_origen'].queryset = Parada.objects.filter(es_agencia=True).order_by('nombre')
+            self.fields['parada_destino'].queryset = Parada.objects.filter(es_agencia=True).order_by('nombre')
             from django.utils import timezone
             from django.db.models import Q
             
@@ -795,6 +802,7 @@ class TimbradoForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
             if 'class' not in field.widget.attrs:
@@ -807,6 +815,7 @@ class TimbradoForm(forms.ModelForm):
     
     def clean(self):
         cleaned_data = super().clean()
+        empresa = cleaned_data.get('empresa')
         fecha_inicio = cleaned_data.get('fecha_inicio')
         fecha_fin = cleaned_data.get('fecha_fin')
         numero_desde = cleaned_data.get('numero_desde')
@@ -822,6 +831,8 @@ class TimbradoForm(forms.ModelForm):
             
         if empresa and fecha_inicio and fecha_fin:
             from django.core.exceptions import ValidationError
+            from django.utils import timezone
+            
             existing = Timbrado.objects.filter(empresa=empresa)
             if self.instance and self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
@@ -833,6 +844,14 @@ class TimbradoForm(forms.ModelForm):
                         f"válido desde {t.fecha_inicio.strftime('%d/%m/%Y')} "
                         f"hasta {t.fecha_fin.strftime('%d/%m/%Y')}."
                     )
+            
+            # Check for existing active timbrado for Programador restriction
+            if not self.instance.pk: # Only for creation
+                now = timezone.now().date()
+                active_timbrados = existing.filter(activo=True, fecha_fin__gte=now)
+                if active_timbrados.exists():
+                    if not self.user or not self.user.is_superuser:
+                        raise ValidationError("Solo los Programadores pueden crear un nuevo timbrado si ya existe uno vigente y no vencido para esta empresa.")
         
         return cleaned_data
 

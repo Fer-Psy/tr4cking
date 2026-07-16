@@ -107,8 +107,10 @@ class Persona(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        if self.user and self.user.is_active != self.activo:
-            self.user.is_active = self.activo
+        tiene_rol = self.es_chofer or self.es_ayudante or self.es_cliente or self.es_agente or self.es_empleado
+        should_be_active = self.activo and tiene_rol
+        if self.user and self.user.is_active != should_be_active:
+            self.user.is_active = should_be_active
             self.user.save(update_fields=['is_active'])
 
     def __str__(self):

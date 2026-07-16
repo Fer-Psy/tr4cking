@@ -255,14 +255,14 @@ class DashboardAyudanteView(LoginRequiredMixin, TemplateView):
             itinerario__activo=True
         ).select_related('itinerario', 'bus', 'horario').first()
 
-        # Si no hay uno en curso, buscar el próximo programado para hoy
+        # Si no hay uno en curso, buscar el próximo programado para hoy o el futuro
         if not viaje_activo:
             viaje_activo = Viaje.objects.filter(
                 Q(chofer=persona) | Q(ayudantes=persona),
                 estado='programado',
-                fecha_viaje=hoy,
+                fecha_viaje__gte=hoy,
                 itinerario__activo=True
-            ).select_related('itinerario', 'bus', 'horario').order_by('horario__hora_salida').first()
+            ).select_related('itinerario', 'bus', 'horario').order_by('fecha_viaje', 'horario__hora_salida').first()
 
         context['viaje_activo'] = viaje_activo
 
@@ -1787,6 +1787,11 @@ class TimbradoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         context['empresas'] = Empresa.objects.all()
         return context
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
 
 class TimbradoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     """Editar timbrado."""
@@ -1795,6 +1800,11 @@ class TimbradoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'operations/timbrado_form.html'
     success_url = reverse_lazy('operations:timbrado_list')
     success_message = "Timbrado actualizado exitosamente."
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
     def dispatch(self, request, *args, **kwargs):
         timbrado = self.get_object()
@@ -1809,6 +1819,33 @@ class TimbradoUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['empresas'] = Empresa.objects.all()
         return context
+
+class TimbradoDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
+    """Eliminar timbrado."""
+    model = Timbrado
+    template_name = 'operations/timbrado_confirm_delete.html'
+    success_url = reverse_lazy('operations:timbrado_list')
+    success_message = "Timbrado eliminado exitosamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        timbrado = self.get_object()
+        if timbrado.facturas.exists():
+            from django.contrib import messages
+            from django.shortcuts import redirect
+            messages.error(request, "No se puede eliminar un timbrado que ya tiene facturas asociadas.")
+            return redirect('operations:timbrado_list')
+        return super().dispatch(request, *args, **kwargs)
+
+class TimbradoInhabilitarView(LoginRequiredMixin, View):
+    """Inhabilitar timbrado."""
+    def post(self, request, pk, *args, **kwargs):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        timbrado = get_object_or_404(Timbrado, pk=pk)
+        timbrado.activo = False
+        timbrado.save(update_fields=['activo'])
+        messages.success(request, f"Timbrado {timbrado.numero} inhabilitado exitosamente.")
+        return redirect('operations:timbrado_list')
 
 
 class FacturaListView(LoginRequiredMixin, ListView):
@@ -3143,17 +3180,19 @@ class CrearClienteAjaxView(LoginRequiredMixin, View):
         if not cedula or not nombre:
             return JsonResponse({'success': False, 'error': 'Cédula y Nombre son obligatorios.'}, status=400)
             
-        try:
-            cedula_int = int(cedula.replace('.', '').replace(' ', ''))
-        except ValueError:
-            return JsonResponse({'success': False, 'error': 'La cédula debe ser un número válido.'}, status=400)
+        cedula_clean = cedula.replace('.', '').replace(' ', '').upper()
+        cedula_base = cedula_clean.split('-')[0]
+        
+        if not cedula_base.isdigit():
+            return JsonResponse({'success': False, 'error': 'La cédula debe contener números válidos.'}, status=400)
             
-        if Persona.objects.filter(cedula=cedula_int).exists():
-            return JsonResponse({'success': False, 'error': 'Ya existe una persona registrada con esta cédula.'}, status=400)
+        from django.db.models import Q
+        if Persona.objects.filter(Q(cedula=cedula_clean) | Q(cedula=cedula_base) | Q(cedula__startswith=cedula_base + '-')).exists():
+            return JsonResponse({'success': False, 'error': 'Ya existe una persona registrada con esta cédula o RUC.'}, status=400)
             
         try:
             persona = Persona.objects.create(
-                cedula=cedula_int,
+                cedula=cedula_clean,
                 nombre=nombre,
                 apellido=apellido,
                 telefono=telefono,
@@ -3471,7 +3510,12 @@ class ViajeParadasView(LoginRequiredMixin, View):
         
         # Obtener paradas del itinerario
         paradas_ids = viaje.itinerario.detalles.values_list('parada_id', flat=True)
-        paradas = Parada.objects.filter(id__in=list(paradas_ids)).order_by('nombre')
+        paradas = Parada.objects.filter(id__in=list(paradas_ids))
+        
+        if request.GET.get('solo_agencias') == '1':
+            paradas = paradas.filter(es_agencia=True)
+            
+        paradas = paradas.order_by('nombre')
         
         paradas_data = [
             {'id': p.id, 'nombre': p.nombre}

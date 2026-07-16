@@ -251,6 +251,43 @@ class DetalleItinerarioForm(forms.ModelForm):
                 raise forms.ValidationError(f"Ya existe una parada con el orden {orden}.")
         return orden
 
+    def clean(self):
+        cleaned_data = super().clean()
+        orden = cleaned_data.get('orden')
+        minutos = cleaned_data.get('minutos_desde_origen')
+        distancia = cleaned_data.get('distancia_desde_origen_km')
+        
+        if self.itinerario and orden is not None:
+            if orden > 1:
+                if minutos == 0 or minutos is None:
+                    self.add_error('minutos_desde_origen', "Debe ingresar un valor mayor a 0 para paradas posteriores al origen.")
+                if distancia == 0 or distancia is None:
+                    self.add_error('distancia_desde_origen_km', "Debe ingresar una distancia mayor a 0 para paradas posteriores al origen.")
+                    
+            anterior = DetalleItinerario.objects.filter(
+                itinerario=self.itinerario, 
+                orden__lt=orden
+            ).order_by('-orden').first()
+            
+            if anterior:
+                if minutos is not None and anterior.minutos_desde_origen is not None and minutos <= anterior.minutos_desde_origen:
+                    self.add_error('minutos_desde_origen', f"Debe ser mayor a la parada anterior (Orden {anterior.orden}: {anterior.minutos_desde_origen} min).")
+                if distancia is not None and anterior.distancia_desde_origen_km is not None and distancia <= anterior.distancia_desde_origen_km:
+                    self.add_error('distancia_desde_origen_km', f"Debe ser mayor a la parada anterior (Orden {anterior.orden}: {anterior.distancia_desde_origen_km} km).")
+
+            siguiente = DetalleItinerario.objects.filter(
+                itinerario=self.itinerario, 
+                orden__gt=orden
+            ).order_by('orden').first()
+            
+            if siguiente:
+                if minutos is not None and siguiente.minutos_desde_origen is not None and minutos >= siguiente.minutos_desde_origen:
+                    self.add_error('minutos_desde_origen', f"Debe ser menor a la parada siguiente (Orden {siguiente.orden}: {siguiente.minutos_desde_origen} min).")
+                if distancia is not None and siguiente.distancia_desde_origen_km is not None and distancia >= siguiente.distancia_desde_origen_km:
+                    self.add_error('distancia_desde_origen_km', f"Debe ser menor a la parada siguiente (Orden {siguiente.orden}: {siguiente.distancia_desde_origen_km} km).")
+                    
+        return cleaned_data
+
 
 class HorarioForm(forms.ModelForm):
     """Formulario para crear/editar horarios de salida."""

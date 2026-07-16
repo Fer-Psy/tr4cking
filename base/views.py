@@ -15,17 +15,17 @@ from django.shortcuts import redirect
 from django.http import HttpResponse
 
 def debug_view_2(request):
-    from operations.utils import normalize_search
-    from fleet.models import Parada
-    p9 = Parada.objects.filter(id=9).first()
-    p13 = Parada.objects.filter(id=13).first()
+    from operations.models import Encomienda
+    encs = Encomienda.objects.filter(codigo__icontains='030')
+    out = []
+    for enc in encs:
+        s = f"ID: {enc.id}, Codigo: {enc.codigo}, Estado: {enc.estado}, Viaje ID: {enc.viaje_id}"
+        if enc.viaje:
+            s += f" | Viaje: {enc.viaje.estado}, Fecha: {enc.viaje.fecha_viaje}"
+        out.append(s)
     
-    out = [
-        f"P9 ({p9.nombre}): {normalize_search(p9.nombre)}",
-        f"P9 loc: {normalize_search(p9.localidad.nombre) if p9.localidad else 'None'}",
-        f"P13 ({p13.nombre}): {normalize_search(p13.nombre)}",
-        f"P13 loc: {normalize_search(p13.localidad.nombre) if p13.localidad else 'None'}"
-    ]
+    if not out:
+        out = ["No found 030"]
     return HttpResponse('<br>'.join(out))
 
 def debug_view(request):

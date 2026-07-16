@@ -75,6 +75,8 @@ urlpatterns = [
     path('timbrados/', views.TimbradoListView.as_view(), name='timbrado_list'),
     path('timbrados/nuevo/', views.TimbradoCreateView.as_view(), name='timbrado_create'),
     path('timbrados/<int:pk>/editar/', views.TimbradoUpdateView.as_view(), name='timbrado_update'),
+    path('timbrados/<int:pk>/eliminar/', views.TimbradoDeleteView.as_view(), name='timbrado_delete'),
+    path('timbrados/<int:pk>/inhabilitar/', views.TimbradoInhabilitarView.as_view(), name='timbrado_inhabilitar'),
     path('timbrados/<int:pk>/siguiente-numero/', views.TimbradoSiguienteNumeroView.as_view(), name='timbrado_siguiente'),
     
     path('facturacion/pendientes/', views.ClientesPendientesFacturaView.as_view(), name='clientes_pendientes_factura'),

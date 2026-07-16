@@ -688,6 +688,12 @@ class Timbrado(models.Model):
         hoy = timezone.now().date()
         return self.fecha_inicio <= hoy <= self.fecha_fin and self.activo
 
+    @property
+    def esta_vencido(self):
+        """Verifica si el timbrado ya venció."""
+        hoy = timezone.now().date()
+        return self.fecha_fin < hoy
+
     def get_siguiente_numero(self):
         """Obtiene el siguiente número de factura disponible."""
         ultima = self.facturas.order_by('-numero_factura').first()

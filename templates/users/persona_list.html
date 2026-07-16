@@ -43,7 +43,7 @@
                             <span class="input-icon-addon">
                                 <i class="bi bi-search text-muted"></i>
                             </span>
-                            <input type="text" name="search" class="form-control" value="{{ search }}" placeholder="Buscar personas por nombre, apellido, cédula o teléfono..." aria-label="Buscar personas">
+                            <input type="text" name="search" class="form-control" value="{{ search }}" placeholder="Buscar personas por nombre, apellido, cédula, teléfono o empresa..." aria-label="Buscar personas">
                         </div>
                     </div>
                     
@@ -98,7 +98,13 @@
                     <tbody>
                         {% for persona in personas %}
                         <tr>
-                            <td><span class="text-secondary">{{ persona.cedula }}</span></td>
+                            <td>
+                                {% if persona.es_cedula_autogenerada %}
+                                    <span class="text-muted">-</span>
+                                {% else %}
+                                    <span class="text-secondary">{{ persona.cedula }}</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <a href="{% url 'users:persona_detail' persona.pk %}" class="text-reset" tabindex="-1">{{ persona.nombre_completo }}</a>
                             </td>

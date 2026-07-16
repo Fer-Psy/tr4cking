@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (viajeId) {
                 const currentOrigen = paradaOrigen ? paradaOrigen.value : '';
                 const currentDestino = paradaDestino ? paradaDestino.value : '';
-                fetch(`/operations/viajes/${viajeId}/paradas/?origen=${currentOrigen}&destino=${currentDestino}`)
+                fetch(`/operations/viajes/${viajeId}/paradas/?origen=${currentOrigen}&destino=${currentDestino}&solo_agencias=1`)
                     .then(response => response.json())
                     .then(data => {
                         updateParadaOptions(paradaOrigen, data.paradas, data.mapped_origen);

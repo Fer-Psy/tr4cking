@@ -66,7 +66,8 @@ class PersonaListView(LoginRequiredMixin, ListView):
                 Q(cedula__icontains=search) |
                 Q(nombre__icontains=search) |
                 Q(apellido__icontains=search) |
-                Q(telefono__icontains=search)
+                Q(telefono__icontains=search) |
+                Q(empresa__nombre__icontains=search)
             )
         
         # Role filter

@@ -1,0 +1,36 @@
+{% extends 'layouts/base_tabler.html' %}
+
+{% block title %}Eliminar Timbrado - TR4CKING{% endblock %}
+{% block title_content %}Eliminar Timbrado{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Confirmar Eliminación
+                </h3>
+            </div>
+            <div class="card-body">
+                <p>¿Está seguro de que desea eliminar el timbrado <strong>N° {{ object.numero }}</strong> de la empresa <strong>{{ object.empresa.nombre }}</strong>?</p>
+                <p class="text-danger">
+                    <i class="bi bi-exclamation-circle me-1"></i> Esta acción no se puede deshacer.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-end mt-4">
+                        <a href="{% url 'operations:timbrado_list' %}" class="btn btn-outline-secondary me-2">
+                            Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i> Eliminar Timbrado
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -70,6 +70,21 @@
                             class="btn btn-sm btn-outline-primary" title="Editar">
                             <i class="bi bi-pencil"></i>
                         </a>
+                        {% if not timbrado.facturas.exists %}
+                        <form action="{% url 'operations:timbrado_delete' timbrado.pk %}" method="get" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if timbrado.esta_vencido and timbrado.activo %}
+                        <form action="{% url 'operations:timbrado_inhabilitar' timbrado.pk %}" method="post" class="d-inline" onsubmit="return confirm('¿Está seguro de inhabilitar este timbrado vencido?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Inhabilitar">
+                                <i class="bi bi-pause-circle"></i>
+                            </button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
