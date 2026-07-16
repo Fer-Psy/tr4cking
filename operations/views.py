@@ -2144,28 +2144,26 @@ class CancelarTodoPendienteView(LoginRequiredMixin, View):
         # Cancelar pasajes
         pasajes = Pasaje.objects.filter(
             Q(pasajero=persona) | Q(cliente=persona),
-            estado='reservado'
+            estado__in=['vendido', 'reservado', 'abordado']
         ).exclude(
             detalles_factura__factura__estado='emitida'
         )
         
         count_pasajes = pasajes.count()
         for p in pasajes:
-            p.estado = 'cancelado'
-            p.save()
+            p.delete()
             
         # Cancelar encomiendas
         encomiendas = Encomienda.objects.filter(
             remitente=persona,
-            estado='registrado'
+            estado__in=['registrado', 'entregado', 'en_ruta', 'en_terminal']
         ).exclude(
             detalles_factura__factura__estado='emitida'
         )
         
         count_encomiendas = encomiendas.count()
         for e in encomiendas:
-            e.estado = 'cancelado'
-            e.save()
+            e.delete()
             
         messages.success(request, f"Se han cancelado {count_pasajes} pasajes y {count_encomiendas} encomiendas de {persona.nombre_completo}.")
         return redirect('operations:clientes_pendientes_factura')

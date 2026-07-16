@@ -92,9 +92,6 @@
                     {% else %}
                     {{ user.username }}
                     {% endif %}
-                    {% if user.is_superuser %}
-                    <span class="badge bg-red text-red-fg ms-2" style="font-size: 0.7rem;">Administrador</span>
-                    {% endif %}
                 </div>
                 <div class="sidebar-user-role">
                     {% if user.is_superuser %}Administrador{% else %}Usuario{% endif %}

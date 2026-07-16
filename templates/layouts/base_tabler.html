@@ -54,9 +54,6 @@
                             <div class="d-none d-xl-block ps-2">
                                 <div class="d-flex align-items-center">
                                     <span class="font-weight-medium me-2">{{ user.username }}</span>
-                                    {% if user.is_superuser %}
-                                    <span class="badge bg-red-lt">Administrador</span>
-                                    {% endif %}
                                 </div>
                                 <div class="mt-1 small text-muted">
                                     {% if user.is_superuser %}Administrador{% else %}Usuario{% endif %}
