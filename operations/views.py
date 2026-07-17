@@ -4705,247 +4705,256 @@ class CrearReservaClienteView(LoginRequiredMixin, View):
             except Viaje.DoesNotExist:
                 return JsonResponse({'error': 'Viaje no encontrado'}, status=404)
 
-        if viaje.reservas_bloqueadas:
-            return JsonResponse({'error': 'Este viaje ya no admite nuevas reservas (bus lleno).'}, status=403)
+            if viaje.reservas_bloqueadas:
+                return JsonResponse({'error': 'Este viaje ya no admite nuevas reservas (bus lleno).'}, status=403)
 
-        asiento_ids = body.get('asiento_ids', [])
-        # Caso retrocompatible
-        if not asiento_ids and body.get('asiento_id'):
-            asiento_ids = [body.get('asiento_id')]
+            asiento_ids = body.get('asiento_ids', [])
+            # Caso retrocompatible
+            if not asiento_ids and body.get('asiento_id'):
+                asiento_ids = [body.get('asiento_id')]
 
-        parada_origen_id = body.get('parada_origen_id')
-        parada_destino_id = body.get('parada_destino_id')
+            parada_origen_id = body.get('parada_origen_id')
+            parada_destino_id = body.get('parada_destino_id')
 
-        if not all([asiento_ids, parada_origen_id, parada_destino_id]):
-            return JsonResponse({
-                'error': 'Asiento, parada origen y parada destino son requeridos'
-            }, status=400)
-
-        persona = getattr(request.user, 'persona', None)
-        if not persona:
-            return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
-
-        # Verificar si ya tiene una reserva para este viaje o para el mismo día
-        confirmar = body.get('confirmar', False)
-        if not confirmar:
-            # 1. Misma reserva específica
-            tiene_misma = Pasaje.objects.filter(
-                viaje=viaje,
-                pasajero=persona,
-                estado__in=['reservado', 'vendido', 'abordado']
-            ).exists()
-            
-            # 2. Otras reservas el mismo día
-            otras_reservas = Pasaje.objects.filter(
-                viaje__fecha_viaje=viaje.fecha_viaje,
-                pasajero=persona,
-                estado__in=['reservado', 'vendido', 'abordado']
-            ).exclude(viaje=viaje).select_related('viaje__empresa')
-
-            empresa_actual = viaje.empresa.nombre if viaje.empresa else (viaje.bus.empresa.nombre if viaje.bus.empresa else "la empresa")
-            
-            if tiene_misma:
+            if not all([asiento_ids, parada_origen_id, parada_destino_id]):
                 return JsonResponse({
-                    'warning': f'Usted ya cuenta con una reserva o pasaje activo para este viaje con {empresa_actual}.',
-                    'confirmacion_requerida': True
-                })
-            elif otras_reservas.exists():
-                r_otra = otras_reservas.first()
-                empresa_otra = r_otra.viaje.empresa.nombre if r_otra.viaje.empresa else "otra empresa"
-                return JsonResponse({
-                    'warning': (
-                        f'Usted ya tiene una reserva para este mismo día ({viaje.fecha_viaje.strftime("%d/%m/%Y")}) '
-                        f'con la empresa {empresa_otra}.'
-                    ),
-                    'confirmacion_requerida': True
-                })
+                    'error': 'Asiento, parada origen y parada destino son requeridos'
+                }, status=400)
 
-        # Validar paradas
-        from .utils import obtener_orden_parada, asiento_disponible_en_tramo
-        from fleet.models import Asiento
+            persona = getattr(request.user, 'persona', None)
+            if not persona:
+                return JsonResponse({'error': 'Usuario sin perfil persona'}, status=403)
 
-        try:
-            parada_origen = Parada.objects.get(pk=parada_origen_id)
-            parada_destino = Parada.objects.get(pk=parada_destino_id)
-        except Parada.DoesNotExist:
-            return JsonResponse({'error': 'Parada no encontrada'}, status=404)
+            # Verificar si ya tiene una reserva para este viaje o para el mismo día
+            confirmar = body.get('confirmar', False)
+            if not confirmar:
+                # 1. Misma reserva específica
+                tiene_misma = Pasaje.objects.filter(
+                    viaje=viaje,
+                    pasajero=persona,
+                    estado__in=['reservado', 'vendido', 'abordado']
+                ).exists()
 
-        orden_origen = obtener_orden_parada(viaje, parada_origen)
-        orden_destino = obtener_orden_parada(viaje, parada_destino)
+                # 2. Reserva para el mismo día en cualquier otro viaje
+                otras_reservas = Pasaje.objects.filter(
+                    viaje__fecha_viaje=viaje.fecha_viaje,
+                    pasajero=persona,
+                    estado__in=['reservado', 'vendido', 'abordado']
+                ).exclude(viaje=viaje).select_related('viaje__empresa')
 
-        if orden_origen is None or orden_destino is None:
-            return JsonResponse({'error': 'Paradas no pertenecen al itinerario'}, status=400)
+                empresa_actual = viaje.empresa.nombre if viaje.empresa else (viaje.bus.empresa.nombre if viaje.bus.empresa else "la empresa")
 
-        if orden_origen >= orden_destino:
-            return JsonResponse({'error': 'Origen debe ser anterior al destino'}, status=400)
-
-        # Validar disponibilidad de TODOS los asientos solicitados
-        asientos = []
-        for a_id in asiento_ids:
-            try:
-                asiento = Asiento.objects.get(pk=a_id, bus=viaje.bus)
-                if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
+                if tiene_misma:
                     return JsonResponse({
-                        'error': f'El asiento {asiento.numero_asiento} ya no está disponible en ese tramo'
-                    }, status=409)
-                asientos.append(asiento)
-            except Asiento.DoesNotExist:
-                 return JsonResponse({'error': f'Asiento ID {a_id} no encontrado'}, status=404)
+                        'warning': f'Usted ya cuenta con una reserva o pasaje activo para este viaje con {empresa_actual}.',
+                        'confirmacion_requerida': True
+                    })
+                elif otras_reservas.exists():
+                    r_otra = otras_reservas.first()
+                    empresa_otra = r_otra.viaje.empresa.nombre if r_otra.viaje.empresa else "otra empresa"
+                    return JsonResponse({
+                        'warning': (
+                            f'Usted ya tiene una reserva para este mismo día ({viaje.fecha_viaje.strftime("%d/%m/%Y")}) '
+                            f'con la empresa {empresa_otra}.'
+                        ),
+                        'confirmacion_requerida': True
+                    })
 
-        # Calcular precio (Lookup flexible con fallbacks)
-        precio = None
-        # 1. Intento por paradas directas
-        precio_alternativo = Precio.objects.filter(
-            origen=parada_origen,
-            destino=parada_destino
-        ).first()
-        if precio_alternativo:
-            precio = precio_alternativo.precio
-        else:
-            # 2. Intento por NOMBRES
-            precio_por_nombre = Precio.objects.filter(
-                origen__nombre=parada_origen.nombre,
-                destino__nombre=parada_destino.nombre
-            ).first()
-            if precio_por_nombre:
-                precio = precio_por_nombre.precio
-            else:
-                # 3. Intento por LOCALIDADES
-                precio_localidad = Precio.objects.filter(
-                    origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
-                    destino__localidad__nombre__iexact=parada_destino.localidad.nombre
-                ).first()
-                if precio_localidad:
-                    precio = precio_localidad.precio
-                else:
-                    # 4. Intento Fuzzy
-                    o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                    d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
-                    if len(o_search) > 3 and len(d_search) > 3:
-                        precio_fuzzy = Precio.objects.filter(
-                            Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
-                            Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
-                        ).first()
-                        if precio_fuzzy:
-                            precio = precio_fuzzy.precio
+            # Validar paradas
+            from .utils import obtener_orden_parada, asiento_disponible_en_tramo
+            from fleet.models import Asiento
 
-        if precio is None:
-            return JsonResponse({
-                'error': 'No hay precio definido para ese tramo. Contacte a la empresa.'
-            }, status=400)
+            try:
+                parada_origen = Parada.objects.get(pk=parada_origen_id)
+                parada_destino = Parada.objects.get(pk=parada_destino_id)
+            except Parada.DoesNotExist:
+                return JsonResponse({'error': 'Parada no encontrada'}, status=404)
 
-        from datetime import datetime, timedelta
-        
-        detalle_origen = viaje.itinerario.detalles.filter(parada=parada_origen).first()
-        minutos_origen = detalle_origen.minutos_desde_origen if detalle_origen and detalle_origen.minutos_desde_origen else 0
+            orden_origen = obtener_orden_parada(viaje, parada_origen)
+            orden_destino = obtener_orden_parada(viaje, parada_destino)
 
-        if viaje.horario:
-            fecha_hora_salida_origen = timezone.make_aware(
-                datetime.combine(viaje.fecha_viaje, viaje.horario.hora_salida)
-            )
-            fecha_hora_llegada_parada = fecha_hora_salida_origen + timedelta(minutes=minutos_origen)
-            limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
-            hora_salida_str = viaje.horario.hora_salida.strftime("%H:%M")
-        else:
-            fecha_hora_llegada_parada = timezone.now() + timedelta(minutes=minutos_origen)
-            limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
-            hora_salida_str = "--:--"
-            
-        if timezone.now() >= limite_pago:
-            return JsonResponse({
-                'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la llegada del bus a su parada) ha concluido.'
-            }, status=400)
+            if orden_origen is None or orden_destino is None:
+                return JsonResponse({'error': 'Paradas no pertenecen al itinerario'}, status=400)
 
-        # Manejar datos de facturación (cliente pagador opcional)
-        facturacion_data = body.get('facturacion', {})
-        cliente_pagador = None
-        if facturacion_data.get('usar_otros_datos'):
-            ruc_ci_raw = facturacion_data.get('ruc', '')
-            razon_social = facturacion_data.get('nombre', '')
-            
-            import re
-            ruc_ci_clean = re.sub(r'[^0-9]', '', str(ruc_ci_raw))
-            
-            if ruc_ci_clean and razon_social:
-                from users.models import Persona
+            if orden_origen >= orden_destino:
+                return JsonResponse({'error': 'Origen debe ser anterior al destino'}, status=400)
+
+            # Validar disponibilidad de TODOS los asientos solicitados
+            asientos = []
+            for a_id in asiento_ids:
                 try:
-                    cliente_pagador = Persona.objects.get(cedula=int(ruc_ci_clean))
-                except Persona.DoesNotExist:
-                    # Crear nueva persona para facturación
-                    parts = razon_social.split(' ', 1)
-                    if len(parts) > 1:
-                        p_nom, p_ape = parts[0], parts[1]
+                    asiento = Asiento.objects.get(pk=a_id, bus=viaje.bus)
+                    if not asiento_disponible_en_tramo(viaje, asiento, orden_origen, orden_destino):
+                        return JsonResponse({
+                            'error': f'El asiento {asiento.numero_asiento} ya no está disponible en ese tramo'
+                        }, status=409)
+                    asientos.append(asiento)
+                except Asiento.DoesNotExist:
+                     return JsonResponse({'error': f'Asiento ID {a_id} no encontrado'}, status=404)
+
+            # Calcular precio (Lookup flexible con fallbacks)
+            precio = None
+            # 1. Intento por paradas directas
+            precio_alternativo = Precio.objects.filter(
+                origen=parada_origen,
+                destino=parada_destino
+            ).first()
+
+            if precio_alternativo:
+                precio = precio_alternativo.precio
+            else:
+                # 2. Intento por NOMBRES
+                precio_por_nombre = Precio.objects.filter(
+                    origen__nombre=parada_origen.nombre,
+                    destino__nombre=parada_destino.nombre
+                ).first()
+                if precio_por_nombre:
+                    precio = precio_por_nombre.precio
+                else:
+                    # 3. Intento por LOCALIDADES
+                    precio_localidad = Precio.objects.filter(
+                        origen__localidad__nombre__iexact=parada_origen.localidad.nombre,
+                        destino__localidad__nombre__iexact=parada_destino.localidad.nombre
+                    ).first()
+                    if precio_localidad:
+                        precio = precio_localidad.precio
                     else:
-                        p_nom, p_ape = razon_social, '.'
-                    cliente_pagador = Persona.objects.create(
-                        cedula=int(ruc_ci_clean),
-                        nombre=p_nom,
-                        apellido=p_ape,
-                        es_cliente=True
+                        # 4. Intento Fuzzy
+                        o_search = parada_origen.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        d_search = parada_destino.localidad.nombre.replace('Terminal', '').replace('de', '').strip()
+                        if len(o_search) > 3 and len(d_search) > 3:
+                            precio_fuzzy = Precio.objects.filter(
+                                Q(origen__localidad__nombre__icontains=o_search) | Q(origen__nombre__icontains=o_search),
+                                Q(destino__localidad__nombre__icontains=d_search) | Q(destino__nombre__icontains=d_search)
+                            ).first()
+                            if precio_fuzzy:
+                                precio = precio_fuzzy.precio
+
+            if precio is None:
+                return JsonResponse({
+                    'error': 'No hay precio definido para ese tramo. Contacte a la empresa.'
+                }, status=400)
+
+            from datetime import datetime, timedelta
+            
+            detalle_origen = viaje.itinerario.detalles.filter(parada=parada_origen).first()
+            minutos_origen = detalle_origen.minutos_desde_origen if detalle_origen and detalle_origen.minutos_desde_origen else 0
+
+            if viaje.horario:
+                fecha_hora_salida_origen = timezone.make_aware(
+                    datetime.combine(viaje.fecha_viaje, viaje.horario.hora_salida)
+                )
+                fecha_hora_llegada_parada = fecha_hora_salida_origen + timedelta(minutes=minutos_origen)
+                limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
+                hora_salida_str = viaje.horario.hora_salida.strftime("%H:%M")
+            else:
+                fecha_hora_llegada_parada = timezone.now() + timedelta(minutes=minutos_origen)
+                limite_pago = fecha_hora_llegada_parada - timedelta(minutes=30)
+                hora_salida_str = "--:--"
+                
+            if timezone.now() >= limite_pago:
+                return JsonResponse({
+                    'error': 'Ya no es posible realizar reservas, el plazo (hasta 30 min antes de la llegada del bus a su parada) ha concluido.'
+                }, status=400)
+
+            # Manejar datos de facturación (cliente pagador opcional)
+            facturacion_data = body.get('facturacion', {})
+            cliente_pagador = None
+            if facturacion_data.get('usar_otros_datos'):
+                ruc_ci_raw = facturacion_data.get('ruc', '')
+                razon_social = facturacion_data.get('nombre', '')
+                
+                import re
+                ruc_ci_clean = re.sub(r'[^0-9]', '', str(ruc_ci_raw))
+                
+                if ruc_ci_clean and razon_social:
+                    from users.models import Persona
+                    try:
+                        cliente_pagador = Persona.objects.get(cedula=int(ruc_ci_clean))
+                    except Persona.DoesNotExist:
+                        # Crear nueva persona para facturación
+                        parts = razon_social.split(' ', 1)
+                        if len(parts) > 1:
+                            p_nom, p_ape = parts[0], parts[1]
+                        else:
+                            p_nom, p_ape = razon_social, '.'
+                        cliente_pagador = Persona.objects.create(
+                            cedula=int(ruc_ci_clean),
+                            nombre=p_nom,
+                            apellido=p_ape,
+                            es_cliente=True
+                        )
+                    except (ValueError, TypeError):
+                        pass
+
+            # Crear reservas
+            pasajes = []
+            try:
+                for asiento in asientos:
+                    pasaje = Pasaje(
+                        viaje=viaje,
+                        asiento=asiento,
+                        pasajero=persona,
+                        cliente=cliente_pagador,
+                        parada_origen=parada_origen,
+                        parada_destino=parada_destino,
+                        orden_origen=orden_origen,
+                        orden_destino=orden_destino,
+                        precio=precio,
+                        estado='reservado',
+                        vendedor=request.user,
+                        fecha_limite_pago=limite_pago,
                     )
-                except (ValueError, TypeError):
-                    pass
+                    pasaje.save()
+                    pasajes.append(pasaje)
+            except Exception as e:
+                import traceback
+                return JsonResponse({'error': f"Exception: {str(e)}\n\n{traceback.format_exc()}"}, status=400)
 
-        # Crear reservas
-        pasajes = []
-        for asiento in asientos:
-            pasaje = Pasaje(
-                viaje=viaje,
-                asiento=asiento,
-                pasajero=persona,
-                cliente=cliente_pagador,
-                parada_origen=parada_origen,
-                parada_destino=parada_destino,
-                orden_origen=orden_origen,
-                orden_destino=orden_destino,
-                precio=precio,
-                estado='reservado',
-                vendedor=request.user,
-                fecha_limite_pago=limite_pago,
-            )
-            pasaje.save()
-            pasajes.append(pasaje)
+            # Generar data de respuesta (usamos el primer pasaje para la cabecera)
+            p_main = pasajes[0]
+            codigos = ", ".join([p.codigo for p in pasajes])
+            numero_asientos = ", ".join([str(p.asiento.numero_asiento) for p in pasajes])
+            try:
+                precio_total = sum([p.precio for p in pasajes])
+            except Exception as e:
+                # Fallback por si sum() falla con Decimal
+                precio_total = p_main.precio * len(pasajes)
 
-        # Generar data de respuesta (usamos el primer pasaje para la cabecera)
-        p_main = pasajes[0]
-        codigos = ", ".join([p.codigo for p in pasajes])
-        numero_asientos = ", ".join([str(p.asiento.numero_asiento) for p in pasajes])
-        precio_total = sum([p.precio for p in pasajes])
+            comprobante_url = reverse('operations:pasaje_comprobante', kwargs={'pk': p_main.pk})
+            if len(pasajes) > 1:
+                 # Nota: Se podría crear una vista de comprobante grupal, por ahora permitimos ver el primero
+                 # y listamos todos los códigos si es necesario.
+                 pass
 
-        comprobante_url = reverse('operations:pasaje_comprobante', kwargs={'pk': p_main.pk})
-        if len(pasajes) > 1:
-             # Nota: Se podría crear una vista de comprobante grupal, por ahora permitimos ver el primero
-             # y listamos todos los códigos si es necesario.
-             pass
+            nombre_origen_itinerario = viaje.itinerario.nombre_origen
+            hora_llegada_str = fecha_hora_llegada_parada.strftime('%H:%M')
+            hora_limite_str = p_main.fecha_limite_pago.strftime('%H:%M')
 
-        nombre_origen_itinerario = viaje.itinerario.nombre_origen
-        hora_llegada_str = fecha_hora_llegada_parada.strftime('%H:%M')
-        hora_limite_str = p_main.fecha_limite_pago.strftime('%H:%M')
-
-        return JsonResponse({
-            'ok': True,
-            'pasaje': {
-                'id': p_main.pk,
-                'codigo': codigos,
-                'descripcion': p_main.descripcion,
-                'asiento': numero_asientos,
-                'origen': parada_origen.nombre,
-                'destino': parada_destino.nombre,
-                'cliente_nombre': p_main.cliente.nombre_completo if p_main.cliente else None,
-                'precio': float(precio_total),
-                'fecha_limite_pago': p_main.fecha_limite_pago.strftime('%d/%m/%Y %H:%M'),
-                'estado': 'reservado',
-                'comprobante_url': comprobante_url,
-                'cantidad': len(pasajes),
-            },
-            'mensaje': (
-                f'¡Reserva confirmada de {len(pasajes)} asiento(s)! Asientos: {numero_asientos}. '
-                f'El bus saldrá de {nombre_origen_itinerario} a las {hora_salida_str} hs. '
-                f'De acuerdo a los minutos de viaje, su hora estimada de abordaje en {parada_origen.nombre} es a las {hora_llegada_str} hs. '
-                f'Por favor, acérquese a su parada hasta 30 minutos antes (Límite: {hora_limite_str} hs) para abonar, '
-                f'de lo contrario su reserva se cancela automáticamente y los asientos quedarán libres.'
-            )
-        })
+            return JsonResponse({
+                'ok': True,
+                'pasaje': {
+                    'id': p_main.pk,
+                    'codigo': codigos,
+                    'descripcion': p_main.descripcion,
+                    'asiento': numero_asientos,
+                    'origen': parada_origen.nombre,
+                    'destino': parada_destino.nombre,
+                    'cliente_nombre': p_main.cliente.nombre_completo if p_main.cliente else None,
+                    'precio': float(precio_total),
+                    'fecha_limite_pago': p_main.fecha_limite_pago.strftime('%d/%m/%Y %H:%M'),
+                    'estado': 'reservado',
+                    'comprobante_url': comprobante_url,
+                    'cantidad': len(pasajes),
+                },
+                'mensaje': (
+                    f'¡Reserva confirmada de {len(pasajes)} asiento(s)! Asientos: {numero_asientos}. '
+                    f'El bus saldrá de {nombre_origen_itinerario} a las {hora_salida_str} hs. '
+                    f'De acuerdo a los minutos de viaje, su hora estimada de abordaje en {parada_origen.nombre} es a las {hora_llegada_str} hs. '
+                    f'Por favor, acérquese a su parada hasta 30 minutos antes (Límite: {hora_limite_str} hs) para abonar, '
+                    f'de lo contrario su reserva se cancela automáticamente y los asientos quedarán libres.'
+                )
+            })
 
 
 class PasajeComprobanteView(LoginRequiredMixin, DetailView):

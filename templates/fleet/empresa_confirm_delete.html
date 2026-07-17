@@ -46,8 +46,7 @@
                             <i class="bi bi-x-lg me-2"></i>
                             Cancelar
                         </a>
-                        <button type="submit" class="btn btn-danger" {% if object.buses.exists or object.paradas.exists
-                            %}disabled{% endif %}>
+                        <button type="submit" class="btn btn-danger" {% if object.buses.exists or object.paradas.exists %}disabled{% endif %}>
                             <i class="bi bi-trash me-2"></i>
                             Sí, eliminar
                         </button>
